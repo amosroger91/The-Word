@@ -9,7 +9,9 @@ export interface SpeechChunk {
 export type SpeechState = 'idle' | 'speaking' | 'paused';
 
 // Owns the verse queue and the play/pause state machine; the adapter only has to speak one chunk.
-export function useSpeech(adapter: SpeechAdapter, options: SpeakOptions) {
+// onComplete fires when the queue drains on its own (not on stop, pause, or error), which is how
+// continuous read-aloud knows a chapter finished and it may advance to the next one.
+export function useSpeech(adapter: SpeechAdapter, options: SpeakOptions, onComplete?: () => void) {
   const [state, setState] = useState<SpeechState>('idle');
   const [speakingVerse, setSpeakingVerse] = useState<number | null>(null);
   const [error, setError] = useState('');
@@ -17,6 +19,9 @@ export function useSpeech(adapter: SpeechAdapter, options: SpeakOptions) {
   const queueRef = useRef<SpeechChunk[]>([]);
   const indexRef = useRef(0);
   const optionsRef = useRef(options);
+  // Held in a ref so run() always calls the latest callback without being re-created.
+  const onCompleteRef = useRef(onComplete);
+  useEffect(() => { onCompleteRef.current = onComplete; });
 
   useEffect(() => {
     optionsRef.current = options;
@@ -44,6 +49,7 @@ export function useSpeech(adapter: SpeechAdapter, options: SpeakOptions) {
       }
       setSpeakingVerse(null);
       setState('idle');
+      onCompleteRef.current?.();
     } catch (e) {
       if (requestId !== requestRef.current) return;
       setError(e instanceof Error ? e.message : 'Speech failed.');

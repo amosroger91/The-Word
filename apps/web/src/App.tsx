@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { localBible } from '@the-word/bible';
 import { paintVerseImage, readingFonts, useWordApp, verseImageFilename, verseImageSize, verseRuns, type Language } from '@the-word/core';
 import { SearchableSelect } from './SearchableSelect';
+import { BookBibleIcon, VolumeHighIcon, VolumeLowIcon } from './icons';
 import { createWebSpeech, webClipboard, webStorage } from './platform';
 import './styles.css';
 
@@ -88,17 +89,17 @@ function App() {
 
   const speedControl = (
     <div className="speed-control">
-      <button onClick={() => app.changeSpeechRate(-speechRateRange.step)} disabled={speechRate <= speechRateRange.min} aria-label={label.decreaseSpeed}>−</button>
+      <button onClick={() => app.changeSpeechRate(-speechRateRange.step)} disabled={speechRate <= speechRateRange.min} aria-label={label.decreaseSpeed} title={label.decreaseSpeed}>−</button>
       <span aria-live="polite">{speechRate.toFixed(1)}×</span>
-      <button onClick={() => app.changeSpeechRate(speechRateRange.step)} disabled={speechRate >= speechRateRange.max} aria-label={label.increaseSpeed}>+</button>
+      <button onClick={() => app.changeSpeechRate(speechRateRange.step)} disabled={speechRate >= speechRateRange.max} aria-label={label.increaseSpeed} title={label.increaseSpeed}>+</button>
     </div>
   );
 
   const volumeControl = (
-    <div className="speed-control" title={label.volume}>
-      <button onClick={() => app.changeSpeechVolume(-speechVolumeRange.step)} disabled={speechVolume <= speechVolumeRange.min} aria-label={label.decreaseVolume}>−</button>
+    <div className="speed-control volume-control" title={label.volume}>
+      <button onClick={() => app.changeSpeechVolume(-speechVolumeRange.step)} disabled={speechVolume <= speechVolumeRange.min} aria-label={label.decreaseVolume} title={label.decreaseVolume}><VolumeLowIcon /></button>
       <span aria-live="polite">{Math.round(speechVolume * 100)}%</span>
-      <button onClick={() => app.changeSpeechVolume(speechVolumeRange.step)} disabled={speechVolume >= speechVolumeRange.max} aria-label={label.increaseVolume}>+</button>
+      <button onClick={() => app.changeSpeechVolume(speechVolumeRange.step)} disabled={speechVolume >= speechVolumeRange.max} aria-label={label.increaseVolume} title={label.increaseVolume}><VolumeHighIcon /></button>
     </div>
   );
 
@@ -115,25 +116,25 @@ function App() {
     <div className="app-shell">
       <header className="topbar">
         <div className="topbar-identity">
-          <span className="brand-mark" aria-label="The Word">✦</span>
+          <span className="brand-mark" role="img" aria-label="The Word"><BookBibleIcon /></span>
           <h1 className="topbar-reference">{bookName} <span>{chapterNumber}</span></h1>
         </div>
         <div className="topbar-controls" ref={controlsRef}>
           <div className="control-row">
             <div className={settingsOpen ? 'control-settings open' : 'control-settings'} ref={settingsRef}>
               <SearchableSelect compact className="font-select" value={app.fontId} onChange={app.setFontId} label={label.font} filterPlaceholder={label.filterPlaceholder} options={readingFonts.map((font) => ({ value: font.id, label: font.name }))} />
-              <button className="icon-button" onClick={() => app.setFontSize(app.fontSize - 1)} aria-label={label.decreaseText}>A−</button>
-              <button className="icon-button" onClick={() => app.setFontSize(app.fontSize + 1)} aria-label={label.increaseText}>A+</button>
+              <button className="icon-button" onClick={() => app.setFontSize(app.fontSize - 1)} aria-label={label.decreaseText} title={label.decreaseText}>A−</button>
+              <button className="icon-button" onClick={() => app.setFontSize(app.fontSize + 1)} aria-label={label.increaseText} title={label.increaseText}>A+</button>
               <SearchableSelect compact className="language-select" value={language} onChange={(value) => app.changeLanguage(value as Language)} label={label.interfaceLanguage} filterPlaceholder={label.filterPlaceholder} options={app.languageOptions} />
               <SearchableSelect compact className="voice-select" value={speechVoice} onChange={setSpeechVoice} label={label.voice} filterPlaceholder={label.filterPlaceholder} options={voiceOptions.map((voice) => ({ value: voice.id, label: voice.name }))} />
               {speedControl}
               {volumeControl}
             </div>
             {speechControls}
-            <button className={`icon-button settings-toggle ${settingsOpen ? 'active' : ''}`} onClick={() => setSettingsOpen((open) => !open)} aria-label={label.settings} aria-expanded={settingsOpen}>⚙</button>
-            <button className="icon-button" onClick={() => setSearchOpen((open) => !open)} aria-label={label.search}>⌕</button>
-            <button className={`icon-button ${bookmarksOpen ? 'active' : ''}`} onClick={() => setBookmarksOpen((open) => !open)} aria-label={label.bookmarks}>◈</button>
-            <button className="icon-button" onClick={app.toggleTheme} aria-label={label.toggleTheme}>◐</button>
+            <button className={`icon-button settings-toggle ${settingsOpen ? 'active' : ''}`} onClick={() => setSettingsOpen((open) => !open)} aria-label={label.settings} title={label.settings} aria-expanded={settingsOpen}>⚙</button>
+            <button className="icon-button" onClick={() => setSearchOpen((open) => !open)} aria-label={label.search} title={label.search}>⌕</button>
+            <button className={`icon-button ${bookmarksOpen ? 'active' : ''}`} onClick={() => setBookmarksOpen((open) => !open)} aria-label={label.bookmarks} title={label.bookmarks}>◈</button>
+            <button className="icon-button" onClick={app.toggleTheme} aria-label={label.toggleTheme} title={label.toggleTheme}>◐</button>
           </div>
         </div>
       </header>

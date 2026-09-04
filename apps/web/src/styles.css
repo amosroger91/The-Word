@@ -14,8 +14,9 @@ button { cursor: pointer; }
 
 .topbar { position: relative; padding: 12px 4vw; display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; border-bottom: 1px solid #ded9cf; background: color-mix(in srgb, var(--background, #f7f4ee) 92%, transparent); }
 :root[data-theme='dark'] .topbar { border-color: #38352e; }
-.topbar-identity { display: flex; align-items: baseline; gap: 14px; min-width: 0; }
-.brand-mark { color: #947849; font-size: 24px; }
+.topbar-identity { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.brand-mark { color: #947849; font-size: 26px; display: inline-flex; align-items: center; }
+.brand-mark svg, .speed-control button svg { display: block; }
 .topbar-reference { font-size: clamp(24px, 3.4vw, 38px); line-height: 1.1; margin: 0; font-weight: 400; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .topbar-reference span { color: #a3895e; }
 .topbar-controls { display: flex; justify-content: flex-end; min-width: 0; }

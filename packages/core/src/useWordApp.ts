@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BIBLE_TOPICS, localBible } from '@the-word/bible';
 import type { SearchResult } from '@the-word/shared';
 import { clampFontSize, clampRate, clampVolume, defaults, fontFor, speechRateRange, speechVolumeRange, storageKeys, voicesFor } from './catalogue';
@@ -41,6 +41,21 @@ function readBookmarks(raw: string | null) {
 function readNumber(raw: string | null, fallback: number) {
   const value = Number(raw);
   return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+// The next reading position for continuous read-aloud: the next chapter in the
+// same book, rolling into chapter 1 of the following book, or null at the very end.
+function nextReadingPosition(
+  bookId: number,
+  chapterNumber: number,
+  books: ReturnType<typeof localBible.getBooks>,
+): { bookId: number; chapter: number } | null {
+  const index = books.findIndex((item) => item.id === bookId);
+  const current = books[index];
+  if (!current) return null;
+  if (chapterNumber < current.chapters) return { bookId, chapter: chapterNumber + 1 };
+  const nextBook = books[index + 1];
+  return nextBook ? { bookId: nextBook.id, chapter: 1 } : null;
 }
 
 // Every piece of reader behaviour lives here so the web and native views only render.
@@ -87,7 +102,24 @@ export function useWordApp({ storage, speech, clipboard, voices }: Platform, ini
     () => ({ voice: speechVoice, rate: speechRate, volume: speechVolume, language }),
     [speechVoice, speechRate, speechVolume, language],
   );
-  const player = useSpeech(speech, speechOptions);
+
+  // Continuous read-aloud: true once "read chapter" starts, cleared by stop or by
+  // reading a selection. pendingAutoSpeak marks that we advanced and are waiting for
+  // the new chapter's verses to load before speaking them.
+  const autoAdvanceRef = useRef(false);
+  const [pendingAutoSpeak, setPendingAutoSpeak] = useState(false);
+
+  const handleSpeechComplete = useCallback(() => {
+    if (!autoAdvanceRef.current) return;
+    const next = nextReadingPosition(bookId, chapterNumber, books);
+    if (!next) { autoAdvanceRef.current = false; return; }
+    setBookId(next.bookId);
+    setChapterNumber(next.chapter);
+    setSelectedVerses(new Set());
+    setPendingAutoSpeak(true);
+  }, [bookId, chapterNumber, books]);
+
+  const player = useSpeech(speech, speechOptions, handleSpeechComplete);
 
   useEffect(() => { storage.set(storageKeys.translation, translationId); }, [translationId]);
   useEffect(() => { storage.set(storageKeys.language, language); }, [language]);
@@ -214,6 +246,8 @@ export function useWordApp({ storage, speech, clipboard, voices }: Platform, ini
 
   const speakChapter = useCallback(() => {
     if (!chapter) return;
+    // Reading a whole chapter turns on continuous mode so it rolls into the next one.
+    autoAdvanceRef.current = true;
     player.speak(chapter.verses.map((verse, index) => ({
       verse: verse.ref.verse,
       // The reference is announced once, ahead of the first verse.
@@ -223,12 +257,32 @@ export function useWordApp({ storage, speech, clipboard, voices }: Platform, ini
 
   const speakSelection = useCallback(() => {
     if (!chapter) return;
+    // A selection is a one-off; do not roll into the next chapter.
+    autoAdvanceRef.current = false;
     const chosen = chapter.verses.filter((verse) => selectedVerses.has(verse.ref.verse));
     player.speak(chosen.map((verse, index) => ({
       verse: verse.ref.verse,
       text: index === 0 ? `${selectedReference}. ${verse.text}` : verse.text,
     })));
   }, [chapter, selectedVerses, selectedReference, player]);
+
+  // Once continuous mode has advanced to the next chapter and its verses have loaded,
+  // start reading them. Gated on the loaded chapter matching the advanced position so
+  // it never re-reads the chapter that just finished.
+  useEffect(() => {
+    if (!pendingAutoSpeak || chapterLoading) return;
+    const first = chapter?.verses[0]?.ref;
+    if (!first || first.bookId !== bookId || first.chapter !== chapterNumber) return;
+    setPendingAutoSpeak(false);
+    speakChapter();
+  }, [pendingAutoSpeak, chapterLoading, chapter, bookId, chapterNumber, speakChapter]);
+
+  // Stopping read-aloud also leaves continuous mode.
+  const stopSpeech = useCallback(() => {
+    autoAdvanceRef.current = false;
+    setPendingAutoSpeak(false);
+    player.stop();
+  }, [player]);
 
   const changeSpeechRate = useCallback((delta: number) => {
     setSpeechRate((rate) => clampRate(rate + delta));
@@ -331,7 +385,7 @@ export function useWordApp({ storage, speech, clipboard, voices }: Platform, ini
     speakSelection,
     pauseSpeech: player.pause,
     resumeSpeech: player.resume,
-    stopSpeech: player.stop,
+    stopSpeech,
     copySelection,
   };
 }
