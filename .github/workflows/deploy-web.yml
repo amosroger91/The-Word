@@ -23,6 +23,14 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      # apps/web/.npmrc hardcodes a Windows powershell.exe as script-shell, which
+      # does not exist on the Linux runner and breaks native install scripts
+      # (e.g. sharp). Env config outranks .npmrc, so point it at the runner's bash.
+      npm_config_script_shell: /bin/bash
+      # Playwright is a dev-only dep of apps/web and its browser is not needed to
+      # build; skip the ~150 MB download.
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
