@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Modal, Platform, Pressable, SafeAreaView, ScrollView, StatusBar as RNStatusBar, StyleSheet, Text, TextInput, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { fontFor, paletteFor, readingFonts, speechRateRange, speechVolumeRange, verseImageFilename, verseRuns, type Language, type Palette, type WordApp } from '@the-word/core';
@@ -37,6 +37,21 @@ export function Reader({ app }: { app: WordApp }) {
     const offset = versePositions.current[speakingVerse];
     if (offset !== undefined) scrollRef.current?.scrollTo({ y: Math.max(0, offset - 120), animated: true });
   }
+
+  useEffect(() => {
+    if (chapterLoading || app.focusedVerse == null) return;
+    const verse = app.focusedVerse;
+    const tryScroll = () => {
+      const offset = versePositions.current[verse];
+      if (offset === undefined) return false;
+      scrollRef.current?.scrollTo({ y: Math.max(0, offset - 120), animated: true });
+      return true;
+    };
+    if (tryScroll()) return;
+    const poll = setInterval(() => { if (tryScroll()) clearInterval(poll); }, 50);
+    const stop = setTimeout(() => clearInterval(poll), 1200);
+    return () => { clearInterval(poll); clearTimeout(stop); };
+  }, [chapterLoading, app.focusedVerse, app.bookId, chapterNumber]);
 
   const sheets: Record<Exclude<Sheet, null>, { title: string; options: PickerOption[]; value: string; onSelect: (value: string) => void }> = {
     translation: { title: label.translation, options: app.translationOptions, value: app.translationId, onSelect: app.changeTranslation },
@@ -117,12 +132,13 @@ export function Reader({ app }: { app: WordApp }) {
         {chapterLoading ? <Text style={styles.empty}>{label.loading}</Text> : chapter ? chapter.verses.map((verse) => {
           const selected = app.selectedVerses.has(verse.ref.verse);
           const speaking = speakingVerse === verse.ref.verse;
+          const focused = !speaking && !selected && app.focusedVerse === verse.ref.verse;
           return (
             <Pressable
               key={verse.ref.verse}
               onPress={() => app.toggleVerse(verse.ref.verse)}
               onLayout={(event) => { versePositions.current[verse.ref.verse] = event.nativeEvent.layout.y; }}
-              style={[styles.verseRow, selected && styles.verseSelected, speaking && styles.verseSpeaking]}
+              style={[styles.verseRow, selected && styles.verseSelected, speaking && styles.verseSpeaking, focused && styles.verseFocused]}
             >
               <Text style={[styles.verse, { fontSize: app.fontSize, lineHeight: app.fontSize * 1.7, fontFamily: readerFont }]}>
                 <Text style={styles.verseNumber}>{verse.ref.verse} </Text>
@@ -245,11 +261,19 @@ export function Reader({ app }: { app: WordApp }) {
             <TextInput
               style={styles.input}
               value={app.query}
-              onChangeText={(value) => { app.setQuery(value); app.setSelectedTopic(''); }}
+              onChangeText={(value) => { app.setQuery(value); if (value.trim()) app.setSelectedTopic(''); }}
               placeholder={label.searchPlaceholder}
               placeholderTextColor={palette.muted}
               autoFocus
             />
+            {app.selectedTopic ? (
+              <View style={styles.topicChip}>
+                <Text style={styles.topicChipText}>{app.topics.find((topic) => topic.id === app.selectedTopic)?.name}</Text>
+                <Pressable onPress={() => app.setSelectedTopic('')} hitSlop={12} accessibilityLabel={label.clearTopic}>
+                  <Text style={styles.close}>×</Text>
+                </Pressable>
+              </View>
+            ) : null}
             <View style={styles.modeRow}>
               <Chip styles={styles} text={label.allWords} active={app.searchMode === 'all'} onPress={() => app.setSearchMode('all')} />
               <Chip styles={styles} text={label.exactPhrase} active={app.searchMode === 'exact'} onPress={() => app.setSearchMode('exact')} />
@@ -261,12 +285,16 @@ export function Reader({ app }: { app: WordApp }) {
             </View>
             <Selector styles={styles} label={label.book} value={app.searchBookId === 'all' ? label.allBooks : app.books.find((item) => String(item.id) === app.searchBookId)?.name ?? ''} onPress={() => setSheet('searchBook')} />
             <ScrollView keyboardShouldPersistTaps="handled">
-              <Text style={styles.sectionLabel}>{label.browseByTopic}</Text>
-              <View style={styles.topicWrap}>
-                {app.topics.map((topic) => (
-                  <Chip key={topic.id} styles={styles} text={topic.name} active={app.selectedTopic === topic.id} onPress={() => { app.setSelectedTopic(topic.id); app.setQuery(''); }} />
-                ))}
-              </View>
+              {!app.query.trim() && !app.selectedTopic ? (
+                <View>
+                  <Text style={styles.sectionLabel}>{label.browseByTopic}</Text>
+                  <View style={styles.topicWrap}>
+                    {app.topics.map((topic) => (
+                      <Chip key={topic.id} styles={styles} text={topic.name} onPress={() => { app.setSelectedTopic(topic.id); app.setQuery(''); }} />
+                    ))}
+                  </View>
+                </View>
+              ) : null}
               {(app.query || app.selectedTopic) ? (
                 <View>
                   <Text style={styles.sectionLabel}>{app.searchLoading ? label.searching : label.results(app.searchResults.length)}</Text>
@@ -274,7 +302,7 @@ export function Reader({ app }: { app: WordApp }) {
                     <Pressable
                       key={`${result.translationId}:${result.verse.ref.bookId}:${result.verse.ref.chapter}:${result.verse.ref.verse}`}
                       style={styles.result}
-                      onPress={() => { app.goTo(result.verse.ref.bookId, result.verse.ref.chapter); setSearchOpen(false); app.setQuery(''); }}
+                      onPress={() => { app.goToVerse(result.verse.ref.bookId, result.verse.ref.chapter, result.verse.ref.verse); setSearchOpen(false); app.setQuery(''); }}
                     >
                       <Text style={styles.resultReference}>{app.books.find((item) => item.id === result.verse.ref.bookId)?.name} {result.verse.ref.chapter}:{result.verse.ref.verse}</Text>
                       <Text style={styles.resultText} numberOfLines={3}>{result.verse.text}</Text>
@@ -299,7 +327,7 @@ export function Reader({ app }: { app: WordApp }) {
               <Pressable
                 key={`${entry.bookId}:${entry.chapter}:${entry.verse}`}
                 style={styles.result}
-                onPress={() => { app.goTo(entry.bookId, entry.chapter); setBookmarksOpen(false); }}
+                onPress={() => { app.goToVerse(entry.bookId, entry.chapter, entry.verse); setBookmarksOpen(false); }}
               >
                 <Text style={styles.resultReference}>{app.books.find((item) => item.id === entry.bookId)?.name} {entry.chapter}:{entry.verse}</Text>
               </Pressable>
@@ -371,9 +399,10 @@ function createStyles(palette: Palette) {
     navText: { color: palette.accent, fontSize: 14 },
     navReference: { color: palette.muted, fontSize: 13 },
     disabled: { opacity: 0.35 },
-    verseRow: { borderRadius: 6, paddingHorizontal: 6, paddingVertical: 6, marginTop: 8 },
+    verseRow: { borderRadius: 6, paddingHorizontal: 6, paddingVertical: 6, marginTop: 8, borderWidth: 2, borderColor: 'transparent' },
     verseSelected: { backgroundColor: palette.highlight },
     verseSpeaking: { backgroundColor: palette.speaking },
+    verseFocused: { backgroundColor: palette.highlight, borderColor: palette.accent, borderWidth: 2 },
     verse: { color: palette.text },
     verseNumber: { color: palette.accentSoft, fontSize: 12, fontWeight: '700' },
     redLetter: { color: palette.redLetter },
@@ -407,6 +436,8 @@ function createStyles(palette: Palette) {
     modeRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
     sectionLabel: { color: palette.muted, fontSize: 11, fontWeight: '700', letterSpacing: 1.3, textTransform: 'uppercase', marginTop: 16, marginBottom: 8 },
     topicWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    topicChip: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 8, borderColor: palette.accent, borderWidth: 1, borderRadius: 999, paddingLeft: 12, paddingRight: 8, paddingVertical: 6, backgroundColor: palette.highlight },
+    topicChipText: { color: palette.text, fontSize: 14, fontWeight: '600' },
     result: { borderColor: palette.rule, borderWidth: 1, borderRadius: 8, padding: 12, marginBottom: 8, gap: 4 },
     resultReference: { color: palette.accent, fontWeight: '700' },
     resultText: { color: palette.text, fontSize: 14 },

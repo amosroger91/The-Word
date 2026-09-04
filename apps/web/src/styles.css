@@ -63,6 +63,8 @@ select, input { border: 1px solid #c9c1b3; border-radius: 8px; background: trans
 /* Read Party: where the host is, on a participant not playing local audio. */
 .verse.following { box-shadow: 0 0 0 2px #2f9e6f; }
 :root[data-theme='dark'] .verse.following { box-shadow: 0 0 0 2px #4bbd8a; }
+.verse.focused { background: #e7ddc9; box-shadow: 0 0 0 2px #947849; }
+:root[data-theme='dark'] .verse.focused { background: #3b3529; box-shadow: 0 0 0 2px #c5a76c; }
 .verse sup { color: #a3895e; font-size: .55em; font-weight: 700; margin-right: 7px; vertical-align: top; }
 .words-of-jesus { color: #a5342b; }
 :root[data-theme='dark'] .words-of-jesus { color: #e08a7e; }
@@ -92,6 +94,10 @@ select, input { border: 1px solid #c9c1b3; border-radius: 8px; background: trans
 .topic { display: grid; gap: 3px; border: 1px solid #ded9cf; border-radius: 8px; padding: 10px; text-align: left; background: transparent; color: inherit; }
 .topic:hover, .topic.active { background: #e7ddc9; }
 .topic small { color: #8e806c; font-size: 12px; }
+.topic-chip { display: flex; align-items: center; gap: 10px; margin: 12px 0 0; padding: 8px 10px; border: 1px solid #947849; border-radius: 999px; width: fit-content; background: #e7ddc9; }
+:root[data-theme='dark'] .topic-chip { background: #3b3529; border-color: #c5a76c; }
+.topic-chip strong { font-size: 14px; font-weight: 600; }
+.topic-chip button { border: 0; background: transparent; color: inherit; font-size: 20px; line-height: 1; padding: 0 4px; }
 .result-count { color: #8e806c; font-size: 12px; text-transform: uppercase; letter-spacing: .1em; }
 .bookmark-item { display: grid; gap: 5px; text-align: left; background: transparent; border: 1px solid #ded9cf; border-radius: 8px; padding: 12px; color: inherit; width: 100%; margin-bottom: 8px; }
 .bookmark-item:hover { background: #e7ddc9; }

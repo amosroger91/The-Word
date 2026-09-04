@@ -80,6 +80,7 @@ export function useWordApp({ storage, speech, clipboard, voices }: Platform, ini
   });
   const [bookmarks, setBookmarks] = useState(() => readBookmarks(storage.get(storageKeys.bookmarks)));
   const [selectedVerses, setSelectedVerses] = useState<Set<number>>(new Set());
+  const [focusedVerse, setFocusedVerse] = useState<number | null>(null);
   const [chapter, setChapter] = useState<Awaited<ReturnType<typeof localBible.getChapter>>>(null);
   const [chapterLoading, setChapterLoading] = useState(true);
   const [query, setQuery] = useState('');
@@ -180,6 +181,7 @@ export function useWordApp({ storage, speech, clipboard, voices }: Platform, ini
     const next = localBible.getTranslations().find((item) => item.id === nextId);
     if (next) setLanguage(resolveLanguage(next.language));
     setSelectedVerses(new Set());
+    setFocusedVerse(null);
   }, []);
 
   const changeLanguage = useCallback((nextLanguage: Language) => {
@@ -198,11 +200,13 @@ export function useWordApp({ storage, speech, clipboard, voices }: Platform, ini
     setBookId(nextBookId);
     setChapterNumber(1);
     setSelectedVerses(new Set());
+    setFocusedVerse(null);
   }, []);
 
   const changeChapter = useCallback((next: number) => {
     setChapterNumber(next);
     setSelectedVerses(new Set());
+    setFocusedVerse(null);
   }, []);
 
   const moveChapter = useCallback((direction: -1 | 1) => {
@@ -212,6 +216,7 @@ export function useWordApp({ storage, speech, clipboard, voices }: Platform, ini
   }, [book, chapterNumber, changeChapter]);
 
   const toggleVerse = useCallback((verseNumber: number) => {
+    setFocusedVerse(null);
     setSelectedVerses((current) => {
       const next = new Set(current);
       next.has(verseNumber) ? next.delete(verseNumber) : next.add(verseNumber);
@@ -242,6 +247,14 @@ export function useWordApp({ storage, speech, clipboard, voices }: Platform, ini
     setBookId(nextBookId);
     setChapterNumber(nextChapter);
     setSelectedVerses(new Set());
+    setFocusedVerse(null);
+  }, []);
+
+  const goToVerse = useCallback((nextBookId: number, nextChapter: number, verse: number) => {
+    setBookId(nextBookId);
+    setChapterNumber(nextChapter);
+    setSelectedVerses(new Set());
+    setFocusedVerse(verse);
   }, []);
 
   const speakChapter = useCallback(() => {
@@ -366,6 +379,8 @@ export function useWordApp({ storage, speech, clipboard, voices }: Platform, ini
     bookmarkList,
     toggleBookmark,
     goTo,
+    goToVerse,
+    focusedVerse,
     query,
     setQuery,
     searchMode,

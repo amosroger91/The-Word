@@ -46,6 +46,7 @@ export interface Strings {
   newTestament: string;
   allBooks: string;
   browseByTopic: string;
+  clearTopic: string;
   searching: string;
   noMatches: string;
   noBookmarks: string;
@@ -139,6 +140,7 @@ export const strings: Record<Language, Strings> = {
     newTestament: 'New Testament',
     allBooks: 'All Books',
     browseByTopic: 'Browse by topic',
+    clearTopic: 'Clear topic',
     searching: 'Searching…',
     noMatches: 'No matches for this search and filter combination.',
     noBookmarks: 'No bookmarks yet. Select verses and press Bookmark.',
@@ -224,6 +226,7 @@ export const strings: Record<Language, Strings> = {
     newTestament: 'Nuevo Testamento',
     allBooks: 'Todos los libros',
     browseByTopic: 'Explorar por tema',
+    clearTopic: 'Quitar tema',
     searching: 'Buscando…',
     noMatches: 'No hay resultados para esta búsqueda y estos filtros.',
     noBookmarks: 'Aún no hay marcadores. Selecciona versículos y pulsa Marcador.',
@@ -309,6 +312,7 @@ export const strings: Record<Language, Strings> = {
     newTestament: 'Nouveau Testament',
     allBooks: 'Tous les livres',
     browseByTopic: 'Parcourir par thème',
+    clearTopic: 'Retirer le thème',
     searching: 'Recherche…',
     noMatches: 'Aucun résultat pour cette recherche et ces filtres.',
     noBookmarks: 'Aucun signet pour le moment. Sélectionnez des versets puis appuyez sur Signet.',
@@ -394,6 +398,7 @@ export const strings: Record<Language, Strings> = {
     newTestament: '新约',
     allBooks: '所有书卷',
     browseByTopic: '按主题浏览',
+    clearTopic: '清除主题',
     searching: '正在搜索…',
     noMatches: '没有符合此搜索和筛选条件的结果。',
     noBookmarks: '还没有书签。选择经文后点按“加书签”。',
@@ -479,6 +484,7 @@ export const strings: Record<Language, Strings> = {
     newTestament: 'Tân Ước',
     allBooks: 'Mọi sách',
     browseByTopic: 'Xem theo chủ đề',
+    clearTopic: 'Xóa chủ đề',
     searching: 'Đang tìm…',
     noMatches: 'Không có kết quả cho tìm kiếm và bộ lọc này.',
     noBookmarks: 'Chưa có dấu trang. Hãy chọn câu rồi nhấn Dấu trang.',

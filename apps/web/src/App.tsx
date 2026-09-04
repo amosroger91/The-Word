@@ -28,6 +28,7 @@ function App() {
   } = app;
 
   const party = useReadParty(app);
+  const activeTopic = app.topics.find((topic) => topic.id === app.selectedTopic);
   const [searchOpen, setSearchOpen] = useState(false);
   const [bookmarksOpen, setBookmarksOpen] = useState(false);
   const [partyOpen, setPartyOpen] = useState(false);
@@ -57,6 +58,15 @@ function App() {
     if (verse == null) return;
     verseRefs.current[verse]?.scrollIntoView({ block: 'center', behavior: 'smooth' });
   }, [speakingVerse, followVerse, app.bookId, chapterNumber]);
+
+  useEffect(() => {
+    if (chapterLoading || app.focusedVerse == null) return;
+    const verse = app.focusedVerse;
+    const id = window.setTimeout(() => {
+      verseRefs.current[verse]?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }, 50);
+    return () => window.clearTimeout(id);
+  }, [chapterLoading, app.focusedVerse, app.bookId, chapterNumber]);
 
   useEffect(() => {
     const element = controlsRef.current;
@@ -191,11 +201,12 @@ function App() {
                 const selected = selectedVerses.has(verse.ref.verse);
                 const speaking = speakingVerse === verse.ref.verse;
                 const following = !speaking && followVerse === verse.ref.verse;
+                const focused = !speaking && !selected && app.focusedVerse === verse.ref.verse;
                 return (
                   <button
                     key={verse.ref.verse}
                     ref={(el) => { verseRefs.current[verse.ref.verse] = el; }}
-                    className={speaking ? 'verse speaking' : following ? 'verse following' : selected ? 'verse selected' : 'verse'}
+                    className={speaking ? 'verse speaking' : following ? 'verse following' : focused ? 'verse focused' : selected ? 'verse selected' : 'verse'}
                     onClick={() => app.toggleVerse(verse.ref.verse)}
                   >
                     <sup>{verse.ref.verse}</sup>
@@ -234,7 +245,13 @@ function App() {
       {searchOpen && (
         <div className="search-panel">
           <div className="search-header"><h2>{label.searchTitle} · {app.translations.find((item) => item.id === app.translationId)?.shortName}</h2><button onClick={() => setSearchOpen(false)} aria-label={label.search}>×</button></div>
-          <input autoFocus placeholder={label.searchPlaceholder} value={app.query} onChange={(event) => { app.setQuery(event.target.value); app.setSelectedTopic(''); }} />
+          <input autoFocus placeholder={label.searchPlaceholder} value={app.query} onChange={(event) => { app.setQuery(event.target.value); if (event.target.value.trim()) app.setSelectedTopic(''); }} />
+          {activeTopic && (
+            <div className="topic-chip">
+              <strong>{activeTopic.name}</strong>
+              <button type="button" onClick={() => app.setSelectedTopic('')} aria-label={label.clearTopic}>×</button>
+            </div>
+          )}
           <div className="search-options">
             <div className="search-mode">
               <button className={app.searchMode === 'all' ? 'active' : ''} onClick={() => app.setSearchMode('all')}>{label.allWords}</button>
@@ -250,15 +267,17 @@ function App() {
               {app.books.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
             </select>
           </div>
-          <div className="topic-section">
-            <span className="section-label">{label.browseByTopic}</span>
-            <div className="topic-grid">{app.topics.map((topic) => <button className={app.selectedTopic === topic.id ? 'topic active' : 'topic'} key={topic.id} onClick={() => { app.setSelectedTopic(topic.id); app.setQuery(''); }}><strong>{topic.name}</strong><small>{topic.description}</small></button>)}</div>
-          </div>
+          {!app.query.trim() && !activeTopic && (
+            <div className="topic-section">
+              <span className="section-label">{label.browseByTopic}</span>
+              <div className="topic-grid">{app.topics.map((topic) => <button className="topic" key={topic.id} onClick={() => { app.setSelectedTopic(topic.id); app.setQuery(''); }}><strong>{topic.name}</strong><small>{topic.description}</small></button>)}</div>
+            </div>
+          )}
           {(app.query || app.selectedTopic) && (
             <div className="results">
               <div className="result-count">{app.searchLoading ? label.searching : label.results(app.searchResults.length)}</div>
               {app.searchResults.length ? app.searchResults.map((result) => (
-                <button className="result" key={`${result.translationId}:${result.verse.ref.bookId}:${result.verse.ref.chapter}:${result.verse.ref.verse}`} onClick={() => { app.goTo(result.verse.ref.bookId, result.verse.ref.chapter); setSearchOpen(false); app.setQuery(''); }}>
+                <button className="result" key={`${result.translationId}:${result.verse.ref.bookId}:${result.verse.ref.chapter}:${result.verse.ref.verse}`} onClick={() => { app.goToVerse(result.verse.ref.bookId, result.verse.ref.chapter, result.verse.ref.verse); setSearchOpen(false); app.setQuery(''); }}>
                   <strong>{localBible.getBook(result.verse.ref.bookId, app.translationId)?.name} {result.verse.ref.chapter}:{result.verse.ref.verse}</strong>
                   <span>{result.verse.text}</span>
                 </button>
@@ -271,7 +290,7 @@ function App() {
         <div className="bookmarks-panel">
           <div className="panel-header"><h2>{label.bookmarks}</h2><button onClick={() => setBookmarksOpen(false)} aria-label={label.closeBookmarks}>×</button></div>
           {app.bookmarkList.length ? app.bookmarkList.map((entry) => (
-            <button className="bookmark-item" key={`${entry.bookId}:${entry.chapter}:${entry.verse}`} onClick={() => { app.goTo(entry.bookId, entry.chapter); setBookmarksOpen(false); }}>
+            <button className="bookmark-item" key={`${entry.bookId}:${entry.chapter}:${entry.verse}`} onClick={() => { app.goToVerse(entry.bookId, entry.chapter, entry.verse); setBookmarksOpen(false); }}>
               <span className="bookmark-reference">{app.books.find((item) => item.id === entry.bookId)?.name} {entry.chapter}:{entry.verse}</span>
               <span className="bookmark-verse-text">{entry.bookId === app.bookId && entry.chapter === chapterNumber ? chapter?.verses.find((verse) => verse.ref.verse === entry.verse)?.text ?? '' : ''}</span>
             </button>
