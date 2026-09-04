@@ -283,10 +283,14 @@ select, input { border: 1px solid #c9c1b3; border-radius: 8px; background: trans
   text-wrap: pretty;
   text-shadow: 0 2px 14px #00000059;
 }
+/* Reference bottom-left, source credit bottom-right, both over the artwork. */
+.verse-foot { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; }
 .verse-art cite { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; font-style: normal; font-weight: 700; font-size: 15px; letter-spacing: .02em; color: #fff; }
+.verse-credit { font-size: 11px; letter-spacing: .04em; color: #ffffffb0; text-decoration: none; text-shadow: 0 1px 8px #0000008c; }
+.verse-credit:hover { color: #fff; text-decoration: underline; }
 .verse-translation { font-weight: 400; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; padding: 4px 9px; border-radius: 999px; background: #ffffff26; border: 1px solid #ffffff40; }
 
-.verse-tools { display: grid; gap: 10px; padding: 16px clamp(16px, 2.4vw, 24px) 4px; }
+.verse-tools { display: grid; gap: 10px; padding: 16px clamp(16px, 2.4vw, 24px) 18px; }
 .verse-tools-primary { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
 .verse-tools-secondary { display: flex; flex-wrap: wrap; gap: 8px; }
 .verse-tools button {
@@ -307,16 +311,12 @@ select, input { border: 1px solid #c9c1b3; border-radius: 8px; background: trans
 :root[data-theme='dark'] .verse-tools button.active { color: #191816; }
 .verse-tools button:disabled { opacity: .4; }
 
-.landing-credit { margin: 0; padding: 12px clamp(16px, 2.4vw, 24px) 18px; font-size: 12px; color: var(--ink-soft); }
-.landing-credit a { color: inherit; }
-
 /* ---- Side rail: where to read next, and search ---- */
 .landing-rail { display: grid; gap: 18px; min-width: 0; position: sticky; top: 18px; }
 .landing-cta { display: grid; gap: 10px; }
 .landing-read { width: 100%; min-height: 56px; padding: 16px 20px; border: 0; border-radius: 14px; background: var(--accent); color: #fff7f2; font-size: 18px; box-shadow: 0 12px 28px -16px #947849cc; }
 :root[data-theme='dark'] .landing-read { color: #191816; }
 .landing-read:hover { background: var(--accent-strong); }
-.landing-resume { margin: -2px 0 0; text-align: center; color: var(--ink-soft); font-size: 14px; }
 .landing-group { width: 100%; min-height: 50px; padding: 13px 20px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: inherit; font-size: 16px; }
 .landing-group:hover { border-color: var(--accent); }
 

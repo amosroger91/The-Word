@@ -126,10 +126,14 @@ export function Landing({
                 <div className="verse-copy">
                   <span className="verse-eyebrow">{label.verseOfTheDayFor(daily.verse.date)}</span>
                   <blockquote>{displayText}</blockquote>
-                  <cite>
-                    {displayReference}
-                    {translationName ? <span className="verse-translation">{translationName}</span> : null}
-                  </cite>
+                  <div className="verse-foot">
+                    <cite>
+                      {displayReference}
+                      {translationName ? <span className="verse-translation">{translationName}</span> : null}
+                    </cite>
+                    {/* Preview only — the exported PNG carries its own footer. */}
+                    <a className="verse-credit" href={daily.verse.url} target="_blank" rel="noreferrer">{label.dailyVerseCredit}</a>
+                  </div>
                 </div>
               </div>
 
@@ -157,10 +161,6 @@ export function Landing({
                   </div>
                 </div>
               )}
-
-              <p className="landing-credit">
-                <a href={daily.verse.url} target="_blank" rel="noreferrer">{label.dailyVerseCredit}</a>
-              </p>
             </article>
           )}
         </section>
@@ -168,9 +168,8 @@ export function Landing({
         <aside className="landing-rail">
           <div className="landing-cta">
             <button className="landing-read" onClick={onEnterReader}>
-              {app.hasProgress ? label.continueReading : label.readTheBible}
+              {app.hasProgress ? label.continueAt(`${app.bookName} ${app.chapterNumber}`) : label.readTheBible}
             </button>
-            {app.hasProgress && <p className="landing-resume">{app.bookName} {app.chapterNumber}</p>}
             {onGroupStudy && (
               <button className="landing-group" onClick={onGroupStudy}>{label.readParty}</button>
             )}

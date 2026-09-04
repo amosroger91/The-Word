@@ -88,6 +88,7 @@ export interface Strings {
   home: string;
   readTheBible: string;
   continueReading: string;
+  continueAt: (reference: string) => string;
   verseOfTheDay: string;
   verseOfTheDayFor: (date: string) => string;
   openThisVerse: string;
@@ -205,6 +206,7 @@ export const strings: Record<Language, Strings> = {
     home: 'Home',
     readTheBible: 'Read the Bible',
     continueReading: 'Continue reading',
+    continueAt: (reference) => `Continue ${reference}`,
     verseOfTheDay: 'Verse of the day',
     verseOfTheDayFor: (date) => (date ? `Verse of the day for ${date}` : 'Verse of the day'),
     openThisVerse: 'Open this verse',
@@ -314,6 +316,7 @@ export const strings: Record<Language, Strings> = {
     home: 'Inicio',
     readTheBible: 'Leer la Biblia',
     continueReading: 'Seguir leyendo',
+    continueAt: (reference) => `Continuar ${reference}`,
     verseOfTheDay: 'Versículo del día',
     verseOfTheDayFor: (date) => (date ? `Versículo del día para el ${date}` : 'Versículo del día'),
     openThisVerse: 'Abrir este versículo',
@@ -423,6 +426,7 @@ export const strings: Record<Language, Strings> = {
     home: 'Accueil',
     readTheBible: 'Lire la Bible',
     continueReading: 'Continuer la lecture',
+    continueAt: (reference) => `Continuer ${reference}`,
     verseOfTheDay: 'Verset du jour',
     verseOfTheDayFor: (date) => (date ? `Verset du jour pour le ${date}` : 'Verset du jour'),
     openThisVerse: 'Ouvrir ce verset',
@@ -532,6 +536,7 @@ export const strings: Record<Language, Strings> = {
     home: '首页',
     readTheBible: '阅读圣经',
     continueReading: '继续阅读',
+    continueAt: (reference) => `继续${reference}`,
     verseOfTheDay: '每日经文',
     verseOfTheDayFor: (date) => (date ? `${date}的每日经文` : '每日经文'),
     openThisVerse: '打开这节经文',
@@ -641,6 +646,7 @@ export const strings: Record<Language, Strings> = {
     home: 'Trang chủ',
     readTheBible: 'Đọc Kinh Thánh',
     continueReading: 'Tiếp tục đọc',
+    continueAt: (reference) => `Tiếp tục ${reference}`,
     verseOfTheDay: 'Câu gốc trong ngày',
     verseOfTheDayFor: (date) => (date ? `Câu gốc ngày ${date}` : 'Câu gốc trong ngày'),
     openThisVerse: 'Mở câu này',
