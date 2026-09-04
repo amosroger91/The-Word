@@ -13,28 +13,28 @@ page.on('pageerror', (e) => errors.push(e.message));
 page.on('console', (msg) => { if (msg.type() === 'error') errors.push('console: ' + msg.text()); });
 
 await page.goto('http://localhost:5173/', { waitUntil: 'networkidle' });
-await page.waitForSelector('.landing-verse blockquote', { timeout: 15000 });
+await page.waitForSelector('.verse-card blockquote', { timeout: 15000 });
 await page.waitForFunction(() => {
-  const button = [...document.querySelectorAll('.landing-actions button')].find((el) => el.textContent === 'Read from here');
+  const button = [...document.querySelectorAll('.verse-tools button')].find((el) => el.textContent === 'Read from here');
   return button instanceof HTMLButtonElement && !button.disabled;
 }, { timeout: 15000 });
 
-const verseText = await page.locator('.landing-verse blockquote').innerText();
-const cite = await page.locator('.landing-verse cite').innerText();
-const actions = await page.locator('.landing-actions button').allInnerTexts();
+const verseText = await page.locator('.verse-card blockquote').innerText();
+const cite = await page.locator('.verse-card cite').innerText();
+const actions = await page.locator('.verse-tools button').allInnerTexts();
 await page.screenshot({ path: shot('landing-actions.png'), fullPage: true });
 console.log(JSON.stringify({ cite, actions, verseText: verseText.slice(0, 90) }));
 
-const bookmark = page.locator('.landing-actions button', { hasText: 'Bookmark' });
+const bookmark = page.locator('.verse-tools button', { hasText: 'Bookmark' });
 await bookmark.click();
 const bookmarked = await bookmark.evaluate((el) => el.classList.contains('active'));
-await page.locator('.landing-actions button', { hasText: 'Copy' }).click();
+await page.locator('.verse-tools button', { hasText: 'Copy' }).click();
 const download = page.waitForEvent('download', { timeout: 8000 });
-await page.locator('.landing-actions button', { hasText: 'Image' }).click();
+await page.locator('.verse-tools button', { hasText: 'Image' }).click();
 const file = await download;
 console.log('download', file.suggestedFilename());
 
-await page.locator('.landing-actions button', { hasText: 'Read from here' }).click();
+await page.locator('.verse-tools button', { hasText: 'Read from here' }).click();
 await page.waitForSelector('.verse.focused, .verse.speaking', { timeout: 20000 });
 const reference = await page.locator('.topbar-reference').innerText();
 const focused = await page.locator('.verse.focused sup, .verse.speaking sup').first().innerText();
