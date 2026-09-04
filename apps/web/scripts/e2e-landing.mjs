@@ -15,7 +15,7 @@ page.on('console', (msg) => { if (msg.type() === 'error') errors.push('console: 
 await page.goto('http://localhost:5173/', { waitUntil: 'networkidle' });
 await page.waitForSelector('.verse-card blockquote', { timeout: 15000 });
 await page.waitForFunction(() => {
-  const button = [...document.querySelectorAll('.verse-tools button')].find((el) => el.textContent === 'Read from here');
+  const button = [...document.querySelectorAll('.verse-tools button')].find((el) => el.textContent === 'Listen from here');
   return button instanceof HTMLButtonElement && !button.disabled;
 }, { timeout: 15000 });
 
@@ -34,7 +34,7 @@ await page.locator('.verse-tools button', { hasText: 'Image' }).click();
 const file = await download;
 console.log('download', file.suggestedFilename());
 
-await page.locator('.verse-tools button', { hasText: 'Read from here' }).click();
+await page.locator('.verse-tools button', { hasText: 'Listen from here' }).click();
 await page.waitForSelector('.verse.focused, .verse.speaking', { timeout: 20000 });
 const reference = await page.locator('.topbar-reference').innerText();
 const focused = await page.locator('.verse.focused sup, .verse.speaking sup').first().innerText();
@@ -44,7 +44,7 @@ console.log(JSON.stringify({ hash, reference, focused, bookmarked }));
 
 await browser.close();
 if (!/everlasting life|eternal life/i.test(verseText)) throw new Error('expected local or Discovery John 5:24 text');
-if (!actions.includes('Read from here') || !actions.includes('Read the chapter') || !actions.includes('Image')) {
+if (!actions.includes('Listen from here') || !actions.includes('Listen to the chapter') || !actions.includes('Image')) {
   throw new Error('missing verse actions');
 }
 if (!bookmarked) throw new Error('bookmark did not toggle');

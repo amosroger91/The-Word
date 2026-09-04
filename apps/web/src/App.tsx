@@ -5,6 +5,7 @@ import { SearchableSelect } from './SearchableSelect';
 import { BookBibleIcon, VolumeHighIcon, VolumeLowIcon } from './icons';
 import { CrossRefMenu } from './CrossRefMenu';
 import { Landing } from './Landing';
+import { Preferences } from './Preferences';
 import { VerseImageEditor, type VerseImageJob } from './VerseImageEditor';
 import { createWebSpeech, webClipboard, webStorage } from './platform';
 import { useReadParty } from './useReadParty';
@@ -42,6 +43,7 @@ function App() {
   const [partyCode, setPartyCode] = useState('');
   const [partyChat, setPartyChat] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [prefsOpen, setPrefsOpen] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
   const [view, setView] = useState<'home' | 'reader'>(viewFromHash);
   const [xrefMenu, setXrefMenu] = useState<{ verse: number; x: number; y: number } | null>(null);
@@ -80,8 +82,14 @@ function App() {
   useEffect(() => {
     const verse = speakingVerse ?? followVerse;
     if (verse == null) return;
+    // The first verse means the chapter is being read from the start, so show
+    // the chapter heading rather than centring verse 1 halfway down.
+    if (verse === chapter?.verses[0]?.ref.verse) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
     verseRefs.current[verse]?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-  }, [speakingVerse, followVerse, app.bookId, chapterNumber]);
+  }, [speakingVerse, followVerse, app.bookId, chapterNumber, chapter]);
 
   useEffect(() => {
     if (chapterLoading || app.focusedVerse == null) return;
@@ -114,11 +122,19 @@ function App() {
 
   if (view === 'home') {
     return (
-      <Landing
-        app={app}
-        onEnterReader={() => { app.markProgress(); openReader(); }}
-        onGroupStudy={() => { app.markProgress(); setPartyOpen(true); openReader(); }}
-      />
+      <>
+        <Landing
+          app={app}
+          onEnterReader={() => { app.markProgress(); openReader(); }}
+          onGroupStudy={() => { app.markProgress(); setPartyOpen(true); openReader(); }}
+          onBookmarks={() => { app.markProgress(); setBookmarksOpen(true); openReader(); }}
+          onPreferences={() => setPrefsOpen(true)}
+          partyMembers={party.active ? party.members.length : 0}
+        />
+        {prefsOpen && (
+          <Preferences app={app} name={party.name} onNameChange={party.setName} onClose={() => setPrefsOpen(false)} />
+        )}
+      </>
     );
   }
 
@@ -153,8 +169,9 @@ function App() {
         <div className="topbar-identity">
           <button className="topbar-home" onClick={openHome} aria-label={label.home} title={label.home}>
             <span className="brand-mark" role="img" aria-hidden="true"><BookBibleIcon /></span>
-            <h1 className="topbar-reference">{bookName} <span>{chapterNumber}</span></h1>
+            <span className="topbar-wordmark">The Word</span>
           </button>
+          <h1 className="topbar-reference">{bookName} <span>{chapterNumber}</span></h1>
         </div>
         <div className="topbar-controls" ref={controlsRef}>
           <div className="control-row">
@@ -163,7 +180,7 @@ function App() {
               <button className="icon-button" onClick={() => app.setFontSize(app.fontSize - 1)} aria-label={label.decreaseText} title={label.decreaseText}>A−</button>
               <button className="icon-button" onClick={() => app.setFontSize(app.fontSize + 1)} aria-label={label.increaseText} title={label.increaseText}>A+</button>
               <SearchableSelect compact className="language-select" value={language} onChange={(value) => app.changeLanguage(value as Language)} label={label.interfaceLanguage} filterPlaceholder={label.filterPlaceholder} options={app.languageOptions} />
-              <SearchableSelect compact className="voice-select" value={speechVoice} onChange={setSpeechVoice} label={label.voice} filterPlaceholder={label.filterPlaceholder} options={voiceOptions.map((voice) => ({ value: voice.id, label: voice.name }))} />
+              <SearchableSelect compact className="voice-select" value={speechVoice} onChange={setSpeechVoice} label={label.voice} filterPlaceholder={label.filterPlaceholder} options={voiceOptions.map((voice) => ({ value: voice.id, label: voice.isDefault ? label.defaultVoice : voice.name }))} />
               {speedControl}
               {volumeControl}
             </div>
@@ -188,7 +205,7 @@ function App() {
           </div>
           <div className="control-group">
             <span className="section-label">{label.chapter}</span>
-            <SearchableSelect value={String(chapterNumber)} onChange={(value) => app.changeChapter(Number(value))} label={label.chapter} filterPlaceholder={label.filterPlaceholder} options={app.chapterOptions} />
+            <SearchableSelect searchable={false} value={String(chapterNumber)} onChange={(value) => app.changeChapter(Number(value))} label={label.chapter} filterPlaceholder={label.filterPlaceholder} options={app.chapterOptions} />
           </div>
           <div className="sidebar-footer"><span>{label.footerFree}</span><span>{label.footerLocal}</span></div>
         </aside>

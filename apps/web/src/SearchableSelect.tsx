@@ -15,18 +15,21 @@ interface Props {
   filterPlaceholder: string;
   className?: string;
   compact?: boolean;
+  // Short, self-evident lists (chapter numbers) do without a filter box.
+  searchable?: boolean;
 }
 
 function fold(value: string) {
   return value.normalize('NFD').replace(/[̀-ͯ]/g, '').toLocaleLowerCase();
 }
 
-export function SearchableSelect({ value, options, onChange, label, filterPlaceholder, className, compact }: Props) {
+export function SearchableSelect({ value, options, onChange, label, filterPlaceholder, className, compact, searchable = true }: Props) {
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState('');
   const [highlight, setHighlight] = useState(0);
   const rootRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const selected = options.find((option) => option.value === value);
@@ -49,7 +52,7 @@ export function SearchableSelect({ value, options, onChange, label, filterPlaceh
     if (!open) return;
     setFilter('');
     setHighlight(Math.max(0, options.findIndex((option) => option.value === value)));
-    inputRef.current?.focus();
+    (searchable ? inputRef.current : panelRef.current)?.focus();
   }, [open]);
 
   useLayoutEffect(() => {
@@ -63,7 +66,8 @@ export function SearchableSelect({ value, options, onChange, label, filterPlaceh
   }
 
   function onKeyDown(event: React.KeyboardEvent) {
-    if (event.key === 'Escape') { setOpen(false); return; }
+    // Close just this dropdown; a dialog behind it keeps its own Escape.
+    if (event.key === 'Escape') { event.stopPropagation(); setOpen(false); return; }
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault();
       setHighlight((current) => {
@@ -94,16 +98,25 @@ export function SearchableSelect({ value, options, onChange, label, filterPlaceh
         <span className="combo-caret" aria-hidden="true">▾</span>
       </button>
       {open && (
-        <div className="combo-panel" role="listbox" aria-label={label}>
-          <input
-            ref={inputRef}
-            className="combo-filter"
-            value={filter}
-            placeholder={filterPlaceholder}
-            aria-label={`${label} — ${filterPlaceholder}`}
-            onChange={(event) => { setFilter(event.target.value); setHighlight(0); }}
-            onKeyDown={onKeyDown}
-          />
+        <div
+          className="combo-panel"
+          role="listbox"
+          aria-label={label}
+          ref={panelRef}
+          tabIndex={searchable ? undefined : -1}
+          onKeyDown={searchable ? undefined : onKeyDown}
+        >
+          {searchable && (
+            <input
+              ref={inputRef}
+              className="combo-filter"
+              value={filter}
+              placeholder={filterPlaceholder}
+              aria-label={`${label} — ${filterPlaceholder}`}
+              onChange={(event) => { setFilter(event.target.value); setHighlight(0); }}
+              onKeyDown={onKeyDown}
+            />
+          )}
           <div className="combo-options" ref={listRef}>
             {matches.map((option, index) => {
               const header = option.group && option.group !== lastGroup ? option.group : null;

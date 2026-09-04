@@ -9,11 +9,9 @@ import {
   useLocalVerse,
   verseImageFilename,
   verseImageFontRange,
-  type Language,
   type WordApp,
 } from '@the-word/core';
 import { BookBibleIcon } from './icons';
-import { SearchableSelect } from './SearchableSelect';
 import { useSavedDailyVerse } from './savedDailyVerse';
 import { downloadVerseImage } from './verseImageExport';
 
@@ -25,10 +23,17 @@ export function Landing({
   app,
   onEnterReader,
   onGroupStudy,
+  onBookmarks,
+  onPreferences,
+  partyMembers,
 }: {
   app: WordApp;
   onEnterReader: () => void;
   onGroupStudy?: () => void;
+  onBookmarks?: () => void;
+  onPreferences?: () => void;
+  // Live Group Study roster, so the landing shows who is connected.
+  partyMembers?: number;
 }) {
   const { label, language } = app;
   const urls = useMemo(() => {
@@ -76,7 +81,9 @@ export function Landing({
     if (!parsed) return;
     if (speak !== 'none') app.unlockSpeech();
     if (speak === 'from') app.speakFromVerse(parsed.bookId, parsed.chapter, parsed.verse);
-    else if (speak === 'chapter') app.speakChapterAt(parsed.bookId, parsed.chapter, parsed.verse);
+    // No focus verse: the chapter is read from verse 1, so the page should sit
+    // at the top rather than jumping to the day's verse and back.
+    else if (speak === 'chapter') app.speakChapterAt(parsed.bookId, parsed.chapter);
     else app.goToVerse(parsed.bookId, parsed.chapter, parsed.verse);
     onEnterReader();
   }, [app, onEnterReader, parsed]);
@@ -115,15 +122,20 @@ export function Landing({
           <h1 className="landing-wordmark">The Word</h1>
         </div>
         <div className="landing-bar-actions">
-          <SearchableSelect
-            compact
-            className="language-select"
-            value={language}
-            onChange={(value) => app.changeLanguage(value as Language)}
-            label={label.interfaceLanguage}
-            filterPlaceholder={label.filterPlaceholder}
-            options={app.languageOptions}
+          <input
+            className="landing-bar-search"
+            type="search"
+            placeholder={label.searchPlaceholder}
+            value={app.query}
+            onChange={(event) => {
+              app.setQuery(event.target.value);
+              if (event.target.value.trim()) app.setSelectedTopic('');
+            }}
+            aria-label={label.search}
           />
+          {onPreferences && (
+            <button className="icon-button" onClick={onPreferences} aria-label={label.preferences} title={label.preferences}>⚙</button>
+          )}
           <button className="icon-button" onClick={app.toggleTheme} aria-label={label.toggleTheme} title={label.toggleTheme}>◐</button>
         </div>
       </header>
@@ -198,21 +210,20 @@ export function Landing({
               {app.hasProgress ? label.continueAt(`${app.bookName} ${app.chapterNumber}`) : label.readTheBible}
             </button>
             {onGroupStudy && (
-              <button className="landing-group" onClick={onGroupStudy}>{label.readParty}</button>
+              <button className="landing-group" onClick={onGroupStudy}>
+                {label.readParty}
+                {partyMembers ? <span className="landing-count">{partyMembers}</span> : null}
+              </button>
+            )}
+            {onBookmarks && (
+              <button className="landing-group" onClick={onBookmarks}>
+                {label.bookmarks}
+                {app.bookmarkList.length ? <span className="landing-count">{app.bookmarkList.length}</span> : null}
+              </button>
             )}
           </div>
 
           <div className="landing-search">
-            <input
-              type="search"
-              placeholder={label.searchPlaceholder}
-              value={app.query}
-              onChange={(event) => {
-                app.setQuery(event.target.value);
-                if (event.target.value.trim()) app.setSelectedTopic('');
-              }}
-              aria-label={label.search}
-            />
             {!searching && (
               <div className="landing-topics">
                 <h2 className="section-label">{label.browseByTopic}</h2>

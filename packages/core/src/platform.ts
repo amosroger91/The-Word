@@ -41,6 +41,8 @@ export interface VoiceOption {
   id: string;
   name: string;
   locale: string;
+  // The stock voice, shown under a translated name rather than its model id.
+  isDefault?: boolean;
 }
 
 export interface Platform {

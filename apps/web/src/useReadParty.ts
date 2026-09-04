@@ -15,6 +15,18 @@ function randomFrom<T>(list: T[]): T { return list[Math.floor(Math.random() * li
 function randomName(): string { return `${randomFrom(ADJECTIVES)} ${randomFrom(NOUNS)}`; }
 function randomCode(): string { return Math.random().toString(36).slice(2, 7); }
 
+const NAME_KEY = 'word.partyName';
+
+// The name other readers see. Chosen at random the first time, then kept — and
+// editable in Preferences — so a returning reader is recognisable.
+function storedName(): string {
+  try {
+    const saved = localStorage.getItem(NAME_KEY)?.trim();
+    if (saved) return saved.slice(0, 40);
+  } catch { /* storage blocked */ }
+  return randomName();
+}
+
 function actionFor(speechState: WordApp['speechState']): ReadingState['action'] {
   return speechState === 'speaking' ? 'playing' : speechState === 'paused' ? 'paused' : 'idle';
 }
@@ -33,7 +45,8 @@ export function useReadParty(app: WordApp) {
   // tap-to-read-along button if the browser still blocks autoplay.
   const [armed, setArmed] = useState(false);
 
-  const identityRef = useRef({ id: 'me-' + randomCode(), name: randomName(), color: randomFrom(COLORS) });
+  const identityRef = useRef({ id: 'me-' + randomCode(), name: storedName(), color: randomFrom(COLORS) });
+  const [name, setNameValue] = useState(identityRef.current.name);
   // The last reading state the HOST broadcast, so we don't re-send identical updates.
   const lastSentRef = useRef<string>('');
   // Last verse this device actually started speaking, so we don't re-trigger the
@@ -148,6 +161,16 @@ export function useReadParty(app: WordApp) {
   // highlighting even before (or without) local audio.
   const hostVerse = (Boolean(room) && !isHost && following && remoteReading?.action !== 'idle') ? (remoteReading?.verse ?? null) : null;
 
+  // Renaming applies live: the roster in an open room updates too.
+  const setName = useCallback((next: string) => {
+    const clean = next.trim().slice(0, 40);
+    if (!clean) return;
+    identityRef.current.name = clean;
+    setNameValue(clean);
+    try { localStorage.setItem(NAME_KEY, clean); } catch { /* storage blocked */ }
+    room?.updateIdentity({ name: clean });
+  }, [room]);
+
   return {
     active: Boolean(room),
     code,
@@ -163,6 +186,8 @@ export function useReadParty(app: WordApp) {
     needsArm,
     hostVerse,
     identity: identityRef.current,
+    name,
+    setName,
     createParty,
     joinParty: (code: string) => startParty(code, { armed: true }),
     leaveParty,

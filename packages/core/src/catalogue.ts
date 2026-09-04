@@ -40,13 +40,15 @@ export const readingFonts: ReadingFont[] = [
 export interface SpeechVoice {
   id: string;
   name: string;
+  // The stock voice, shown under a translated name rather than its model id.
+  isDefault?: boolean;
   language: Language;
   // BCP-47 tag handed to the platform speech engine.
   locale: string;
 }
 
 export const speechVoices: SpeechVoice[] = [
-  { id: 'en_US-libritts_r-medium', name: 'LibriTTS', language: 'en', locale: 'en-US' },
+  { id: 'en_US-libritts_r-medium', name: 'Default Voice', isDefault: true, language: 'en', locale: 'en-US' },
   { id: 'en_US-amy-medium', name: 'Amy', language: 'en', locale: 'en-US' },
   { id: 'en_US-ryan-medium', name: 'Ryan', language: 'en', locale: 'en-US' },
   { id: 'en_GB-alan-medium', name: 'Alan', language: 'en', locale: 'en-GB' },
