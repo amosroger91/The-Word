@@ -1,0 +1,22 @@
+{
+  "expo": {
+    "name": "The Word",
+    "slug": "the-word",
+    "version": "0.0.1",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "plugins": [
+      "expo-font"
+    ],
+    "ios": {
+      "bundleIdentifier": "com.theword.reader",
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.theword.reader"
+    }
+  }
+}

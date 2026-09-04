@@ -1,0 +1,25 @@
+node_modules/
+dist/
+build/
+.expo/
+.env
+.env.*
+*.log
+*.log.err
+*.err
+coverage/
+data/*.db
+data/*.db-*
+.usfm-cache/
+.expo-export/
+.DS_Store
+Thumbs.db
+
+# Downloaded at predev (mobile fonts, Piper voices, copied WASM)
+**/assets/fonts/
+**/public/models/
+**/public/onnx/
+**/public/piper/
+**/public/worker/models/
+**/public/worker/onnx/
+**/public/worker/piper/
