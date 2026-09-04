@@ -34,6 +34,10 @@ export function backgroundById(id: string) {
   return verseBackgrounds.find((item) => item.id === id) ?? verseBackgrounds[0];
 }
 
+export function randomBackground() {
+  return verseBackgrounds[Math.floor(Math.random() * verseBackgrounds.length)];
+}
+
 export function backgroundForSeed(seed: string) {
   let total = 0;
   for (let index = 0; index < seed.length; index += 1) total += seed.charCodeAt(index) * (index + 1);

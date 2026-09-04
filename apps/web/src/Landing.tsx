@@ -2,8 +2,8 @@ import { useCallback, useMemo, useState } from 'react';
 import { localBible } from '@the-word/bible';
 import {
   DAILY_VERSE_API,
-  backgroundForSeed,
   overlayFor,
+  randomBackground,
   useDailyVerse,
   useLocalVerse,
   verseImageFilename,
@@ -45,7 +45,9 @@ export function Landing({
   const spokenReference = parsed ? label.verseReference(bookName, parsed.chapter, [parsed.verse]) : displayReference;
   const canRead = Boolean(parsed && local.ready && local.text);
   const bookmarked = parsed ? app.isBookmarked(parsed.bookId, parsed.chapter, parsed.verse) : false;
-  const art = backgroundForSeed(daily.verse?.date || daily.verse?.ref || 'verse');
+  // A fresh photograph each visit, held steady for the session so the card
+  // and the image it exports always agree.
+  const [art] = useState(randomBackground);
   const artUrl = `${import.meta.env.BASE_URL}backgrounds/${art.file}`;
   const artOverlay = overlayFor(art.kind);
   const searching = Boolean(app.query.trim() || app.selectedTopic);
