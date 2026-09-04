@@ -43,6 +43,24 @@ function asDailyVerse(data: unknown): DailyVerse {
   };
 }
 
+const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+
+// The feed dates in English ("4th Sep 2026"). Reformat it in the reader's own
+// language so a translated sentence does not carry an English ordinal.
+export function formatVerseDate(raw: string, language: string) {
+  const match = /^(\d{1,2})[a-z]*\s+([a-z]+)\.?\s+(\d{4})$/i.exec(raw.trim());
+  if (!match) return raw;
+  const month = MONTHS.indexOf(match[2].slice(0, 3).toLowerCase());
+  if (month < 0) return raw;
+  const date = new Date(Number(match[3]), month, Number(match[1]));
+  if (Number.isNaN(date.getTime())) return raw;
+  try {
+    return new Intl.DateTimeFormat(language, { day: 'numeric', month: 'long', year: 'numeric' }).format(date);
+  } catch {
+    return raw;
+  }
+}
+
 let cache: { key: string; verse: DailyVerse } | null = null;
 
 function cacheKey(urls: string[]) {

@@ -1,7 +1,8 @@
 import { useCallback, useMemo, useState } from 'react';
-import { localBible } from '@the-word/bible';
+import { localBible, parseReference } from '@the-word/bible';
 import {
   DAILY_VERSE_API,
+  formatVerseDate,
   overlayFor,
   randomBackground,
   useDailyVerse,
@@ -13,7 +14,12 @@ import {
 } from '@the-word/core';
 import { BookBibleIcon } from './icons';
 import { SearchableSelect } from './SearchableSelect';
+import { useSavedDailyVerse } from './savedDailyVerse';
 import { downloadVerseImage } from './verseImageExport';
+
+// Shown only when the feed fails and nothing was ever saved. The text comes
+// from the bundled translation, so the card still works with no network.
+const OFFLINE_REF = parseReference('John 3:16');
 
 export function Landing({
   app,
@@ -32,16 +38,20 @@ export function Landing({
       : [snapshot, DAILY_VERSE_API];
   }, []);
   const daily = useDailyVerse(urls);
-  const parsed = daily.verse?.parsed ?? null;
+  const saved = useSavedDailyVerse(daily.verse);
+
+  const failed = daily.status === 'error';
+  const verse = daily.verse ?? (failed ? saved : null);
+  const parsed = verse?.parsed ?? (failed && !verse ? OFFLINE_REF : null);
   const local = useLocalVerse(app.translationId, parsed);
   const [exporting, setExporting] = useState(false);
 
-  const bookName = parsed ? (localBible.getBook(parsed.bookId, app.translationId)?.name ?? daily.verse?.ref ?? '') : '';
+  const bookName = parsed ? (localBible.getBook(parsed.bookId, app.translationId)?.name ?? verse?.ref ?? '') : '';
   const translationName = app.translations.find((item) => item.id === app.translationId)?.shortName ?? '';
-  const displayText = local.text ?? daily.verse?.text ?? '';
+  const displayText = local.text ?? verse?.text ?? '';
   const displayReference = parsed
     ? `${bookName} ${parsed.chapter}:${parsed.verse}`
-    : daily.verse?.ref ?? '';
+    : verse?.ref ?? '';
   const spokenReference = parsed ? label.verseReference(bookName, parsed.chapter, [parsed.verse]) : displayReference;
   const canRead = Boolean(parsed && local.ready && local.text);
   const bookmarked = parsed ? app.isBookmarked(parsed.bookId, parsed.chapter, parsed.verse) : false;
@@ -52,6 +62,15 @@ export function Landing({
   const artOverlay = overlayFor(art.kind);
   const searching = Boolean(app.query.trim() || app.selectedTopic);
   const activeTopic = app.topics.find((topic) => topic.id === app.selectedTopic);
+
+  const heading = verse?.date
+    ? label.verseOfTheDayFor(formatVerseDate(verse.date, language))
+    : label.verseOfTheDay;
+  const status = daily.status === 'loading'
+    ? label.loadingVerse
+    : failed
+      ? label.dailyVerseUnavailable
+      : `${heading}. ${displayReference}`;
 
   const enter = useCallback((speak: 'from' | 'chapter' | 'none') => {
     if (!parsed) return;
@@ -93,7 +112,7 @@ export function Landing({
       <header className="landing-bar">
         <div className="landing-logo">
           <span className="landing-mark" role="img" aria-hidden="true"><BookBibleIcon /></span>
-          <span className="landing-wordmark">The Word</span>
+          <h1 className="landing-wordmark">The Word</h1>
         </div>
         <div className="landing-bar-actions">
           <SearchableSelect
@@ -110,61 +129,67 @@ export function Landing({
       </header>
 
       <main className="landing-main">
-        <section className="landing-hero" aria-live="polite">
-          {daily.status === 'loading' && (
-            <div className="verse-card verse-card-fallback"><p className="muted">{label.loadingVerse}</p></div>
-          )}
-          {daily.status === 'error' && (
-            <div className="verse-card verse-card-fallback">
-              <p className="muted">{label.dailyVerseUnavailable}</p>
-              <button className="landing-secondary" onClick={daily.reload}>{label.tryAgain}</button>
-            </div>
-          )}
-          {daily.status === 'ready' && daily.verse && (
-            <article className="verse-card">
-              <div className="verse-art" style={{ backgroundImage: `url(${artUrl})` }}>
-                {artOverlay > 0 ? <div className="verse-art-overlay" style={{ opacity: artOverlay }} /> : null}
-                <div className="verse-art-scrim" />
-                <div className="verse-copy">
-                  <span className="verse-eyebrow">{label.verseOfTheDayFor(daily.verse.date)}</span>
-                  <blockquote>{displayText}</blockquote>
+        {/* Only the outcome is announced — the card itself is ordinary content,
+            so the action buttons do not re-announce it as they change. */}
+        <p className="visually-hidden" role="status">{status}</p>
+
+        <section className="landing-hero">
+          <article className="verse-card">
+            <div className="verse-art" style={{ backgroundImage: `url(${artUrl})` }}>
+              {artOverlay > 0 ? <div className="verse-art-overlay" style={{ opacity: artOverlay }} /> : null}
+              <div className="verse-art-scrim" />
+              <div className="verse-copy">
+                <h2 className="verse-eyebrow">{heading}</h2>
+                {displayText
+                  ? <blockquote>{displayText}</blockquote>
+                  : <p className="verse-waiting">{failed ? label.dailyVerseUnavailable : label.loadingVerse}</p>}
+                {displayText && displayReference && (
                   <div className="verse-foot">
                     <cite>
                       {displayReference}
                       {translationName ? <span className="verse-translation">{translationName}</span> : null}
                     </cite>
                     {/* Preview only — the exported PNG carries its own footer. */}
-                    <a className="verse-credit" href={daily.verse.url} target="_blank" rel="noreferrer">{label.dailyVerseCredit}</a>
-                  </div>
-                </div>
-              </div>
-
-              {parsed && (
-                <div className="verse-tools">
-                  <div className="verse-tools-primary">
-                    {app.speechState === 'idle' ? (
-                      <>
-                        <button className="primary" disabled={!canRead} onClick={() => enter('from')}>{label.readFromHere}</button>
-                        <button className="primary" disabled={!canRead} onClick={() => enter('chapter')}>{label.readTheChapter}</button>
-                      </>
-                    ) : (
-                      <>
-                        {app.speechState === 'speaking' && <button className="primary" onClick={app.pauseSpeech}>{label.pause}</button>}
-                        {app.speechState === 'paused' && <button className="primary" onClick={app.resumeSpeech}>{label.resume}</button>}
-                        <button onClick={app.stopSpeech}>{label.stop}</button>
-                      </>
+                    {verse?.url && (
+                      <a className="verse-credit" href={verse.url} target="_blank" rel="noreferrer">{label.dailyVerseCredit}</a>
                     )}
                   </div>
-                  <div className="verse-tools-secondary">
-                    <button onClick={() => enter('none')}>{label.openThisVerse}</button>
-                    <button disabled={!displayText} onClick={() => { void app.copyPassage(spokenReference, displayText); }}>{label.copy}</button>
-                    <button disabled={!displayText || exporting} onClick={() => { void saveImage(); }}>{exporting ? label.exporting : label.image}</button>
-                    <button className={bookmarked ? 'active' : ''} onClick={() => app.toggleBookmarkAt(parsed.bookId, parsed.chapter, parsed.verse)}>{label.bookmark}</button>
-                  </div>
+                )}
+              </div>
+            </div>
+
+            {failed && (
+              <p className="verse-notice">
+                {displayText ? <span>{label.dailyVerseUnavailable}</span> : null}
+                <button type="button" onClick={daily.reload}>{label.tryAgain}</button>
+              </p>
+            )}
+
+            {parsed && displayText && (
+              <div className="verse-tools">
+                <div className="verse-tools-primary">
+                  {app.speechState === 'idle' ? (
+                    <>
+                      <button className="primary" disabled={!canRead} onClick={() => enter('from')}>{label.readFromHere}</button>
+                      <button className="primary" disabled={!canRead} onClick={() => enter('chapter')}>{label.readTheChapter}</button>
+                    </>
+                  ) : (
+                    <>
+                      {app.speechState === 'speaking' && <button className="primary" onClick={app.pauseSpeech}>{label.pause}</button>}
+                      {app.speechState === 'paused' && <button className="primary" onClick={app.resumeSpeech}>{label.resume}</button>}
+                      <button onClick={app.stopSpeech}>{label.stop}</button>
+                    </>
+                  )}
                 </div>
-              )}
-            </article>
-          )}
+                <div className="verse-tools-secondary">
+                  <button onClick={() => enter('none')}>{label.openThisVerse}</button>
+                  <button disabled={!displayText} onClick={() => { void app.copyPassage(spokenReference, displayText); }}>{label.copy}</button>
+                  <button disabled={!displayText || exporting} onClick={() => { void saveImage(); }}>{exporting ? label.exporting : label.image}</button>
+                  <button className={bookmarked ? 'active' : ''} onClick={() => app.toggleBookmarkAt(parsed.bookId, parsed.chapter, parsed.verse)}>{label.bookmark}</button>
+                </div>
+              </div>
+            )}
+          </article>
         </section>
 
         <aside className="landing-rail">
@@ -190,7 +215,7 @@ export function Landing({
             />
             {!searching && (
               <div className="landing-topics">
-                <span className="section-label">{label.browseByTopic}</span>
+                <h2 className="section-label">{label.browseByTopic}</h2>
                 <div className="landing-topic-list">
                   {app.topics.map((topic) => (
                     <button

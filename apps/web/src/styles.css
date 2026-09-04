@@ -232,7 +232,7 @@ select, input { border: 1px solid #c9c1b3; border-radius: 8px; background: trans
 .landing-logo { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .landing-mark { color: var(--accent); font-size: 26px; display: inline-flex; }
 .landing-mark svg { display: block; }
-.landing-wordmark { font-size: 21px; letter-spacing: .01em; white-space: nowrap; }
+.landing-wordmark { margin: 0; font-size: 21px; font-weight: 400; letter-spacing: .01em; white-space: nowrap; }
 .landing-bar-actions { display: flex; align-items: center; gap: 8px; }
 
 .landing-main {
@@ -271,7 +271,7 @@ select, input { border: 1px solid #c9c1b3; border-radius: 8px; background: trans
 /* Keeps the copy legible over the light parts of a photograph. */
 .verse-art-scrim { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(to top, #000000c9 0%, #0000009e 38%, #00000047 68%, #00000000 100%); }
 .verse-copy { position: relative; z-index: 1; display: grid; gap: 14px; width: 100%; }
-.verse-eyebrow { text-transform: uppercase; letter-spacing: .16em; font-size: 11px; font-weight: 700; color: #ffffffc7; }
+.verse-eyebrow { margin: 0; text-transform: uppercase; letter-spacing: .16em; font-size: 11px; font-weight: 700; color: #ffffffc7; }
 .verse-art blockquote {
   margin: 0;
   /* The measure is in em so the line length tracks the type size at any width. */
@@ -286,7 +286,7 @@ select, input { border: 1px solid #c9c1b3; border-radius: 8px; background: trans
 /* Reference bottom-left, source credit bottom-right, both over the artwork. */
 .verse-foot { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; }
 .verse-art cite { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; font-style: normal; font-weight: 700; font-size: 15px; letter-spacing: .02em; color: #fff; }
-.verse-credit { font-size: 11px; letter-spacing: .04em; color: #ffffffb0; text-decoration: none; text-shadow: 0 1px 8px #0000008c; }
+.verse-credit { display: inline-block; padding: 14px 8px; margin: -14px -8px; font-size: 11px; letter-spacing: .04em; color: #ffffffb0; text-decoration: none; text-shadow: 0 1px 8px #0000008c; }
 .verse-credit:hover { color: #fff; text-decoration: underline; }
 .verse-translation { font-weight: 400; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; padding: 4px 9px; border-radius: 999px; background: #ffffff26; border: 1px solid #ffffff40; }
 
@@ -331,10 +331,28 @@ select, input { border: 1px solid #c9c1b3; border-radius: 8px; background: trans
 
 .landing-topics { display: grid; gap: 10px; }
 .landing-topic-list { display: flex; flex-wrap: wrap; gap: 8px; }
-.landing-topic { border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: inherit; padding: 9px 15px; font-size: 14px; }
+.landing-topic { display: inline-flex; align-items: center; min-height: 44px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: inherit; padding: 9px 16px; font-size: 14px; }
 .landing-topic:hover { border-color: var(--accent); color: var(--accent-strong); }
 :root[data-theme='dark'] .landing-topic:hover { color: var(--accent); }
 .landing-results .topic-chip { margin: 0; }
+
+/* Screen-reader-only status line; the card itself is not a live region. */
+.visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0; }
+
+/* The card holds its shape while the verse loads, or if it never arrives. */
+.verse-waiting { margin: 0; font-size: clamp(19px, 2vw, 24px); font-style: italic; color: #ffffffd6; text-shadow: 0 2px 14px #00000059; }
+.verse-notice { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin: 0; padding: 14px clamp(16px, 2.4vw, 24px) 0; font-size: 13px; color: var(--ink-soft); }
+.verse-notice button { min-height: 44px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-soft); color: inherit; padding: 10px 16px; font-size: 14px; }
+.verse-notice button:hover { border-color: var(--accent); }
+.verse-notice + .verse-tools { padding-top: 12px; }
+
+/* A focus ring that survives both the parchment and the photograph. */
+.landing :is(button, a, input, [tabindex]):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.landing .verse-art :is(button, a):focus-visible { outline: 2px solid #fff; outline-offset: 3px; border-radius: 4px; }
+
+/* 44px targets in the top bar. */
+.landing-bar .icon-button { min-width: 44px; min-height: 44px; }
+.landing-bar .combo-compact .combo-value { min-height: 44px; }
 
 .topbar-home { display: flex; align-items: center; gap: 14px; min-width: 0; border: 0; background: transparent; color: inherit; padding: 0; text-align: left; }
 
