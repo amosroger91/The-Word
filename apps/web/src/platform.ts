@@ -42,6 +42,7 @@ export function createWebSpeech(): SpeechAdapter {
   // True while a verse is loaded (playing or paused) — pause()/resume() need this
   // because the element itself always exists.
   let hasVerse = false;
+  let pausedByUser = false;
 
   // import.meta.env.BASE_URL always ends in '/'. It is '/' for local/root deploys
   // and the repository subpath (e.g. '/The-Word/') on GitHub Pages, so the
@@ -73,6 +74,13 @@ export function createWebSpeech(): SpeechAdapter {
     audio.onended = null;
     audio.onerror = null;
     audio.onpause = null;
+    audio.oncanplay = null;
+  }
+
+  function isPlayInterrupted(err: unknown) {
+    if (!err || typeof err !== 'object') return false;
+    const e = err as { name?: string; message?: string };
+    return e.name === 'AbortError' || /interrupted by a call to pause/i.test(e.message ?? '');
   }
 
   function clearMedia() {
@@ -83,6 +91,7 @@ export function createWebSpeech(): SpeechAdapter {
     audio.removeAttribute('src');
     revokeUrl();
     hasVerse = false;
+    pausedByUser = false;
   }
 
   return {
@@ -100,37 +109,85 @@ export function createWebSpeech(): SpeechAdapter {
       audio.playbackRate = rate;
       audio.volume = volume;
       hasVerse = true;
+      pausedByUser = false;
       try {
         return await new Promise<'ended' | 'stopped'>((resolve, reject) => {
+          let settled = false;
+          let readyTimer = 0;
           const stale = () => started !== generation;
-          audio.onended = () => { if (!stale()) resolve('ended'); };
+          const finish = (result: 'ended' | 'stopped') => {
+            if (settled) return;
+            settled = true;
+            window.clearTimeout(readyTimer);
+            detachHandlers();
+            resolve(result);
+          };
+
+          audio.onended = () => finish(stale() ? 'stopped' : 'ended');
           audio.onerror = () => {
-            if (stale()) resolve('stopped');
+            if (stale() || pausedByUser) finish('stopped');
             else reject(new Error('Piper could not play this verse.'));
           };
-          // stop() bumps generation then pauses; pause() does not, so the verse stays pending.
-          audio.onpause = () => { if (stale()) resolve('stopped'); };
-          void audio.play().catch((err) => {
-            if (stale()) resolve('stopped');
-            else reject(err);
-          });
+          // stop() bumps generation then pauses; a user pause does not, so the
+          // verse stays pending for resume(). Android Chrome also pauses internally
+          // while a blob is loading — that must not reject play().
+          audio.onpause = () => { if (stale()) finish('stopped'); };
+
+          const attemptPlay = (tries: number) => {
+            if (settled) return;
+            if (stale() || pausedByUser) { finish('stopped'); return; }
+            const p = audio.play();
+            if (!p) return;
+            void p.catch((err) => {
+              if (settled) return;
+              if (stale() || pausedByUser) { finish('stopped'); return; }
+              // Chrome Android: "The play() request was interrupted by a call to pause()"
+              // when src is still buffering, unlock() pauses silence, or the next verse
+              // replaces src. Retry a couple of times; otherwise keep waiting for ended.
+              if (isPlayInterrupted(err)) {
+                if (tries > 0) window.setTimeout(() => attemptPlay(tries - 1), 60);
+                else finish('stopped');
+                return;
+              }
+              settled = true;
+              window.clearTimeout(readyTimer);
+              detachHandlers();
+              reject(err);
+            });
+          };
+
+          if (audio.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) {
+            attemptPlay(2);
+            return;
+          }
+          readyTimer = window.setTimeout(() => attemptPlay(2), 4000);
+          audio.oncanplay = () => {
+            window.clearTimeout(readyTimer);
+            audio.oncanplay = null;
+            attemptPlay(2);
+          };
+          audio.load();
         });
       } finally {
         if (started === generation) {
           detachHandlers();
-          revokeUrl();
           hasVerse = false;
         }
       }
     },
     pause() {
       if (!hasVerse) return false;
+      pausedByUser = true;
       audio.pause();
       return true;
     },
     resume() {
       if (!hasVerse) return false;
-      void audio.play();
+      pausedByUser = false;
+      void audio.play().catch((err) => {
+        if (isPlayInterrupted(err)) return;
+        console.warn('resume play failed', err);
+      });
       return true;
     },
     stop() {
@@ -148,16 +205,15 @@ export function createWebSpeech(): SpeechAdapter {
     // Play silence on the persistent element during a user gesture so later
     // verse playback (after TTS generation) is allowed without another tap.
     unlock() {
+      if (hasVerse) return;
       const started = generation;
       const prev = audio.volume;
       audio.volume = 0;
       audio.src = SILENT_WAV;
-      void audio.play().then(() => {
-        if (started !== generation || hasVerse) return;
-        audio.pause();
-        audio.currentTime = 0;
-        audio.volume = prev;
-      }).catch(() => {
+      // Do not pause() after this play() — on Chrome Android that rejects an
+      // overlapping verse play() with "interrupted by a call to pause()".
+      // speak() replaces src when the verse is ready; volume is restored there.
+      void audio.play().catch(() => {
         if (started === generation && !hasVerse) audio.volume = prev;
       });
     },

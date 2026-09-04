@@ -17,6 +17,12 @@ function isAutoplayBlocked(error: unknown): boolean {
   return err.name === 'NotAllowedError' || /user gesture|didn't interact|notallowed/i.test(err.message ?? '');
 }
 
+function isPlayInterrupted(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const err = error as { name?: string; message?: string };
+  return err.name === 'AbortError' || /interrupted by a call to pause/i.test(err.message ?? '');
+}
+
 export function useSpeech(adapter: SpeechAdapter, options: SpeakOptions, onComplete?: () => void) {
   const [state, setState] = useState<SpeechState>('idle');
   const [speakingVerse, setSpeakingVerse] = useState<number | null>(null);
@@ -66,6 +72,12 @@ export function useSpeech(adapter: SpeechAdapter, options: SpeakOptions, onCompl
         setError('');
         setSpeakingVerse(null);
         setState('idle');
+        return;
+      }
+      // Chrome Android rejects play() when a pause() races the start of playback.
+      // The adapter retries; if one still escapes, do not show it as a hard failure.
+      if (isPlayInterrupted(e)) {
+        setError('');
         return;
       }
       setError(e instanceof Error ? e.message : 'Speech failed.');
