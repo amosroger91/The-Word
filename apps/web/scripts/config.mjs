@@ -10,8 +10,14 @@ const modules = await Promise.all([
 const root = process.cwd();
 const packages = fileURLToPath(new URL('../../../packages/', import.meta.url));
 
+// GitHub Pages serves the site under a repository subpath (e.g. /The-Word/).
+// Set BASE_PATH at build time to that subpath; it defaults to '/' for local dev
+// and any root-hosted deploy. Vite exposes this to app code as import.meta.env.BASE_URL.
+const base = process.env.BASE_PATH || '/';
+
 export default {
   root,
+  base,
   plugins: [
     modules[2].default(),
     modules[3].default(),
@@ -32,6 +38,11 @@ export default {
       '@the-word/bible': packages.replace(/[\\/]$/, '') + '/bible/src/index.ts',
       '@the-word/shared': packages.replace(/[\\/]$/, '') + '/shared/src/index.ts',
     },
+    // packages/core is consumed as raw source via the aliases above, but React
+    // is only installed under apps/web. Deduping forces every bare 'react' import
+    // (including core's hooks) to resolve from the app, instead of the unresolved
+    // optional peer-dep stub that breaks the production Rollup build.
+    dedupe: ['react', 'react-dom'],
   },
   optimizeDeps: {
     exclude: ['@the-word/core', '@the-word/bible', '@the-word/shared', 'piper-tts-web'],

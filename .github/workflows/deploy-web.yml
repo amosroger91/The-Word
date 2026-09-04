@@ -1,0 +1,71 @@
+name: Deploy web to GitHub Pages
+
+# Builds apps/web and publishes it to GitHub Pages on every push to main.
+# In the repository settings, set Pages -> Build and deployment -> Source to
+# "GitHub Actions" once; this workflow does the rest.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Least-privilege token for deploying to Pages.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Let one deploy finish rather than cancelling it; never run two at once.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Configure GitHub Pages
+        # enablement:true turns Pages on and sets its source to GitHub Actions,
+        # so no manual repository-settings step is needed on first run.
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Install web + shared dependencies
+        # Only the packages the web build needs — skips the heavy Expo mobile app.
+        run: |
+          npm --prefix packages/shared install
+          npm --prefix packages/bible install
+          npm --prefix packages/core install
+          npm --prefix apps/web install
+
+      - name: Build web client
+        # The site is served from https://<user>.github.io/The-Word/, so the
+        # asset base path must match the repository name.
+        env:
+          BASE_PATH: /The-Word/
+        run: npm run build:web
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/web/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

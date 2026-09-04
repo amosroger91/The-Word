@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#f7f4ee" />
     <title>The Word</title>
+    <!-- Restores cross-origin isolation on static hosts (GitHub Pages) that cannot
+         send COOP/COEP headers, so Piper read-aloud's threaded WASM can run.
+         No-op when the host already sends those headers (local dev, root deploys). -->
+    <script src="/coi-serviceworker.js"></script>
   </head>
   <body>
     <div id="root"></div>
