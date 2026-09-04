@@ -34,10 +34,18 @@ function App() {
   useEffect(() => { document.documentElement.lang = language; }, [language]);
   useEffect(() => { document.documentElement.style.setProperty('--app-font', app.font.stack); }, [app.font]);
 
+  // Preload the selected voice as soon as the page is ready (and whenever it
+  // changes) so pressing Read aloud plays instantly instead of downloading first.
+  useEffect(() => { speech.prewarm?.(speechVoice); }, [speech, speechVoice]);
+
+  // Highlight/scroll to the verse being read locally, or — for a Read Party
+  // participant — to the verse the host is currently on.
+  const followVerse = party.hostVerse;
   useEffect(() => {
-    if (speakingVerse === null) return;
-    verseRefs.current[speakingVerse]?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-  }, [speakingVerse, app.bookId, chapterNumber]);
+    const verse = speakingVerse ?? followVerse;
+    if (verse == null) return;
+    verseRefs.current[verse]?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, [speakingVerse, followVerse, app.bookId, chapterNumber]);
 
   useEffect(() => {
     const element = controlsRef.current;
@@ -171,11 +179,12 @@ function App() {
               {chapter.verses.map((verse) => {
                 const selected = selectedVerses.has(verse.ref.verse);
                 const speaking = speakingVerse === verse.ref.verse;
+                const following = !speaking && followVerse === verse.ref.verse;
                 return (
                   <button
                     key={verse.ref.verse}
                     ref={(el) => { verseRefs.current[verse.ref.verse] = el; }}
-                    className={speaking ? 'verse speaking' : selected ? 'verse selected' : 'verse'}
+                    className={speaking ? 'verse speaking' : following ? 'verse following' : selected ? 'verse selected' : 'verse'}
                     onClick={() => app.toggleVerse(verse.ref.verse)}
                   >
                     <sup>{verse.ref.verse}</sup>
@@ -264,9 +273,9 @@ function App() {
           {!party.active ? (
             <div className="party-setup">
               <p className="muted">Read Scripture together in real time. Everyone follows the host to the same passage and reads it aloud on their own device.</p>
-              <button className="party-primary" onClick={party.createParty}>Start a party</button>
+              <button className="party-primary" onClick={() => { speech.unlock?.(); party.createParty(); }}>Start a party</button>
               <div className="party-or"><span>or join one</span></div>
-              <form className="party-join" onSubmit={(event) => { event.preventDefault(); party.joinParty(partyCode); }}>
+              <form className="party-join" onSubmit={(event) => { event.preventDefault(); speech.unlock?.(); party.joinParty(partyCode); }}>
                 <input placeholder="Party code" value={partyCode} onChange={(event) => setPartyCode(event.target.value)} />
                 <button type="submit" disabled={!partyCode.trim()}>Join</button>
               </form>
@@ -284,7 +293,7 @@ function App() {
                 : (
                   <div className="party-follow">
                     <label><input type="checkbox" checked={party.following} onChange={(event) => party.setFollowing(event.target.checked)} /> Follow the host</label>
-                    {party.needsArm && <button className="party-arm" onClick={party.arm}>🔊 Tap to read along</button>}
+                    {party.needsArm && <button className="party-arm" onClick={() => { speech.unlock?.(); party.arm(); }}>🔊 Tap to read along</button>}
                   </div>
                 )}
               <div className="party-members">

@@ -266,6 +266,16 @@ export function useWordApp({ storage, speech, clipboard, voices }: Platform, ini
     })));
   }, [chapter, selectedVerses, selectedReference, player]);
 
+  // Speak a single verse (used by Read Party participants to follow the host's
+  // current verse). Not continuous — it reads just that verse, no auto-advance.
+  const speakVerse = useCallback((verseNumber: number) => {
+    if (!chapter) return;
+    autoAdvanceRef.current = false;
+    const target = chapter.verses.find((verse) => verse.ref.verse === verseNumber);
+    if (!target) return;
+    player.speak([{ verse: target.ref.verse, text: target.text }]);
+  }, [chapter, player]);
+
   // Once continuous mode has advanced to the next chapter and its verses have loaded,
   // start reading them. Gated on the loaded chapter matching the advanced position so
   // it never re-reads the chapter that just finished.
@@ -372,6 +382,7 @@ export function useWordApp({ storage, speech, clipboard, voices }: Platform, ini
     speechState: player.state,
     speakingVerse: player.speakingVerse,
     speechError: player.error,
+    autoplayBlocked: player.autoplayBlocked,
     speechVoice,
     setSpeechVoice,
     voiceOptions,
@@ -383,6 +394,7 @@ export function useWordApp({ storage, speech, clipboard, voices }: Platform, ini
     changeSpeechVolume,
     speakChapter,
     speakSelection,
+    speakVerse,
     pauseSpeech: player.pause,
     resumeSpeech: player.resume,
     stopSpeech,

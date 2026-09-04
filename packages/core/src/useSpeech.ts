@@ -11,10 +11,17 @@ export type SpeechState = 'idle' | 'speaking' | 'paused';
 // Owns the verse queue and the play/pause state machine; the adapter only has to speak one chunk.
 // onComplete fires when the queue drains on its own (not on stop, pause, or error), which is how
 // continuous read-aloud knows a chapter finished and it may advance to the next one.
+function isAutoplayBlocked(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const err = error as { name?: string; message?: string };
+  return err.name === 'NotAllowedError' || /user gesture|didn't interact|notallowed/i.test(err.message ?? '');
+}
+
 export function useSpeech(adapter: SpeechAdapter, options: SpeakOptions, onComplete?: () => void) {
   const [state, setState] = useState<SpeechState>('idle');
   const [speakingVerse, setSpeakingVerse] = useState<number | null>(null);
   const [error, setError] = useState('');
+  const [autoplayBlocked, setAutoplayBlocked] = useState(false);
   const requestRef = useRef(0);
   const queueRef = useRef<SpeechChunk[]>([]);
   const indexRef = useRef(0);
@@ -52,6 +59,15 @@ export function useSpeech(adapter: SpeechAdapter, options: SpeakOptions, onCompl
       onCompleteRef.current?.();
     } catch (e) {
       if (requestId !== requestRef.current) return;
+      // Autoplay blocks are a UX gate, not a speech failure — the party UI
+      // re-shows "tap to read along" instead of an error banner.
+      if (isAutoplayBlocked(e)) {
+        setAutoplayBlocked(true);
+        setError('');
+        setSpeakingVerse(null);
+        setState('idle');
+        return;
+      }
       setError(e instanceof Error ? e.message : 'Speech failed.');
       setSpeakingVerse(null);
       setState('idle');
@@ -66,6 +82,7 @@ export function useSpeech(adapter: SpeechAdapter, options: SpeakOptions, onCompl
     queueRef.current = chunks;
     indexRef.current = 0;
     setError('');
+    setAutoplayBlocked(false);
     setState('speaking');
     void run(requestId);
   }, [adapter, run]);
@@ -92,5 +109,5 @@ export function useSpeech(adapter: SpeechAdapter, options: SpeakOptions, onCompl
     setState('idle');
   }, [adapter]);
 
-  return { state, speakingVerse, error, setError, speak, pause, resume, stop };
+  return { state, speakingVerse, error, setError, autoplayBlocked, speak, pause, resume, stop };
 }

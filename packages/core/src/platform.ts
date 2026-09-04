@@ -24,6 +24,12 @@ export interface SpeechAdapter {
   stop(): void;
   setRate(rate: number): void;
   setVolume(volume: number): void;
+  // Optional: warm the engine and fetch the given voice ahead of time so the
+  // first speak() has no download/init delay. No audio is played.
+  prewarm?(voice: string): void;
+  // Optional: call from a user-gesture handler (e.g. Join) so later playback
+  // is allowed without a second tap. No-op on platforms with no autoplay gate.
+  unlock?(): void;
   dispose(): void;
 }
 

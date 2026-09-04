@@ -32,10 +32,12 @@ export interface PartyChatMessage {
   text: string;
   ts: number;
 }
-// The shared reading session the host controls. Passage + command only.
+// The shared reading session the host controls: passage, command, and the
+// host's current verse so participants can follow along verse by verse.
 export interface ReadingState {
   bookId: number;
   chapter: number;
+  verse: number | null;
   action: 'idle' | 'playing' | 'paused';
   ts: number;
 }

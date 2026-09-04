@@ -60,6 +60,9 @@ select, input { border: 1px solid #c9c1b3; border-radius: 8px; background: trans
 :root[data-theme='dark'] .verse:hover, :root[data-theme='dark'] .verse.selected { background: #3b3529; }
 .verse.speaking { background: #d4bd87; box-shadow: 0 0 0 2px #947849; }
 :root[data-theme='dark'] .verse.speaking { background: #59492f; box-shadow: 0 0 0 2px #c5a76c; }
+/* Read Party: where the host is, on a participant not playing local audio. */
+.verse.following { box-shadow: 0 0 0 2px #2f9e6f; }
+:root[data-theme='dark'] .verse.following { box-shadow: 0 0 0 2px #4bbd8a; }
 .verse sup { color: #a3895e; font-size: .55em; font-weight: 700; margin-right: 7px; vertical-align: top; }
 .words-of-jesus { color: #a5342b; }
 :root[data-theme='dark'] .words-of-jesus { color: #e08a7e; }
