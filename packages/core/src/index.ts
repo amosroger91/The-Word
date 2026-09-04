@@ -5,3 +5,6 @@ export * from './theme';
 export * from './useSpeech';
 export * from './useWordApp';
 export * from './verseImage';
+export * from './verseBackgrounds';
+export * from './dailyVerse';
+export type { CrossReference } from '@the-word/bible';

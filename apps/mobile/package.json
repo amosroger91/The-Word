@@ -17,6 +17,7 @@
     "@the-word/core": "file:../../packages/core",
     "@the-word/shared": "file:../../packages/shared",
     "expo": "~51.0.0",
+    "expo-asset": "~10.0.10",
     "expo-clipboard": "~6.0.3",
     "expo-file-system": "~17.0.1",
     "expo-font": "~12.0.10",

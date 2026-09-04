@@ -2,12 +2,14 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Modal, Platform, Pressable, SafeAreaView, ScrollView, StatusBar as RNStatusBar, StyleSheet, Text, TextInput, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { fontFor, paletteFor, readingFonts, speechRateRange, speechVolumeRange, verseImageFilename, verseRuns, type Language, type Palette, type WordApp } from '@the-word/core';
+import { CrossRefSheet } from './CrossRefSheet';
 import { PickerSheet, type PickerOption } from './PickerSheet';
+import { VerseImageEditor, type VerseImageJob } from './VerseImageEditor';
 import { VerseImageShare, type VerseImageRequest } from './VerseImageShare';
 
 type Sheet = 'translation' | 'book' | 'chapter' | 'font' | 'language' | 'voice' | 'searchBook' | null;
 
-export function Reader({ app }: { app: WordApp }) {
+export function Reader({ app, onHome }: { app: WordApp; onHome?: () => void }) {
   const palette = paletteFor(app.theme);
   const styles = useMemo(() => createStyles(palette), [palette]);
   const [sheet, setSheet] = useState<Sheet>(null);
@@ -15,8 +17,11 @@ export function Reader({ app }: { app: WordApp }) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [bookmarksOpen, setBookmarksOpen] = useState(false);
   const [headerVisible, setHeaderVisible] = useState(true);
+  const [imageJob, setImageJob] = useState<VerseImageJob | null>(null);
   const [imageRequest, setImageRequest] = useState<VerseImageRequest | null>(null);
   const [exportError, setExportError] = useState('');
+  const [xrefVerse, setXrefVerse] = useState<number | null>(null);
+  const skipVerseToggle = useRef(false);
   const scrollRef = useRef<ScrollView>(null);
   const versePositions = useRef<Record<number, number>>({});
   const lastSpokenVerse = useRef<number | null>(null);
@@ -102,7 +107,9 @@ export function Reader({ app }: { app: WordApp }) {
       <StatusBar style={app.theme === 'dark' ? 'light' : 'dark'} />
       <View style={styles.header}>
         <View style={styles.identity}>
-          <Text style={styles.brand}>✦</Text>
+          <Pressable onPress={onHome} disabled={!onHome} accessibilityLabel={label.home} hitSlop={8}>
+            <Text style={styles.brand}>✦</Text>
+          </Pressable>
           <Text style={styles.reference} numberOfLines={1}>{bookName} <Text style={styles.referenceNumber}>{chapterNumber}</Text></Text>
         </View>
         <View style={styles.controlRow}>
@@ -133,10 +140,14 @@ export function Reader({ app }: { app: WordApp }) {
           const selected = app.selectedVerses.has(verse.ref.verse);
           const speaking = speakingVerse === verse.ref.verse;
           const focused = !speaking && !selected && app.focusedVerse === verse.ref.verse;
+          const refs = app.crossRefs[verse.ref.verse];
           return (
             <Pressable
               key={verse.ref.verse}
-              onPress={() => app.toggleVerse(verse.ref.verse)}
+              onPress={() => {
+                if (skipVerseToggle.current) { skipVerseToggle.current = false; return; }
+                app.toggleVerse(verse.ref.verse);
+              }}
               onLayout={(event) => { versePositions.current[verse.ref.verse] = event.nativeEvent.layout.y; }}
               style={[styles.verseRow, selected && styles.verseSelected, speaking && styles.verseSpeaking, focused && styles.verseFocused]}
             >
@@ -146,6 +157,13 @@ export function Reader({ app }: { app: WordApp }) {
                   <Text key={index} style={run.red ? styles.redLetter : undefined}>{run.text}</Text>
                 ))}
                 {app.bookmarks.has(app.bookmarkKey(verse.ref.verse)) ? <Text style={styles.bookmarkMark}> ◆</Text> : null}
+                {refs?.length ? (
+                  <Text
+                    onPress={() => { skipVerseToggle.current = true; setXrefVerse(verse.ref.verse); }}
+                    style={styles.xrefMark}
+                    accessibilityLabel={label.crossReferences}
+                  > ※</Text>
+                ) : null}
               </Text>
             </Pressable>
           );
@@ -166,20 +184,16 @@ export function Reader({ app }: { app: WordApp }) {
             <BarButton styles={styles} text={label.readSelection} onPress={app.speakSelection} />
             <BarButton
               styles={styles}
-              text={imageRequest ? label.exporting : label.image}
-              disabled={Boolean(imageRequest)}
+              text={label.image}
               onPress={() => {
                 if (!app.selectedText) return;
                 setExportError('');
-                setImageRequest({
+                setImageJob({
                   reference: app.selectedReference,
                   text: app.selectedText,
                   translation: app.translations.find((item) => item.id === app.translationId)?.shortName ?? 'KJV',
-                  background: palette.background,
-                  textColor: palette.text,
-                  accent: palette.accent,
-                  fontStack: fontFor(app.fontId).stack,
                   filename: verseImageFilename(bookName, chapterNumber),
+                  seed: app.selectedReference,
                 });
               }}
             />
@@ -204,12 +218,31 @@ export function Reader({ app }: { app: WordApp }) {
 
       {app.speechError ? <View style={styles.error}><Text style={styles.errorText}>{app.speechError}</Text></View> : null}
       {exportError ? <View style={styles.error}><Text style={styles.errorText}>{exportError}</Text></View> : null}
+      {imageJob ? (
+        <VerseImageEditor
+          job={imageJob}
+          fontStack={fontFor(app.fontId).stack}
+          label={label}
+          theme={app.theme}
+          onClose={() => setImageJob(null)}
+          onSave={(request) => { setImageJob(null); setImageRequest(request); }}
+        />
+      ) : null}
       <VerseImageShare
         request={imageRequest}
         onDone={() => { setImageRequest(null); app.clearSelection(); }}
         onError={(message) => { setImageRequest(null); setExportError(message); }}
       />
 
+      {xrefVerse != null && (
+        <CrossRefSheet
+          app={app}
+          verse={xrefVerse}
+          refs={app.crossRefs[xrefVerse] ?? []}
+          styles={styles}
+          onClose={() => setXrefVerse(null)}
+        />
+      )}
       {activeSheet && (
         <PickerSheet
           visible
@@ -407,6 +440,7 @@ function createStyles(palette: Palette) {
     verseNumber: { color: palette.accentSoft, fontSize: 12, fontWeight: '700' },
     redLetter: { color: palette.redLetter },
     bookmarkMark: { color: palette.accent, fontSize: 12 },
+    xrefMark: { color: palette.crossRef, fontSize: 14, fontWeight: '700' },
     empty: { color: palette.muted, fontSize: 15, marginTop: 20 },
     emptyTitle: { color: palette.text, fontSize: 20, marginTop: 28 },
     bar: { position: 'absolute', left: 12, right: 12, bottom: 16, backgroundColor: palette.barBackground, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, gap: 10 },

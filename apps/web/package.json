@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "predev": "node scripts/copy-piper-assets.mjs",
-    "prebuild": "node scripts/copy-piper-assets.mjs",
+    "predev": "node scripts/prepare.mjs",
+    "prebuild": "node scripts/prepare.mjs",
     "dev": "node scripts/dev.mjs",
     "build": "node scripts/build.mjs",
     "typecheck": "tsc --noEmit"

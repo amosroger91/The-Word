@@ -8,31 +8,34 @@ export interface VerseImageInput {
   textColor: string;
   accent: string;
   fontStack: string;
+  fontSize?: number;
+  overlayOpacity?: number;
+  imageDataUrl?: string;
 }
 
 export function verseImageFilename(bookName: string, chapter: number) {
   return `the-word-${bookName.replace(/\s+/g, '-').toLowerCase() || 'verse'}-${chapter}.png`;
 }
 
-export function paintVerseImage(ctx: CanvasRenderingContext2D, input: VerseImageInput) {
-  const { width, height } = verseImageSize;
-  ctx.fillStyle = input.background;
-  ctx.fillRect(0, 0, width, height);
-  ctx.strokeStyle = input.accent;
-  ctx.lineWidth = 3;
-  ctx.strokeRect(width * 0.06, height * 0.05, width * 0.88, height * 0.9);
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillStyle = input.textColor;
-  ctx.font = `600 44px ${input.fontStack}`;
-  ctx.fillText(input.reference, width / 2, height * 0.18);
+function coverDraw(
+  ctx: CanvasRenderingContext2D,
+  image: CanvasImageSource,
+  width: number,
+  height: number,
+) {
+  const source = image as { width: number; height: number };
+  const sourceWidth = Number(source.width) || width;
+  const sourceHeight = Number(source.height) || height;
+  const scale = Math.max(width / sourceWidth, height / sourceHeight);
+  const drawWidth = sourceWidth * scale;
+  const drawHeight = sourceHeight * scale;
+  ctx.drawImage(image, (width - drawWidth) / 2, (height - drawHeight) / 2, drawWidth, drawHeight);
+}
 
-  const maxWidth = width * 0.72;
-  const lineHeight = 68;
-  ctx.font = `48px ${input.fontStack}`;
+function wrapLines(ctx: CanvasRenderingContext2D, text: string, maxWidth: number) {
   const lines: string[] = [];
   let line = '';
-  for (const word of input.text.split(/\s+/)) {
+  for (const word of text.split(/\s+/)) {
     const test = line ? `${line} ${word}` : word;
     if (ctx.measureText(test).width <= maxWidth) line = test;
     else {
@@ -41,16 +44,59 @@ export function paintVerseImage(ctx: CanvasRenderingContext2D, input: VerseImage
     }
   }
   if (line) lines.push(line);
+  return lines;
+}
 
-  let y = height * 0.38;
+export function paintVerseImage(ctx: CanvasRenderingContext2D, input: VerseImageInput, image?: CanvasImageSource | null) {
+  const { width, height } = verseImageSize;
+  ctx.fillStyle = input.background || '#111111';
+  ctx.fillRect(0, 0, width, height);
+  if (image) coverDraw(ctx, image, width, height);
+  const overlay = input.overlayOpacity ?? 0;
+  if (overlay > 0) {
+    ctx.fillStyle = `rgba(0,0,0,${overlay})`;
+    ctx.fillRect(0, 0, width, height);
+  }
+
+  const bodySize = input.fontSize ?? 46;
+  const refSize = Math.round(bodySize * 0.72);
+  const footSize = Math.max(22, Math.round(bodySize * 0.52));
+  const lineHeight = Math.round(bodySize * 1.32);
+  const color = input.textColor || '#ffffff';
+
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = color;
+  ctx.font = `600 ${refSize}px ${input.fontStack}`;
+  ctx.fillText(input.reference, width / 2, height * 0.16);
+
+  ctx.font = `400 ${bodySize}px ${input.fontStack}`;
+  const lines = wrapLines(ctx, input.text, width * 0.78);
+  const block = lines.length * lineHeight;
+  let y = (height - block) / 2 + lineHeight / 2;
+  const minY = height * 0.26;
+  const maxBottom = height * 0.8;
+  if (y < minY) y = minY;
+  if (y + block - lineHeight / 2 > maxBottom) y = Math.max(minY, maxBottom - block + lineHeight / 2);
   for (const entry of lines) {
     ctx.fillText(entry, width / 2, y);
     y += lineHeight;
   }
 
-  ctx.font = `400 32px ${input.fontStack}`;
-  ctx.fillStyle = input.accent;
-  ctx.fillText(`The Word · ${input.translation}`, width / 2, height * 0.88);
+  ctx.font = `400 ${footSize}px ${input.fontStack}`;
+  ctx.globalAlpha = 0.85;
+  ctx.fillText(`The Word · ${input.translation}`, width / 2, height * 0.9);
+  ctx.globalAlpha = 1;
+}
+
+export function loadVerseImage(src: string) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    image.crossOrigin = 'anonymous';
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error('Could not load the background image.'));
+    image.src = src;
+  });
 }
 
 export function verseImageHtml(input: VerseImageInput) {
@@ -61,41 +107,75 @@ export function verseImageHtml(input: VerseImageInput) {
 <script>
 (function () {
   var i = ${payload};
-  var ctx = document.getElementById('c').getContext('2d');
+  var canvas = document.getElementById('c');
+  var ctx = canvas.getContext('2d');
   var width = ${verseImageSize.width};
   var height = ${verseImageSize.height};
-  ctx.fillStyle = i.background;
-  ctx.fillRect(0, 0, width, height);
-  ctx.strokeStyle = i.accent;
-  ctx.lineWidth = 3;
-  ctx.strokeRect(width * 0.06, height * 0.05, width * 0.88, height * 0.9);
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillStyle = i.textColor;
-  ctx.font = '600 44px ' + i.fontStack;
-  ctx.fillText(i.reference, width / 2, height * 0.18);
-  var maxWidth = width * 0.72;
-  var lineHeight = 68;
-  ctx.font = '48px ' + i.fontStack;
-  var lines = [];
-  var line = '';
-  var words = i.text.split(/\\s+/);
-  for (var n = 0; n < words.length; n++) {
-    var test = line ? line + ' ' + words[n] : words[n];
-    if (ctx.measureText(test).width <= maxWidth) line = test;
-    else { if (line) lines.push(line); line = words[n]; }
+  function wrap(text, maxWidth) {
+    var lines = [];
+    var line = '';
+    var words = text.split(/\\s+/);
+    for (var n = 0; n < words.length; n++) {
+      var test = line ? line + ' ' + words[n] : words[n];
+      if (ctx.measureText(test).width <= maxWidth) line = test;
+      else { if (line) lines.push(line); line = words[n]; }
+    }
+    if (line) lines.push(line);
+    return lines;
   }
-  if (line) lines.push(line);
-  var y = height * 0.38;
-  for (var li = 0; li < lines.length; li++) {
-    ctx.fillText(lines[li], width / 2, y);
-    y += lineHeight;
+  function paint(image) {
+    ctx.fillStyle = i.background || '#111111';
+    ctx.fillRect(0, 0, width, height);
+    if (image) {
+      var scale = Math.max(width / image.width, height / image.height);
+      var dw = image.width * scale;
+      var dh = image.height * scale;
+      ctx.drawImage(image, (width - dw) / 2, (height - dh) / 2, dw, dh);
+    }
+    var overlay = i.overlayOpacity || 0;
+    if (overlay > 0) {
+      ctx.fillStyle = 'rgba(0,0,0,' + overlay + ')';
+      ctx.fillRect(0, 0, width, height);
+    }
+    var bodySize = i.fontSize || 46;
+    var refSize = Math.round(bodySize * 0.72);
+    var footSize = Math.max(22, Math.round(bodySize * 0.52));
+    var lineHeight = Math.round(bodySize * 1.32);
+    var color = i.textColor || '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = color;
+    ctx.font = '600 ' + refSize + 'px ' + i.fontStack;
+    ctx.fillText(i.reference, width / 2, height * 0.16);
+    ctx.font = '400 ' + bodySize + 'px ' + i.fontStack;
+    var lines = wrap(i.text, width * 0.78);
+    var block = lines.length * lineHeight;
+    var y = (height - block) / 2 + lineHeight / 2;
+    var minY = height * 0.26;
+    var maxBottom = height * 0.8;
+    if (y < minY) y = minY;
+    if (y + block - lineHeight / 2 > maxBottom) y = Math.max(minY, maxBottom - block + lineHeight / 2);
+    for (var li = 0; li < lines.length; li++) {
+      ctx.fillText(lines[li], width / 2, y);
+      y += lineHeight;
+    }
+    ctx.font = '400 ' + footSize + 'px ' + i.fontStack;
+    ctx.globalAlpha = 0.85;
+    ctx.fillText('The Word \\u00b7 ' + i.translation, width / 2, height * 0.9);
+    ctx.globalAlpha = 1;
+    var url = canvas.toDataURL('image/png');
+    if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(url);
   }
-  ctx.font = '400 32px ' + i.fontStack;
-  ctx.fillStyle = i.accent;
-  ctx.fillText('The Word \\u00b7 ' + i.translation, width / 2, height * 0.88);
-  var url = document.getElementById('c').toDataURL('image/png');
-  if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(url);
+  if (i.imageDataUrl) {
+    var image = new Image();
+    image.onload = function () { paint(image); };
+    image.onerror = function () {
+      if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage('error:Could not load the background image.');
+    };
+    image.src = i.imageDataUrl;
+  } else {
+    paint(null);
+  }
 })();
 </script>
 </body></html>`;

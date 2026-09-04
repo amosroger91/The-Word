@@ -14,6 +14,9 @@ data/*.db-*
 .expo-export/
 .DS_Store
 Thumbs.db
+apps/web/e2e-landing/
+packages/bible/data/cross-references.zip
+packages/bible/data/cross-references-src/
 
 # Downloaded at predev (mobile fonts, Piper voices, copied WASM)
 **/assets/fonts/

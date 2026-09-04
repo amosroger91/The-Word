@@ -55,6 +55,14 @@ export default {
       'Cross-Origin-Opener-Policy': 'same-origin',
       'Cross-Origin-Embedder-Policy': 'require-corp',
     },
+    proxy: {
+      // Same-origin stand-in for the Daily Discovery API (no CORS/CORP on the real host).
+      '/daily-api': {
+        target: 'https://discoverybiblestudy.org',
+        changeOrigin: true,
+        rewrite: () => '/daily/api/',
+      },
+    },
   },
   preview: {
     headers: {

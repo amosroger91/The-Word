@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BIBLE_TOPICS, localBible } from '@the-word/bible';
+import { BIBLE_TOPICS, chapterCrossRefs, loadBookCrossRefs, localBible, type BookCrossRefFile } from '@the-word/bible';
 import type { SearchResult } from '@the-word/shared';
 import { clampFontSize, clampRate, clampVolume, defaults, fontFor, speechRateRange, speechVolumeRange, storageKeys, voicesFor } from './catalogue';
 import { languages, resolveLanguage, strings, type Language } from './i18n';
@@ -90,6 +90,13 @@ export function useWordApp({ storage, speech, clipboard, voices }: Platform, ini
   const [selectedTopic, setSelectedTopic] = useState('');
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [bookCrossRefs, setBookCrossRefs] = useState<BookCrossRefFile | null>(null);
+  const [hasProgress, setHasProgress] = useState(() => {
+    if (storage.get(storageKeys.progress) === '1') return true;
+    const storedBook = readNumber(storage.get(storageKeys.book), defaults.bookId);
+    const storedChapter = readNumber(storage.get(storageKeys.chapter), defaults.chapter);
+    return storedBook !== defaults.bookId || storedChapter !== defaults.chapter;
+  });
 
   const label = strings[language];
   const translations = localBible.getTranslations();
@@ -109,6 +116,7 @@ export function useWordApp({ storage, speech, clipboard, voices }: Platform, ini
   // the new chapter's verses to load before speaking them.
   const autoAdvanceRef = useRef(false);
   const [pendingAutoSpeak, setPendingAutoSpeak] = useState(false);
+  const [pendingSpeak, setPendingSpeak] = useState<{ kind: 'chapter' | 'from'; bookId: number; chapter: number; verse: number } | null>(null);
 
   const handleSpeechComplete = useCallback(() => {
     if (!autoAdvanceRef.current) return;
@@ -133,6 +141,7 @@ export function useWordApp({ storage, speech, clipboard, voices }: Platform, ini
   useEffect(() => { storage.set(storageKeys.rate, String(speechRate)); }, [speechRate]);
   useEffect(() => { storage.set(storageKeys.volume, String(speechVolume)); }, [speechVolume]);
   useEffect(() => { storage.set(storageKeys.bookmarks, JSON.stringify([...bookmarks.keys()])); }, [bookmarks]);
+  useEffect(() => { if (hasProgress) storage.set(storageKeys.progress, '1'); }, [hasProgress]);
 
   useEffect(() => {
     if (voiceOptions.length && !voiceOptions.some((voice) => voice.id === speechVoice)) setSpeechVoice(voiceOptions[0].id);
@@ -148,6 +157,14 @@ export function useWordApp({ storage, speech, clipboard, voices }: Platform, ini
     });
     return () => { active = false; };
   }, [translationId, bookId, chapterNumber]);
+
+  useEffect(() => {
+    let active = true;
+    void loadBookCrossRefs(bookId).then((loaded) => {
+      if (active) setBookCrossRefs(loaded);
+    });
+    return () => { active = false; };
+  }, [bookId]);
 
   useEffect(() => {
     let active = true;
@@ -172,6 +189,7 @@ export function useWordApp({ storage, speech, clipboard, voices }: Platform, ini
   }, [translationId, query, searchMode, searchBookId, searchTestament, selectedTopic]);
 
   const selectedVerseNumbers = useMemo(() => [...selectedVerses].sort((a, b) => a - b), [selectedVerses]);
+  const crossRefs = useMemo(() => chapterCrossRefs(bookCrossRefs, chapterNumber), [bookCrossRefs, chapterNumber]);
   const selectedText = chapter?.verses.filter((verse) => selectedVerses.has(verse.ref.verse)).map((verse) => verse.text).join(' ') ?? '';
   const selectedReference = selectedVerses.size ? label.verseReference(bookName, chapterNumber, selectedVerseNumbers) : '';
   const chapterReference = label.chapterReference(bookName, chapterNumber);
@@ -226,14 +244,22 @@ export function useWordApp({ storage, speech, clipboard, voices }: Platform, ini
 
   const clearSelection = useCallback(() => setSelectedVerses(new Set()), []);
 
-  const toggleBookmark = useCallback((verseNumber: number) => {
-    const key = `${translationId}:${bookId}:${chapterNumber}:${verseNumber}`;
+  const toggleBookmarkAt = useCallback((targetBook: number, targetChapter: number, verseNumber: number) => {
+    const key = `${translationId}:${targetBook}:${targetChapter}:${verseNumber}`;
     setBookmarks((current) => {
       const next = new Map(current);
-      next.has(key) ? next.delete(key) : next.set(key, { bookId, chapter: chapterNumber, verse: verseNumber });
+      next.has(key) ? next.delete(key) : next.set(key, { bookId: targetBook, chapter: targetChapter, verse: verseNumber });
       return next;
     });
-  }, [translationId, bookId, chapterNumber]);
+  }, [translationId]);
+
+  const toggleBookmark = useCallback((verseNumber: number) => {
+    toggleBookmarkAt(bookId, chapterNumber, verseNumber);
+  }, [toggleBookmarkAt, bookId, chapterNumber]);
+
+  const isBookmarked = useCallback((targetBook: number, targetChapter: number, verseNumber: number) => (
+    bookmarks.has(`${translationId}:${targetBook}:${targetChapter}:${verseNumber}`)
+  ), [bookmarks, translationId]);
 
   const bookmarkKey = useCallback((verseNumber: number) => `${translationId}:${bookId}:${chapterNumber}:${verseNumber}`, [translationId, bookId, chapterNumber]);
 
@@ -257,6 +283,10 @@ export function useWordApp({ storage, speech, clipboard, voices }: Platform, ini
     setFocusedVerse(verse);
   }, []);
 
+  const chapterIs = useCallback((targetBook: number, targetChapter: number) => (
+    Boolean(chapter && !chapterLoading && chapter.verses[0]?.ref.bookId === targetBook && chapter.verses[0]?.ref.chapter === targetChapter)
+  ), [chapter, chapterLoading]);
+
   const speakChapter = useCallback(() => {
     if (!chapter) return;
     // Reading a whole chapter turns on continuous mode so it rolls into the next one.
@@ -267,6 +297,42 @@ export function useWordApp({ storage, speech, clipboard, voices }: Platform, ini
       text: index === 0 ? `${chapterReference}. ${verse.text}` : verse.text,
     })));
   }, [chapter, chapterReference, player]);
+
+  const speakChapterAt = useCallback((targetBook: number, targetChapter: number, focusVerse?: number) => {
+    autoAdvanceRef.current = true;
+    setBookId(targetBook);
+    setChapterNumber(targetChapter);
+    setSelectedVerses(new Set());
+    setFocusedVerse(focusVerse ?? null);
+    if (chapterIs(targetBook, targetChapter) && chapter) {
+      player.speak(chapter.verses.map((verse, index) => ({
+        verse: verse.ref.verse,
+        text: index === 0 ? `${label.chapterReference(bookName, targetChapter)}. ${verse.text}` : verse.text,
+      })));
+      return;
+    }
+    setPendingSpeak({ kind: 'chapter', bookId: targetBook, chapter: targetChapter, verse: focusVerse ?? 1 });
+  }, [chapterIs, chapter, player, label, bookName]);
+
+  // Continuous read-aloud from this verse to the end of the chapter, then onward.
+  const speakFromVerse = useCallback((targetBook: number, targetChapter: number, verseNumber: number) => {
+    autoAdvanceRef.current = true;
+    setBookId(targetBook);
+    setChapterNumber(targetChapter);
+    setSelectedVerses(new Set());
+    setFocusedVerse(verseNumber);
+    if (chapterIs(targetBook, targetChapter) && chapter) {
+      const remaining = chapter.verses.filter((verse) => verse.ref.verse >= verseNumber);
+      if (!remaining.length) return;
+      const announce = label.verseReference(bookName, targetChapter, [verseNumber]);
+      player.speak(remaining.map((verse, index) => ({
+        verse: verse.ref.verse,
+        text: index === 0 ? `${announce}. ${verse.text}` : verse.text,
+      })));
+      return;
+    }
+    setPendingSpeak({ kind: 'from', bookId: targetBook, chapter: targetChapter, verse: verseNumber });
+  }, [chapterIs, chapter, player, label, bookName]);
 
   const speakSelection = useCallback(() => {
     if (!chapter) return;
@@ -300,10 +366,34 @@ export function useWordApp({ storage, speech, clipboard, voices }: Platform, ini
     speakChapter();
   }, [pendingAutoSpeak, chapterLoading, chapter, bookId, chapterNumber, speakChapter]);
 
+  useEffect(() => {
+    if (!pendingSpeak || chapterLoading || !chapter) return;
+    const first = chapter.verses[0]?.ref;
+    if (!first || first.bookId !== pendingSpeak.bookId || first.chapter !== pendingSpeak.chapter) return;
+    if (bookId !== pendingSpeak.bookId || chapterNumber !== pendingSpeak.chapter) return;
+    const job = pendingSpeak;
+    setPendingSpeak(null);
+    if (job.kind === 'chapter') {
+      player.speak(chapter.verses.map((verse, index) => ({
+        verse: verse.ref.verse,
+        text: index === 0 ? `${chapterReference}. ${verse.text}` : verse.text,
+      })));
+      return;
+    }
+    const remaining = chapter.verses.filter((verse) => verse.ref.verse >= job.verse);
+    if (!remaining.length) return;
+    const announce = label.verseReference(bookName, chapterNumber, [job.verse]);
+    player.speak(remaining.map((verse, index) => ({
+      verse: verse.ref.verse,
+      text: index === 0 ? `${announce}. ${verse.text}` : verse.text,
+    })));
+  }, [pendingSpeak, chapterLoading, chapter, bookId, chapterNumber, player, chapterReference, label, bookName]);
+
   // Stopping read-aloud also leaves continuous mode.
   const stopSpeech = useCallback(() => {
     autoAdvanceRef.current = false;
     setPendingAutoSpeak(false);
+    setPendingSpeak(null);
     player.stop();
   }, [player]);
 
@@ -315,11 +405,18 @@ export function useWordApp({ storage, speech, clipboard, voices }: Platform, ini
     setSpeechVolume((volume) => clampVolume(volume + delta));
   }, []);
 
+  const copyPassage = useCallback(async (reference: string, text: string) => {
+    if (!text) return;
+    await clipboard.write(`${reference} — ${text}`);
+  }, [clipboard]);
+
   const copySelection = useCallback(async () => {
     if (!selectedText) return;
-    await clipboard.write(`${selectedReference} — ${selectedText}`);
+    await copyPassage(selectedReference, selectedText);
     clearSelection();
-  }, [clipboard, selectedText, selectedReference, clearSelection]);
+  }, [copyPassage, selectedText, selectedReference, clearSelection]);
+
+  const unlockSpeech = useCallback(() => { speech.unlock?.(); }, [speech]);
 
   const translationOptions = useMemo(() => [...translations]
     .sort((a, b) => languages.indexOf(resolveLanguage(a.language)) - languages.indexOf(resolveLanguage(b.language)))
@@ -378,6 +475,8 @@ export function useWordApp({ storage, speech, clipboard, voices }: Platform, ini
     bookmarkKey,
     bookmarkList,
     toggleBookmark,
+    toggleBookmarkAt,
+    isBookmarked,
     goTo,
     goToVerse,
     focusedVerse,
@@ -394,6 +493,7 @@ export function useWordApp({ storage, speech, clipboard, voices }: Platform, ini
     searchLoading,
     searchResults,
     topics: BIBLE_TOPICS,
+    crossRefs,
     speechState: player.state,
     speakingVerse: player.speakingVerse,
     speechError: player.error,
@@ -408,12 +508,18 @@ export function useWordApp({ storage, speech, clipboard, voices }: Platform, ini
     speechVolumeRange,
     changeSpeechVolume,
     speakChapter,
+    speakChapterAt,
+    speakFromVerse,
     speakSelection,
     speakVerse,
     pauseSpeech: player.pause,
     resumeSpeech: player.resume,
     stopSpeech,
+    unlockSpeech,
     copySelection,
+    copyPassage,
+    hasProgress,
+    markProgress: useCallback(() => setHasProgress(true), []),
   };
 }
 

@@ -6,3 +6,5 @@ export * from './types';
 export * from './schema';
 export * from './local';
 export * from './topics';
+export * from './parseRef';
+export * from './crossRefs';

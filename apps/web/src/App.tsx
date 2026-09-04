@@ -1,11 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { localBible } from '@the-word/bible';
-import { paintVerseImage, readingFonts, useWordApp, verseImageFilename, verseImageSize, verseRuns, type Language, type WordApp } from '@the-word/core';
+import { readingFonts, useWordApp, verseImageFilename, verseRuns, type Language, type WordApp } from '@the-word/core';
 import { SearchableSelect } from './SearchableSelect';
 import { BookBibleIcon, VolumeHighIcon, VolumeLowIcon } from './icons';
+import { CrossRefMenu } from './CrossRefMenu';
+import { Landing } from './Landing';
+import { VerseImageEditor, type VerseImageJob } from './VerseImageEditor';
 import { createWebSpeech, webClipboard, webStorage } from './platform';
 import { useReadParty } from './useReadParty';
 import './styles.css';
+
+function viewFromHash(): 'home' | 'reader' {
+  return window.location.hash === '#read' ? 'reader' : 'home';
+}
 
 function partyStatusText(status: string, label: WordApp['label']) {
   switch (status) {
@@ -35,16 +42,33 @@ function App() {
   const [partyCode, setPartyCode] = useState('');
   const [partyChat, setPartyChat] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [exporting, setExporting] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [view, setView] = useState<'home' | 'reader'>(viewFromHash);
+  const [xrefMenu, setXrefMenu] = useState<{ verse: number; x: number; y: number } | null>(null);
+  const [imageJob, setImageJob] = useState<VerseImageJob | null>(null);
   const controlsRef = useRef<HTMLDivElement>(null);
   const settingsRef = useRef<HTMLDivElement>(null);
-  const verseRefs = useRef<Record<number, HTMLButtonElement | null>>({});
+  const verseRefs = useRef<Record<number, HTMLElement | null>>({});
 
   useEffect(() => { document.documentElement.dataset.theme = app.theme; }, [app.theme]);
   useEffect(() => { document.documentElement.lang = language; }, [language]);
   useEffect(() => { document.documentElement.style.setProperty('--app-font', app.font.stack); }, [app.font]);
+
+  useEffect(() => {
+    const onHash = () => setView(viewFromHash());
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
+
+  const openReader = useCallback(() => {
+    if (window.location.hash !== '#read') window.location.hash = 'read';
+    else setView('reader');
+  }, []);
+
+  const openHome = useCallback(() => {
+    if (window.location.hash === '#read') window.location.hash = '';
+    else setView('home');
+  }, []);
 
   // Preload the selected voice as soon as the page is ready (and whenever it
   // changes) so pressing Read aloud plays instantly instead of downloading first.
@@ -74,7 +98,7 @@ function App() {
     const observer = new IntersectionObserver(([entry]) => setControlsVisible(entry.isIntersecting));
     observer.observe(element);
     return () => observer.disconnect();
-  }, []);
+  }, [view]);
 
   useEffect(() => {
     if (!settingsOpen) return;
@@ -86,40 +110,17 @@ function App() {
     return () => document.removeEventListener('mousedown', onPointerDown);
   }, [settingsOpen]);
 
-  const exportToImage = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || !selectedText) return;
-    setExporting(true);
-
-    const palette = app.theme === 'dark'
-      ? { background: '#191816', text: '#eee9df' }
-      : { background: '#f7f4ee', text: '#292720' };
-    canvas.width = verseImageSize.width;
-    canvas.height = verseImageSize.height;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) { setExporting(false); return; }
-
-    paintVerseImage(ctx, {
-      reference: selectedReference,
-      text: selectedText,
-      translation: app.translations.find((item) => item.id === app.translationId)?.shortName ?? 'KJV',
-      background: palette.background,
-      textColor: palette.text,
-      accent: '#947849',
-      fontStack: app.font.stack,
-    });
-
-    const link = document.createElement('a');
-    link.download = verseImageFilename(bookName, chapterNumber);
-    link.href = canvas.toDataURL('image/png');
-    link.click();
-
-    setExporting(false);
-    app.clearSelection();
-  }, [app, selectedText, selectedReference, bookName, chapterNumber]);
-
   const readingBarOpen = speechState !== 'idle' && !controlsVisible && selectedVerses.size === 0;
+
+  if (view === 'home') {
+    return (
+      <Landing
+        app={app}
+        onEnterReader={() => { app.markProgress(); openReader(); }}
+        onGroupStudy={() => { app.markProgress(); setPartyOpen(true); openReader(); }}
+      />
+    );
+  }
 
   const speedControl = (
     <div className="speed-control">
@@ -150,8 +151,10 @@ function App() {
     <div className="app-shell">
       <header className="topbar">
         <div className="topbar-identity">
-          <span className="brand-mark" role="img" aria-label="The Word"><BookBibleIcon /></span>
-          <h1 className="topbar-reference">{bookName} <span>{chapterNumber}</span></h1>
+          <button className="topbar-home" onClick={openHome} aria-label={label.home} title={label.home}>
+            <span className="brand-mark" role="img" aria-hidden="true"><BookBibleIcon /></span>
+            <h1 className="topbar-reference">{bookName} <span>{chapterNumber}</span></h1>
+          </button>
         </div>
         <div className="topbar-controls" ref={controlsRef}>
           <div className="control-row">
@@ -202,17 +205,39 @@ function App() {
                 const speaking = speakingVerse === verse.ref.verse;
                 const following = !speaking && followVerse === verse.ref.verse;
                 const focused = !speaking && !selected && app.focusedVerse === verse.ref.verse;
+                const refs = app.crossRefs[verse.ref.verse];
                 return (
-                  <button
+                  <span
                     key={verse.ref.verse}
+                    role="button"
+                    tabIndex={0}
                     ref={(el) => { verseRefs.current[verse.ref.verse] = el; }}
                     className={speaking ? 'verse speaking' : following ? 'verse following' : focused ? 'verse focused' : selected ? 'verse selected' : 'verse'}
                     onClick={() => app.toggleVerse(verse.ref.verse)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        app.toggleVerse(verse.ref.verse);
+                      }
+                    }}
                   >
                     <sup>{verse.ref.verse}</sup>
                     <span>{verseRuns(verse.text, verse.redLetters).map((run, index) => (run.red ? <span className="words-of-jesus" key={index}>{run.text}</span> : <span key={index}>{run.text}</span>))}</span>
                     {app.bookmarks.has(app.bookmarkKey(verse.ref.verse)) && <span className="bookmark" aria-label={label.bookmarks}>◆</span>}
-                  </button>
+                    {refs?.length ? (
+                      <button
+                        type="button"
+                        className={xrefMenu?.verse === verse.ref.verse ? 'xref-mark open' : 'xref-mark'}
+                        aria-label={label.crossReferences}
+                        title={label.crossReferences}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          const rect = event.currentTarget.getBoundingClientRect();
+                          setXrefMenu({ verse: verse.ref.verse, x: rect.left, y: rect.bottom });
+                        }}
+                      >※</button>
+                    ) : null}
+                  </span>
                 );
               })}
             </article>
@@ -223,7 +248,13 @@ function App() {
               <button onClick={() => app.selectedVerseNumbers.forEach(app.toggleBookmark)}>{label.bookmark}</button>
               <button onClick={app.copySelection}>{label.copy}</button>
               <button onClick={app.speakSelection}>{label.readSelection}</button>
-              <button onClick={exportToImage} disabled={exporting}>{exporting ? label.exporting : label.image}</button>
+              <button onClick={() => setImageJob({
+                reference: selectedReference,
+                text: selectedText,
+                translation: app.translations.find((item) => item.id === app.translationId)?.shortName ?? 'KJV',
+                filename: verseImageFilename(bookName, chapterNumber),
+                seed: selectedReference,
+              })}>{label.image}</button>
               <button onClick={app.clearSelection}>{label.clearSelection}</button>
             </div>
           )}
@@ -240,7 +271,15 @@ function App() {
           {speechControls}
         </div>
       )}
-      <canvas ref={canvasRef} className="export-canvas" aria-hidden="true" />
+      {imageJob && (
+        <VerseImageEditor
+          job={imageJob}
+          fontStack={app.font.stack}
+          label={label}
+          onClose={() => setImageJob(null)}
+          onSaved={app.clearSelection}
+        />
+      )}
       {speechError && <div className="speech-error" role="alert">{/valid JSON|Could not fetch/.test(speechError) ? `${label.noVoice} (${speechVoice})` : speechError}</div>}
       {searchOpen && (
         <div className="search-panel">
@@ -285,6 +324,20 @@ function App() {
             </div>
           )}
         </div>
+      )}
+      {xrefMenu && (
+        <CrossRefMenu
+          app={app}
+          verse={xrefMenu.verse}
+          refs={app.crossRefs[xrefMenu.verse] ?? []}
+          x={xrefMenu.x}
+          y={xrefMenu.y}
+          onClose={() => setXrefMenu(null)}
+          onSelect={(ref) => {
+            app.goToVerse(ref.bookId, ref.chapter, ref.verse);
+            setXrefMenu(null);
+          }}
+        />
       )}
       {bookmarksOpen && (
         <div className="bookmarks-panel">

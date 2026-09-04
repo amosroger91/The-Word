@@ -6,9 +6,10 @@ Web, Android, and iOS share one reader brain in `packages/core`. The web client 
 
 ## What works today
 
+- Landing page: read the Bible, or today's verse from the [Daily Discovery Bible Study](https://discoverybiblestudy.org/daily/get-api/) API
 - Local KJV, ASV, WEB, Reina-Valera 1909, Valera 1602 Purificada, Louis Segond 1910, CUV, and Vietnamese 1934 (all 66 books)
 - Translation data is lazy-loaded: a translation is fetched only when first chosen
-- Book and chapter navigation, local search, topics, bookmarks
+- Book and chapter navigation, local search, topics, bookmarks, and OpenBible.info cross-references
 - Verse selection, copy, and shareable verse images
 - Words of Jesus in red
 - Light and dark themes, reading fonts including OpenDyslexic

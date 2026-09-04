@@ -18,6 +18,7 @@ export const palettes = {
     barMuted: '#d9d0c2',
     barBorder: '#746955',
     error: '#7d342e',
+    crossRef: '#3d6f8c',
   },
   dark: {
     background: '#191816',
@@ -35,6 +36,7 @@ export const palettes = {
     barMuted: '#d9d0c2',
     barBorder: '#746955',
     error: '#7d342e',
+    crossRef: '#7eabc4',
   },
 };
 

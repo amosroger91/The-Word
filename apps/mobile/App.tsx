@@ -3,6 +3,7 @@ import { ActivityIndicator, Appearance, View } from 'react-native';
 import { useFonts } from 'expo-font';
 import { useWordApp, type KeyValueStore, type Platform, type VoiceOption } from '@the-word/core';
 import { createNativeSpeech, loadStorage, loadVoices, nativeClipboard, voicesForLanguage } from './src/platform';
+import { Landing } from './src/Landing';
 import { Reader } from './src/Reader';
 
 export default function App() {
@@ -40,5 +41,11 @@ function Word({ storage, voices }: { storage: KeyValueStore; voices: VoiceOption
     voices: voices.length ? voicesForLanguage(voices) : undefined,
   }), [storage, speech, voices]);
   const app = useWordApp(platform, Appearance.getColorScheme() === 'dark' ? 'dark' : 'light');
-  return <Reader app={app} />;
+  const [view, setView] = useState<'home' | 'reader'>('home');
+  if (view === 'home') {
+    return (
+      <Landing app={app} onEnterReader={() => { app.markProgress(); setView('reader'); }} />
+    );
+  }
+  return <Reader app={app} onHome={() => setView('home')} />;
 }
