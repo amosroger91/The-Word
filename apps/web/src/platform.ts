@@ -32,15 +32,20 @@ export function createWebSpeech(): SpeechAdapter {
   let generation = 0;
 
   // import.meta.env.BASE_URL always ends in '/'. It is '/' for local/root deploys
-  // and the repository subpath (e.g. '/The-Word/') on GitHub Pages, so the Piper
-  // WASM/voice assets resolve correctly under either.
+  // and the repository subpath (e.g. '/The-Word/') on GitHub Pages, so the
+  // self-hosted Piper WASM runtime resolves correctly under either.
   const base = import.meta.env.BASE_URL;
 
   function ensureEngine() {
     engine ??= new PiperWebEngine({
       onnxRuntime: new OnnxWebRuntime({ basePath: `${base}onnx/`, numThreads: 1 }),
       phonemizeRuntime: new PhonemizeWebRuntime({ basePath: `${base}piper/` }),
-      voiceProvider: new HuggingFaceVoiceProvider({ baseUrl: `${base}models/` }),
+      // Voice models are NOT bundled (they are tens of MB each); fetch the chosen
+      // one on demand from the Piper voices repo on Hugging Face. The default
+      // baseUrl is that repo, so leave it unset. The coi-serviceworker stamps
+      // Cross-Origin-Resource-Policy onto the response, which (with Hugging Face's
+      // CORS) satisfies the page's cross-origin isolation.
+      voiceProvider: new HuggingFaceVoiceProvider(),
     });
     return engine;
   }
