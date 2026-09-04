@@ -56,6 +56,34 @@ export interface Strings {
   results: (count: number) => string;
   chapterReference: (book: string, chapter: number) => string;
   verseReference: (book: string, chapter: number, verses: number[]) => string;
+  readParty: string;
+  closeParty: string;
+  partyIntro: string;
+  startParty: string;
+  orJoinParty: string;
+  partyCodePlaceholder: string;
+  joinParty: string;
+  partyConnectFailed: (error: string) => string;
+  partyCode: string;
+  youAreHost: string;
+  followingHost: string;
+  hostHint: string;
+  followHost: string;
+  tapToReadAlong: string;
+  inTheRoom: (count: number) => string;
+  youSuffix: string;
+  hostTag: string;
+  partyChat: string;
+  partyChatPlaceholder: string;
+  send: string;
+  leaveParty: string;
+  partyConnecting: string;
+  partyHosting: string;
+  partyJoining: string;
+  partyConnected: string;
+  partyReconnecting: string;
+  partyJoined: (name: string) => string;
+  partyLeft: (name: string) => string;
 }
 
 function verseList(verses: number[]) {
@@ -121,6 +149,34 @@ export const strings: Record<Language, Strings> = {
     results: (count) => `${count} result${count === 1 ? '' : 's'}`,
     chapterReference: (book, chapter) => `${book} chapter ${chapter}`,
     verseReference: (book, chapter, verses) => `${book} chapter ${chapter}, verse${verses.length === 1 ? '' : 's'} ${verseList(verses)}`,
+    readParty: 'Read Party',
+    closeParty: 'Close',
+    partyIntro: 'Read Scripture together in real time. Everyone follows the host to the same passage and reads it aloud on their own device.',
+    startParty: 'Start a party',
+    orJoinParty: 'or join one',
+    partyCodePlaceholder: 'Party code',
+    joinParty: 'Join',
+    partyConnectFailed: (error) => `Could not connect (${error}). Try again.`,
+    partyCode: 'Party code',
+    youAreHost: 'You are the host',
+    followingHost: 'Following the host',
+    hostHint: 'When you navigate and press Read aloud, everyone follows on their own device.',
+    followHost: 'Follow the host',
+    tapToReadAlong: 'Tap to read along',
+    inTheRoom: (count) => `In the room (${count})`,
+    youSuffix: ' (you)',
+    hostTag: 'Host',
+    partyChat: 'Party chat',
+    partyChatPlaceholder: 'Say something…',
+    send: 'Send',
+    leaveParty: 'Leave party',
+    partyConnecting: 'Connecting…',
+    partyHosting: 'Hosting party',
+    partyJoining: 'Joining…',
+    partyConnected: 'Connected',
+    partyReconnecting: 'Reconnecting…',
+    partyJoined: (name) => `${name} joined the party`,
+    partyLeft: (name) => `${name} left the party`,
   },
   es: {
     languageName: 'Español',
@@ -178,6 +234,34 @@ export const strings: Record<Language, Strings> = {
     results: (count) => `${count} resultado${count === 1 ? '' : 's'}`,
     chapterReference: (book, chapter) => `${book} capítulo ${chapter}`,
     verseReference: (book, chapter, verses) => `${book} capítulo ${chapter}, versículo${verses.length === 1 ? '' : 's'} ${verseList(verses)}`,
+    readParty: 'Lectura en grupo',
+    closeParty: 'Cerrar',
+    partyIntro: 'Lean la Escritura juntos en tiempo real. Todos siguen al anfitrión al mismo pasaje y lo leen en voz alta en su propio dispositivo.',
+    startParty: 'Empezar un grupo',
+    orJoinParty: 'o únete a uno',
+    partyCodePlaceholder: 'Código del grupo',
+    joinParty: 'Unirse',
+    partyConnectFailed: (error) => `No se pudo conectar (${error}). Inténtalo de nuevo.`,
+    partyCode: 'Código del grupo',
+    youAreHost: 'Eres el anfitrión',
+    followingHost: 'Siguiendo al anfitrión',
+    hostHint: 'Cuando navegues y pulses Leer en voz alta, todos te siguen en su propio dispositivo.',
+    followHost: 'Seguir al anfitrión',
+    tapToReadAlong: 'Toca para leer junto',
+    inTheRoom: (count) => `En la sala (${count})`,
+    youSuffix: ' (tú)',
+    hostTag: 'Anfitrión',
+    partyChat: 'Chat del grupo',
+    partyChatPlaceholder: 'Di algo…',
+    send: 'Enviar',
+    leaveParty: 'Salir del grupo',
+    partyConnecting: 'Conectando…',
+    partyHosting: 'Grupo iniciado',
+    partyJoining: 'Uniéndose…',
+    partyConnected: 'Conectado',
+    partyReconnecting: 'Reconectando…',
+    partyJoined: (name) => `${name} se unió al grupo`,
+    partyLeft: (name) => `${name} salió del grupo`,
   },
   fr: {
     languageName: 'Français',
@@ -235,6 +319,34 @@ export const strings: Record<Language, Strings> = {
     results: (count) => `${count} résultat${count === 1 ? '' : 's'}`,
     chapterReference: (book, chapter) => `${book} chapitre ${chapter}`,
     verseReference: (book, chapter, verses) => `${book} chapitre ${chapter}, verset${verses.length === 1 ? '' : 's'} ${verseList(verses)}`,
+    readParty: 'Lecture partagée',
+    closeParty: 'Fermer',
+    partyIntro: "Lisez l'Écriture ensemble en temps réel. Tout le monde suit l'hôte vers le même passage et le lit à voix haute sur son propre appareil.",
+    startParty: 'Démarrer une lecture',
+    orJoinParty: 'ou en rejoindre une',
+    partyCodePlaceholder: 'Code de lecture',
+    joinParty: 'Rejoindre',
+    partyConnectFailed: (error) => `Impossible de se connecter (${error}). Réessayez.`,
+    partyCode: 'Code de lecture',
+    youAreHost: "Vous êtes l'hôte",
+    followingHost: "Vous suivez l'hôte",
+    hostHint: 'Quand vous naviguez et appuyez sur Lire à voix haute, tout le monde vous suit sur son propre appareil.',
+    followHost: "Suivre l'hôte",
+    tapToReadAlong: 'Appuyez pour lire ensemble',
+    inTheRoom: (count) => `Dans la salle (${count})`,
+    youSuffix: ' (vous)',
+    hostTag: 'Hôte',
+    partyChat: 'Discussion',
+    partyChatPlaceholder: 'Dites quelque chose…',
+    send: 'Envoyer',
+    leaveParty: 'Quitter la lecture',
+    partyConnecting: 'Connexion…',
+    partyHosting: 'Lecture hébergée',
+    partyJoining: 'Connexion…',
+    partyConnected: 'Connecté',
+    partyReconnecting: 'Reconnexion…',
+    partyJoined: (name) => `${name} a rejoint la lecture`,
+    partyLeft: (name) => `${name} a quitté la lecture`,
   },
   zh: {
     languageName: '中文',
@@ -292,6 +404,34 @@ export const strings: Record<Language, Strings> = {
     results: (count) => `${count} 个结果`,
     chapterReference: (book, chapter) => `${book}第${chapter}章`,
     verseReference: (book, chapter, verses) => `${book}第${chapter}章 ${verseList(verses)}节`,
+    readParty: '一起读经',
+    closeParty: '关闭',
+    partyIntro: '实时一起读经。所有人跟随主持者到同一段经文，并在自己的设备上朗读。',
+    startParty: '发起读经',
+    orJoinParty: '或加入已有的读经',
+    partyCodePlaceholder: '房间代码',
+    joinParty: '加入',
+    partyConnectFailed: (error) => `无法连接（${error}）。请重试。`,
+    partyCode: '房间代码',
+    youAreHost: '你是主持者',
+    followingHost: '正在跟随主持者',
+    hostHint: '你翻页并按下「朗读」后，其他人会在自己的设备上跟随。',
+    followHost: '跟随主持者',
+    tapToReadAlong: '点按以一起朗读',
+    inTheRoom: (count) => `房间里（${count}）`,
+    youSuffix: '（你）',
+    hostTag: '主持',
+    partyChat: '房间聊天',
+    partyChatPlaceholder: '说点什么…',
+    send: '发送',
+    leaveParty: '离开读经',
+    partyConnecting: '正在连接…',
+    partyHosting: '正在主持',
+    partyJoining: '正在加入…',
+    partyConnected: '已连接',
+    partyReconnecting: '正在重新连接…',
+    partyJoined: (name) => `${name} 加入了读经`,
+    partyLeft: (name) => `${name} 离开了读经`,
   },
   vi: {
     languageName: 'Tiếng Việt',
@@ -349,6 +489,34 @@ export const strings: Record<Language, Strings> = {
     results: (count) => `${count} kết quả`,
     chapterReference: (book, chapter) => `${book} đoạn ${chapter}`,
     verseReference: (book, chapter, verses) => `${book} đoạn ${chapter}, câu ${verseList(verses)}`,
+    readParty: 'Đọc chung',
+    closeParty: 'Đóng',
+    partyIntro: 'Đọc Kinh Thánh cùng nhau theo thời gian thực. Mọi người theo người chủ trì đến cùng một đoạn và đọc to trên thiết bị của mình.',
+    startParty: 'Bắt đầu nhóm đọc',
+    orJoinParty: 'hoặc tham gia nhóm',
+    partyCodePlaceholder: 'Mã nhóm',
+    joinParty: 'Tham gia',
+    partyConnectFailed: (error) => `Không thể kết nối (${error}). Hãy thử lại.`,
+    partyCode: 'Mã nhóm',
+    youAreHost: 'Bạn là người chủ trì',
+    followingHost: 'Đang theo người chủ trì',
+    hostHint: 'Khi bạn chuyển đoạn và nhấn Đọc to, mọi người sẽ theo trên thiết bị của họ.',
+    followHost: 'Theo người chủ trì',
+    tapToReadAlong: 'Nhấn để đọc cùng',
+    inTheRoom: (count) => `Trong phòng (${count})`,
+    youSuffix: ' (bạn)',
+    hostTag: 'Chủ trì',
+    partyChat: 'Trò chuyện nhóm',
+    partyChatPlaceholder: 'Nói gì đó…',
+    send: 'Gửi',
+    leaveParty: 'Rời nhóm',
+    partyConnecting: 'Đang kết nối…',
+    partyHosting: 'Đang chủ trì nhóm',
+    partyJoining: 'Đang tham gia…',
+    partyConnected: 'Đã kết nối',
+    partyReconnecting: 'Đang kết nối lại…',
+    partyJoined: (name) => `${name} đã tham gia nhóm`,
+    partyLeft: (name) => `${name} đã rời nhóm`,
   },
 };
 

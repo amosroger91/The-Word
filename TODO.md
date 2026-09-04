@@ -9,6 +9,8 @@ _(none)_
 
 ## Recently shipped (committed + deployed)
 
+- Read Party i18n (en/es/fr/zh/vi): party chrome uses `packages/core` strings; connection status is a code (`hosting` / `joining` / …) mapped in the UI; join/leave chat lines carry an `event` so each client translates them. English `text` stays on the wire as a fallback.
+- Persistent `<audio>` stop/src race: switching verses no longer surfaces "no supported source" when the previous blob URL is cleared.
 - Voice preload + Read Party verse-by-verse sync + auto-arm on join:
   - `SpeechAdapter.prewarm?(voice)` / web `prewarm()` fetches the Piper voice and inits WASM on page load (and on voice change) so the first Play isn't a download stall.
   - Host broadcasts `speakingVerse` plus a 3s heartbeat while reading; participants call `speakVerse()` so they track the host verse-by-verse, not just chapter-by-chapter. Mid-verse joiners resync. `.verse.following` (green ring) highlights the host's verse when local audio hasn't started yet.
@@ -30,5 +32,5 @@ Tried a GitHub Actions workflow first; it kept hanging on `npm install` because 
 
 - PeerJS uses its free public broker for the initial WebRTC handshake (same tradeoff OpenWhisper makes) — data flows P2P after that, but the broker is a third-party dependency. Fine for now; self-hosting a PeerServer is a future option if it matters.
 - First read-aloud per voice previously had a real download delay (~75MB voice model from Hugging Face, cached after). Prewarm hides this behind page-load instead of the Play click; the model is still a first-visit download.
-- Read Party is English-only UI strings right now (not wired into the app's i18n system) — fine for v1, worth revisiting if the feature sticks.
+- Read Party UI chrome is wired into i18n; generated display names (Gentle Lamp, etc.) stay English.
 - `apps/mobile/package-lock.json` and `packages/core/package-lock.json` have incidental diffs from local `npm install` runs during this work — intentionally left out of commits so far to keep commits focused; harmless, just noise in `git status`.

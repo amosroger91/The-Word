@@ -31,6 +31,8 @@ export interface PartyChatMessage {
   color?: string;
   text: string;
   ts: number;
+  // Present on system join/leave so each client can translate the line.
+  event?: 'joined' | 'left';
 }
 // The shared reading session the host controls: passage, command, and the
 // host's current verse so participants can follow along verse by verse.
@@ -120,8 +122,8 @@ export function joinParty({ code, identity, handlers = {} }: {
     if (chatLog.length > CHAT_HISTORY) chatLog.splice(0, chatLog.length - CHAT_HISTORY);
     h.onChat?.(msg);
   }
-  function systemMessage(text: string): PartyChatMessage {
-    return { id: newId(), kind: 'system', text, ts: Date.now() };
+  function systemMessage(text: string, event?: 'joined' | 'left', name?: string): PartyChatMessage {
+    return { id: newId(), kind: 'system', text, ts: Date.now(), event, name };
   }
 
   /* ---------------- hub: handle an incoming envelope ---------------- */
@@ -134,7 +136,7 @@ export function joinParty({ code, identity, handlers = {} }: {
       if (conn) {
         try { conn.send({ t: 'welcome', d: { roster: members.slice(), chat: chatLog.slice(-CHAT_HISTORY), reading: readingState } }); } catch { /* dropped */ }
       }
-      const sm = systemMessage(`${m.name || 'Someone'} joined the party`);
+      const sm = systemMessage(`${m.name || 'Someone'} joined the party`, 'joined', m.name || 'Someone');
       recordChat(sm); broadcast({ t: 'chat', d: sm });
       emitRoster(); broadcast({ t: 'roster', d: members.slice() });
     } else if (env.t === 'chat') {
@@ -183,7 +185,7 @@ export function joinParty({ code, identity, handlers = {} }: {
   function wireClientConn(c: DataConnection) {
     hubConn = c;
     c.on('open', () => {
-      status('Connected');
+      status('connected');
       try { c.send({ t: 'hello', d: { id: me.id, name: me.name, color: me.color } }); } catch { /* dropped */ }
     });
     c.on('data', handleFromHub);
@@ -194,7 +196,7 @@ export function joinParty({ code, identity, handlers = {} }: {
   function startAsHub() {
     isHub = true;
     members = [selfMember()];
-    status('Hosting party');
+    status('hosting');
     h.onSelf?.({ host: true });
     emitRoster();
     // A re-elected hub keeps everyone in sync by re-announcing the reading state.
@@ -206,7 +208,7 @@ export function joinParty({ code, identity, handlers = {} }: {
         clientConns.delete(c.peer);
         const m = members.find((x) => x.peerId === c.peer);
         members = members.filter((x) => x.peerId !== c.peer);
-        if (m) { const sm = systemMessage(`${m.name} left the party`); recordChat(sm); broadcast({ t: 'chat', d: sm }); }
+        if (m) { const sm = systemMessage(`${m.name} left the party`, 'left', m.name); recordChat(sm); broadcast({ t: 'chat', d: sm }); }
         emitRoster(); broadcast({ t: 'roster', d: members.slice() });
       });
       c.on('error', () => { /* ignore */ });
@@ -215,7 +217,7 @@ export function joinParty({ code, identity, handlers = {} }: {
 
   function startAsClient() {
     isHub = false;
-    status('Joining…');
+    status('joining');
     h.onSelf?.({ host: false });
     wireClientConn(peer!.connect(HUB_ID, { reliable: true }));
   }
@@ -225,14 +227,14 @@ export function joinParty({ code, identity, handlers = {} }: {
     if (reelectTimer) clearTimeout(reelectTimer);
     try { peer?.destroy(); } catch { /* ignore */ }
     peer = null; hubConn = null;
-    status('Reconnecting…');
+    status('reconnecting');
     // Jitter so clients don't stampede the hub id at once.
     reelectTimer = setTimeout(connect, 300 + Math.random() * 900);
   }
 
   function connect() {
     if (leaving) return;
-    status('Connecting…');
+    status('connecting');
     peer = new Peer(HUB_ID);
     peer.on('open', () => startAsHub());
     peer.on('error', (e: { type?: string }) => {

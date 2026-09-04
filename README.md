@@ -14,6 +14,7 @@ Web, Android, and iOS share one reader brain in `packages/core`. The web client 
 - Light and dark themes, reading fonts including OpenDyslexic
 - Read-aloud with speed and volume controls (five UI languages)
 - Web read-aloud uses local Piper WASM. Android/iOS use the device speech engine
+- Web Read Party: a P2P room so several devices follow one host's passage and read it aloud locally
 
 KJV is sourced from the aruljohn/Bible-kjv repository. ASV is sourced from Scrollmapper’s public Bible database. WEB is sourced from eBible.org’s public-domain WEB Protestant USFM release. Copyrighted translations such as ESV are not bundled.
 

@@ -122,6 +122,8 @@ try {
   const after2 = await dump(part, 'part');
   log('part', `synced to host verse ${hostV2} (speaking=${after2.speaking} following=${after2.following})`);
   if (after2.arm) throw new Error('FAIL: arm button appeared mid-reading');
+  if (after2.speechError) throw new Error(`FAIL: participant speech error on verse ${hostV2}: ${after2.speechError}`);
+  if (after2.speaking !== hostV2) throw new Error(`FAIL: participant did not speak host verse ${hostV2} (speaking=${after2.speaking})`);
 
   if (errors.length) {
     console.log('page errors:', errors);

@@ -69,8 +69,17 @@ export function createWebSpeech(): SpeechAdapter {
     }
   }
 
+  function detachHandlers() {
+    audio.onended = null;
+    audio.onerror = null;
+    audio.onpause = null;
+  }
+
   function clearMedia() {
+    // Pause first so an in-flight speak() can see generation change via onpause
+    // and resolve 'stopped', then detach so removing src does not surface as an error.
     audio.pause();
+    detachHandlers();
     audio.removeAttribute('src');
     revokeUrl();
     hasVerse = false;
@@ -93,18 +102,25 @@ export function createWebSpeech(): SpeechAdapter {
       hasVerse = true;
       try {
         return await new Promise<'ended' | 'stopped'>((resolve, reject) => {
-          audio.onended = () => resolve('ended');
-          audio.onerror = () => reject(new Error('Piper could not play this verse.'));
+          const stale = () => started !== generation;
+          audio.onended = () => { if (!stale()) resolve('ended'); };
+          audio.onerror = () => {
+            if (stale()) resolve('stopped');
+            else reject(new Error('Piper could not play this verse.'));
+          };
           // stop() bumps generation then pauses; pause() does not, so the verse stays pending.
-          audio.onpause = () => { if (started !== generation) resolve('stopped'); };
-          void audio.play().catch(reject);
+          audio.onpause = () => { if (stale()) resolve('stopped'); };
+          void audio.play().catch((err) => {
+            if (stale()) resolve('stopped');
+            else reject(err);
+          });
         });
       } finally {
-        audio.onended = null;
-        audio.onerror = null;
-        audio.onpause = null;
-        revokeUrl();
-        if (started === generation) hasVerse = false;
+        if (started === generation) {
+          detachHandlers();
+          revokeUrl();
+          hasVerse = false;
+        }
       }
     },
     pause() {
