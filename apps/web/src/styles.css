@@ -76,7 +76,7 @@ select, input { border: 1px solid #c9c1b3; border-radius: 8px; background: trans
 .speed-control button { border: 0; background: transparent; color: inherit; padding: 4px 6px; font-size: 15px; line-height: 1; }
 .reading-bar .speed-control { border-color: #746955; }
 
-.search-panel, .bookmarks-panel { position: fixed; inset: 0 0 0 auto; z-index: 30; width: min(440px, 100%); background: var(--background, #f7f4ee); border-left: 1px solid #ded9cf; padding: 28px; box-shadow: -8px 0 30px #0002; overflow-y: auto; }
+.search-panel, .bookmarks-panel, .party-panel { position: fixed; inset: 0 0 0 auto; z-index: 30; width: min(440px, 100%); background: var(--background, #f7f4ee); border-left: 1px solid #ded9cf; padding: 28px; box-shadow: -8px 0 30px #0002; overflow-y: auto; }
 .search-header, .panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 22px; gap: 12px; }
 .search-header h2, .panel-header h2 { font-weight: 400; margin: 0; font-size: 22px; }
 .search-header button, .panel-header button { border: 0; background: transparent; color: inherit; font-size: 28px; }
@@ -134,3 +134,37 @@ select, input { border: 1px solid #c9c1b3; border-radius: 8px; background: trans
   .control-settings.open { right: 12px; width: calc(100vw - 24px); }
   .selection-bar button, .reading-bar button { flex: 1 1 auto; }
 }
+
+/* ---------------- Read Party ---------------- */
+.party-toggle { position: relative; }
+.party-count { position: absolute; top: -4px; right: -4px; min-width: 15px; height: 15px; padding: 0 3px; border-radius: 8px; background: #2f9e6f; color: #fff; font-size: 10px; line-height: 15px; text-align: center; }
+.party-setup { display: flex; flex-direction: column; gap: 16px; }
+.party-primary { padding: 12px; border: 0; border-radius: 10px; background: #947849; color: #fff; font-size: 15px; cursor: pointer; }
+.party-or { display: flex; align-items: center; gap: 10px; color: #8e806c; font-size: 12px; }
+.party-or::before, .party-or::after { content: ''; flex: 1; height: 1px; background: #ded9cf; }
+.party-join { display: flex; gap: 8px; }
+.party-join input { flex: 1 1 auto; padding: 10px; border: 1px solid #c9c1b3; border-radius: 8px; background: transparent; color: inherit; }
+.party-join button, .party-chat form button { padding: 10px 14px; border: 0; border-radius: 8px; background: #947849; color: #fff; cursor: pointer; }
+.party-join button:disabled, .party-chat form button:disabled { opacity: .5; cursor: default; }
+.party-error { color: #c04b5a; font-size: 13px; }
+.party-live { display: flex; flex-direction: column; gap: 16px; }
+.party-status { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.party-code-label { display: block; color: #8e806c; text-transform: uppercase; letter-spacing: .13em; font-size: 10px; font-weight: 700; }
+.party-code { font-size: 24px; font-variant-numeric: tabular-nums; letter-spacing: .06em; }
+.party-role { font-size: 12px; padding: 4px 10px; border-radius: 999px; border: 1px solid #c9c1b3; white-space: nowrap; }
+.party-role.host { background: #947849; color: #fff; border-color: #947849; }
+.party-conn { font-size: 12px; margin: -8px 0 0; }
+.party-follow { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.party-follow label { display: flex; align-items: center; gap: 8px; text-transform: none; letter-spacing: 0; font-weight: 400; font-size: 14px; color: inherit; }
+.party-arm { padding: 8px 12px; border: 0; border-radius: 8px; background: #2f9e6f; color: #fff; cursor: pointer; font-size: 13px; }
+.party-members { display: flex; flex-direction: column; gap: 8px; }
+.party-member { display: flex; align-items: center; gap: 10px; font-size: 14px; }
+.party-dot { width: 12px; height: 12px; border-radius: 50%; flex: 0 0 auto; }
+.party-host-tag { margin-left: auto; font-size: 10px; text-transform: uppercase; letter-spacing: .1em; color: #947849; font-weight: 700; }
+.party-chat { display: flex; flex-direction: column; gap: 8px; }
+.party-messages { display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow-y: auto; padding: 8px; border: 1px solid #ded9cf; border-radius: 8px; font-size: 14px; }
+.party-msg.system { color: #8e806c; font-size: 12px; font-style: italic; }
+.party-chat form { display: flex; gap: 8px; }
+.party-chat form input { flex: 1 1 auto; padding: 10px; border: 1px solid #c9c1b3; border-radius: 8px; background: transparent; color: inherit; }
+.party-leave { padding: 10px; border: 1px solid #c04b5a; border-radius: 8px; background: transparent; color: #c04b5a; cursor: pointer; }
+:root[data-theme='dark'] .party-join input, :root[data-theme='dark'] .party-chat form input, :root[data-theme='dark'] .party-messages { border-color: #38352e; }

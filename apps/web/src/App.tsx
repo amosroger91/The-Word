@@ -4,6 +4,7 @@ import { paintVerseImage, readingFonts, useWordApp, verseImageFilename, verseIma
 import { SearchableSelect } from './SearchableSelect';
 import { BookBibleIcon, VolumeHighIcon, VolumeLowIcon } from './icons';
 import { createWebSpeech, webClipboard, webStorage } from './platform';
+import { useReadParty } from './useReadParty';
 import './styles.css';
 
 function App() {
@@ -15,8 +16,12 @@ function App() {
     speechState, speakingVerse, speechError, speechRate, speechRateRange, speechVolume, speechVolumeRange, voiceOptions, speechVoice, setSpeechVoice,
   } = app;
 
+  const party = useReadParty(app);
   const [searchOpen, setSearchOpen] = useState(false);
   const [bookmarksOpen, setBookmarksOpen] = useState(false);
+  const [partyOpen, setPartyOpen] = useState(false);
+  const [partyCode, setPartyCode] = useState('');
+  const [partyChat, setPartyChat] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
@@ -134,6 +139,7 @@ function App() {
             <button className={`icon-button settings-toggle ${settingsOpen ? 'active' : ''}`} onClick={() => setSettingsOpen((open) => !open)} aria-label={label.settings} title={label.settings} aria-expanded={settingsOpen}>⚙</button>
             <button className="icon-button" onClick={() => setSearchOpen((open) => !open)} aria-label={label.search} title={label.search}>⌕</button>
             <button className={`icon-button ${bookmarksOpen ? 'active' : ''}`} onClick={() => setBookmarksOpen((open) => !open)} aria-label={label.bookmarks} title={label.bookmarks}>◈</button>
+            <button className={`icon-button party-toggle ${party.active ? 'active' : ''}`} onClick={() => setPartyOpen((open) => !open)} aria-label="Read Party" title="Read Party">☍{party.active && <span className="party-count">{party.members.length}</span>}</button>
             <button className="icon-button" onClick={app.toggleTheme} aria-label={label.toggleTheme} title={label.toggleTheme}>◐</button>
           </div>
         </div>
@@ -250,6 +256,64 @@ function App() {
               <span className="bookmark-verse-text">{entry.bookId === app.bookId && entry.chapter === chapterNumber ? chapter?.verses.find((verse) => verse.ref.verse === entry.verse)?.text ?? '' : ''}</span>
             </button>
           )) : <p className="muted">{label.noBookmarks}</p>}
+        </div>
+      )}
+      {partyOpen && (
+        <div className="party-panel">
+          <div className="panel-header"><h2>Read Party</h2><button onClick={() => setPartyOpen(false)} aria-label="Close">×</button></div>
+          {!party.active ? (
+            <div className="party-setup">
+              <p className="muted">Read Scripture together in real time. Everyone follows the host to the same passage and reads it aloud on their own device.</p>
+              <button className="party-primary" onClick={party.createParty}>Start a party</button>
+              <div className="party-or"><span>or join one</span></div>
+              <form className="party-join" onSubmit={(event) => { event.preventDefault(); party.joinParty(partyCode); }}>
+                <input placeholder="Party code" value={partyCode} onChange={(event) => setPartyCode(event.target.value)} />
+                <button type="submit" disabled={!partyCode.trim()}>Join</button>
+              </form>
+              {party.error && <p className="party-error">Could not connect ({party.error}). Try again.</p>}
+            </div>
+          ) : (
+            <div className="party-live">
+              <div className="party-status">
+                <div><span className="party-code-label">Party code</span><strong className="party-code">{party.code}</strong></div>
+                <span className={`party-role ${party.isHost ? 'host' : ''}`}>{party.isHost ? 'You are the host' : 'Following the host'}</span>
+              </div>
+              {party.status && <p className="muted party-conn">{party.status}</p>}
+              {party.isHost
+                ? <p className="muted">When you navigate and press Read aloud, everyone follows on their own device.</p>
+                : (
+                  <div className="party-follow">
+                    <label><input type="checkbox" checked={party.following} onChange={(event) => party.setFollowing(event.target.checked)} /> Follow the host</label>
+                    {party.needsArm && <button className="party-arm" onClick={party.arm}>🔊 Tap to read along</button>}
+                  </div>
+                )}
+              <div className="party-members">
+                <span className="section-label">In the room ({party.members.length})</span>
+                {party.members.map((member) => (
+                  <div className="party-member" key={member.id}>
+                    <span className="party-dot" style={{ background: member.color }} />
+                    <span>{member.name}{member.id === party.identity.id ? ' (you)' : ''}</span>
+                    {member.host && <span className="party-host-tag">Host</span>}
+                  </div>
+                ))}
+              </div>
+              <div className="party-chat">
+                <span className="section-label">Party chat</span>
+                <div className="party-messages">
+                  {party.messages.map((msg) => (
+                    msg.kind === 'system'
+                      ? <div className="party-msg system" key={msg.id}>{msg.text}</div>
+                      : <div className="party-msg" key={msg.id}><strong style={{ color: msg.color }}>{msg.name}</strong> {msg.text}</div>
+                  ))}
+                </div>
+                <form onSubmit={(event) => { event.preventDefault(); if (partyChat.trim()) { party.sendChat(partyChat); setPartyChat(''); } }}>
+                  <input placeholder="Say something…" value={partyChat} onChange={(event) => setPartyChat(event.target.value)} />
+                  <button type="submit" disabled={!partyChat.trim()}>Send</button>
+                </form>
+              </div>
+              <button className="party-leave" onClick={party.leaveParty}>Leave party</button>
+            </div>
+          )}
         </div>
       )}
     </div>
