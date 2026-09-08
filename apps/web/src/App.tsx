@@ -10,6 +10,7 @@ import { VerseImageEditor, type VerseImageJob } from './VerseImageEditor';
 import { createWebSpeech, webClipboard, webStorage } from './platform';
 import { useReadParty } from './useReadParty';
 import './styles.css';
+import './landing.css';
 
 function viewFromHash(): 'home' | 'reader' {
   return window.location.hash === '#read' ? 'reader' : 'home';

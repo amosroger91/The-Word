@@ -12,11 +12,19 @@ import {
   type WordApp,
 } from '@the-word/core';
 import { BookBibleIcon } from './icons';
+import { ReaderIcon } from './ReaderIcon';
 import { useSavedDailyVerse } from './savedDailyVerse';
 import { downloadVerseImage } from './verseImageExport';
 
 // Shown only when the feed fails and nothing was ever saved. The text comes
 // from the bundled translation, so the card still works with no network.
+const welcomeCopy = {
+  en: { title: 'A moment in the Word.', intro: 'Slow down. Open Scripture. Find space for what matters.', reading: 'YOUR QUIET PLACE', resume: 'Pick up where you left off, or begin a new chapter.', together: 'Read, reflect, and grow together.', explore: 'Scripture for every season', exploreHint: 'A place to begin, wherever you are today.' },
+  es: { title: 'Un momento en la Palabra.', intro: 'Haz una pausa. Abre las Escrituras. Da espacio a lo que importa.', reading: 'TU ESPACIO DE PAZ', resume: 'Continúa donde lo dejaste o comienza un nuevo capítulo.', together: 'Lean, reflexionen y crezcan juntos.', explore: 'Escrituras para cada etapa', exploreHint: 'Un lugar para comenzar, estés donde estés hoy.' },
+  fr: { title: 'Un moment dans la Parole.', intro: 'Ralentissez. Ouvrez les Écritures. Faites place à l’essentiel.', reading: 'VOTRE ESPACE DE PAIX', resume: 'Reprenez votre lecture ou commencez un nouveau chapitre.', together: 'Lire, réfléchir et grandir ensemble.', explore: 'Les Écritures en toute saison', exploreHint: 'Un point de départ, où que vous soyez aujourd’hui.' },
+  zh: { title: '与圣言共度片刻。', intro: '放慢脚步，打开圣经，为重要的事留出空间。', reading: '你的宁静时光', resume: '继续上次的阅读，或开始新的篇章。', together: '一起阅读、思考与成长。', explore: '人生每个阶段的经文', exploreHint: '无论今天身在何处，都能从这里开始。' },
+  vi: { title: 'Một khoảnh khắc trong Lời.', intro: 'Chậm lại. Mở Kinh Thánh. Dành chỗ cho điều quan trọng.', reading: 'KHÔNG GIAN BÌNH YÊN', resume: 'Tiếp tục nơi bạn đã dừng hoặc bắt đầu một đoạn mới.', together: 'Cùng đọc, suy ngẫm và trưởng thành.', explore: 'Kinh Thánh cho mọi mùa', exploreHint: 'Một nơi để bắt đầu, dù hôm nay bạn đang ở đâu.' },
+};
 const OFFLINE_REF = parseReference('John 3:16');
 
 export function Landing({
@@ -36,6 +44,7 @@ export function Landing({
   partyMembers?: number;
 }) {
   const { label, language } = app;
+  const copy = welcomeCopy[language];
   const urls = useMemo(() => {
     const snapshot = `${import.meta.env.BASE_URL}daily.json`;
     return import.meta.env.DEV
@@ -119,9 +128,11 @@ export function Landing({
       <header className="landing-bar">
         <div className="landing-logo">
           <span className="landing-mark" role="img" aria-hidden="true"><BookBibleIcon /></span>
-          <h1 className="landing-wordmark">The Word</h1>
+          <div className="landing-wordmark">The Word<span>{label.footerFree}</span></div>
         </div>
         <div className="landing-bar-actions">
+          <button className="landing-nav-read" onClick={onEnterReader}><ReaderIcon name="book" />{label.readTheBible}</button>
+          <div className="landing-search-field"><ReaderIcon name="search" />
           <input
             className="landing-bar-search"
             type="search"
@@ -133,14 +144,16 @@ export function Landing({
             }}
             aria-label={label.search}
           />
+          </div>
           {onPreferences && (
-            <button className="icon-button" onClick={onPreferences} aria-label={label.preferences} title={label.preferences}>⚙</button>
+            <button className="icon-button" onClick={onPreferences} aria-label={label.preferences} title={label.preferences}><ReaderIcon name="settings" /></button>
           )}
-          <button className="icon-button" onClick={app.toggleTheme} aria-label={label.toggleTheme} title={label.toggleTheme}>◐</button>
+          <button className="icon-button" onClick={app.toggleTheme} aria-label={label.toggleTheme} title={label.toggleTheme}><ReaderIcon name={app.theme === 'dark' ? 'sun' : 'moon'} /></button>
         </div>
       </header>
 
       <main className="landing-main">
+        <div className="landing-welcome"><div><h1>{copy.title}</h1><p>{copy.intro}</p></div><span className="welcome-flourish" aria-hidden="true">✦</span></div>
         {/* Only the outcome is announced — the card itself is ordinary content,
             so the action buttons do not re-announce it as they change. */}
         <p className="visually-hidden" role="status">{status}</p>
@@ -151,7 +164,7 @@ export function Landing({
               {artOverlay > 0 ? <div className="verse-art-overlay" style={{ opacity: artOverlay }} /> : null}
               <div className="verse-art-scrim" />
               <div className="verse-copy">
-                <h2 className="verse-eyebrow">{heading}</h2>
+                <h2 className="verse-eyebrow"><span className="daily-dot" />{heading}</h2>
                 {displayText
                   ? <blockquote>{displayText}</blockquote>
                   : <p className="verse-waiting">{failed ? label.dailyVerseUnavailable : label.loadingVerse}</p>}
@@ -182,8 +195,8 @@ export function Landing({
                 <div className="verse-tools-primary">
                   {app.speechState === 'idle' ? (
                     <>
-                      <button className="primary" disabled={!canRead} onClick={() => enter('from')}>{label.readFromHere}</button>
-                      <button className="primary" disabled={!canRead} onClick={() => enter('chapter')}>{label.readTheChapter}</button>
+                      <button className="primary" disabled={!canRead} onClick={() => enter('from')}><ReaderIcon name="headphones" />{label.readFromHere}</button>
+                      <button className="primary" disabled={!canRead} onClick={() => enter('chapter')}><ReaderIcon name="book" />{label.readTheChapter}</button>
                     </>
                   ) : (
                     <>
@@ -197,7 +210,7 @@ export function Landing({
                   <button onClick={() => enter('none')}>{label.openThisVerse}</button>
                   <button disabled={!displayText} onClick={() => { void app.copyPassage(spokenReference, displayText); }}>{label.copy}</button>
                   <button disabled={!displayText || exporting} onClick={() => { void saveImage(); }}>{exporting ? label.exporting : label.image}</button>
-                  <button className={bookmarked ? 'active' : ''} onClick={() => app.toggleBookmarkAt(parsed.bookId, parsed.chapter, parsed.verse)}>{label.bookmark}</button>
+                  <button aria-pressed={bookmarked} className={bookmarked ? 'active' : ''} onClick={() => app.toggleBookmarkAt(parsed.bookId, parsed.chapter, parsed.verse)}>{label.bookmark}</button>
                 </div>
               </div>
             )}
@@ -206,27 +219,35 @@ export function Landing({
 
         <aside className="landing-rail">
           <div className="landing-cta">
+            <section className="continue-card">
+              <div className="continue-eyebrow">{copy.reading}</div>
+              <div className="continue-art" aria-hidden="true"><ReaderIcon name="book" /><span>✦</span></div>
+              <h2>{app.hasProgress ? `${app.bookName} ${app.chapterNumber}` : label.readTheBible}</h2>
+              <p>{copy.resume}</p>
             <button className="landing-read" onClick={onEnterReader}>
-              {app.hasProgress ? label.continueAt(`${app.bookName} ${app.chapterNumber}`) : label.readTheBible}
+              {app.hasProgress ? label.continueAt(`${app.bookName} ${app.chapterNumber}`) : label.readTheBible}<span aria-hidden="true">→</span>
             </button>
+            </section>
             {onGroupStudy && (
               <button className="landing-group" onClick={onGroupStudy}>
-                {label.readParty}
+                <span className="action-icon"><ReaderIcon name="people" /></span><span className="action-copy"><strong>{label.readParty}</strong><small>{copy.together}</small></span><span aria-hidden="true">↗</span>
                 {partyMembers ? <span className="landing-count">{partyMembers}</span> : null}
               </button>
             )}
             {onBookmarks && (
               <button className="landing-group" onClick={onBookmarks}>
-                {label.bookmarks}
+                <span className="action-icon"><ReaderIcon name="bookmark" /></span><span className="action-copy"><strong>{label.bookmarks}</strong><small>{label.footerLocal}</small></span><span aria-hidden="true">↗</span>
                 {app.bookmarkList.length ? <span className="landing-count">{app.bookmarkList.length}</span> : null}
               </button>
             )}
           </div>
 
-          <div className="landing-search">
+          <p className="landing-tagline">{label.footerFree}</p>
+        </aside>
+          <div className={searching ? 'landing-search is-searching' : 'landing-search'}>
             {!searching && (
               <div className="landing-topics">
-                <h2 className="section-label">{label.browseByTopic}</h2>
+                <div className="explore-heading"><div><span className="section-label">{label.browseByTopic}</span><h2>{copy.explore}</h2></div><p>{copy.exploreHint}</p></div>
                 <div className="landing-topic-list">
                   {app.topics.map((topic) => (
                     <button
@@ -234,7 +255,7 @@ export function Landing({
                       key={topic.id}
                       title={topic.description}
                       onClick={() => { app.setSelectedTopic(topic.id); app.setQuery(''); }}
-                    >{topic.name}</button>
+                    ><span className="topic-number" aria-hidden="true">{String(app.topics.indexOf(topic) + 1).padStart(2, '0')}</span><strong>{topic.name}</strong><small>{topic.description}</small><span className="topic-arrow" aria-hidden="true">↗</span></button>
                   ))}
                 </div>
               </div>
@@ -266,9 +287,8 @@ export function Landing({
             )}
           </div>
 
-          <p className="landing-tagline">{label.footerFree}</p>
-        </aside>
       </main>
+      <footer className="landing-bottom"><span>The Word</span><span>{label.footerFree}</span><span>{label.footerLocal}</span></footer>
     </div>
   );
 }
