@@ -202,6 +202,57 @@ select, input { border: 1px solid #c9c1b3; border-radius: 8px; background: trans
 .party-leave { padding: 10px; border: 1px solid #c04b5a; border-radius: 8px; background: transparent; color: #c04b5a; cursor: pointer; }
 :root[data-theme='dark'] .party-join input, :root[data-theme='dark'] .party-chat form input, :root[data-theme='dark'] .party-messages { border-color: #38352e; }
 
+/* ---------------- Meeting (full-screen study) ---------------- */
+.app-shell.meeting .layout { grid-template-columns: minmax(0, 1fr); max-width: 860px; gap: 0; padding-bottom: 120px; }
+.app-shell.meeting .sidebar { display: none; }
+.app-shell.meeting .verse.speaking,
+.app-shell.meeting .verse.following { font-size: 1.12em; }
+.meeting-rail {
+  display: flex; gap: 10px; overflow-x: auto; padding: 10px 4vw 12px;
+  border-bottom: 1px solid #ded9cf; background: color-mix(in srgb, var(--background, #f7f4ee) 92%, transparent);
+}
+:root[data-theme='dark'] .meeting-rail { border-color: #38352e; }
+.meeting-tile {
+  position: relative; flex: 0 0 120px; width: 120px; height: 90px; border-radius: 10px;
+  overflow: hidden; background: #2c261d; color: #f7f4ee;
+}
+.meeting-tile video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.meeting-tile.avatar video { opacity: 0; }
+.meeting-avatar {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-size: 28px; font-weight: 600; color: #fff;
+}
+.meeting-tile-name {
+  position: absolute; left: 0; right: 0; bottom: 0; padding: 16px 6px 5px;
+  background: linear-gradient(transparent, #0009); font-size: 11px; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.meeting-tile.live { box-shadow: inset 0 0 0 2px #2f9e6f; }
+.meeting-tile.self { box-shadow: inset 0 0 0 2px #947849; }
+.meeting-dock {
+  position: fixed; z-index: 22; left: 50%; bottom: 16px; transform: translateX(-50%);
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  max-width: min(720px, calc(100% - 24px)); padding: 10px 14px;
+  background: #292720; color: #f7f4ee; border-radius: 12px; box-shadow: 0 8px 30px #0004;
+}
+.meeting-dock-id { display: grid; gap: 1px; margin-right: 4px; }
+.meeting-dock .party-code-label { color: #d9d0c2; }
+.meeting-dock .party-code { font-size: 18px; color: inherit; }
+.meeting-dock .party-role { border-color: #746955; }
+.meeting-dock .icon-button { color: inherit; border-color: #746955; }
+.meeting-av.on { background: #2f9e6f; border-color: #2f9e6f; color: #fff; }
+.meeting-leave { margin-left: auto; padding: 8px 12px; }
+.meeting-hint, .meeting-cap {
+  position: fixed; z-index: 21; left: 50%; bottom: 78px; transform: translateX(-50%);
+  margin: 0; font-size: 13px; text-align: center; max-width: min(520px, calc(100% - 32px));
+}
+.app-shell.meeting .selection-bar, .app-shell.meeting .reading-bar { bottom: 86px; }
+.app-shell.meeting .speech-error { bottom: 86px; }
+@media (max-width: 860px) {
+  .meeting-tile { flex-basis: 96px; width: 96px; height: 72px; }
+  .meeting-dock { bottom: 10px; padding: 8px 10px; }
+}
+
 /* ---------------- Landing ---------------- */
 .landing {
   --surface: #fffdf8;

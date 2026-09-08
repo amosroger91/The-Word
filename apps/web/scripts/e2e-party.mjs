@@ -1,7 +1,12 @@
 // Two-tab Read Party smoke test: auto-arm on join + verse-by-verse follow.
 import { chromium } from 'playwright';
 
-const URL = process.env.APP_URL || 'http://localhost:5173/';
+function readerUrl() {
+  const raw = process.env.APP_URL || 'http://localhost:5173/';
+  const base = raw.split('#')[0].replace(/\/?$/, '/');
+  return `${base}#read`;
+}
+const URL = readerUrl();
 const errors = [];
 
 function log(pageName, msg) {
@@ -22,13 +27,16 @@ async function openParty(page) {
 async function dump(page, name) {
   const info = await page.evaluate(() => ({
     title: document.querySelector('.topbar-reference')?.textContent?.trim(),
-    role: document.querySelector('.party-role')?.textContent?.trim() || null,
+    role: document.querySelector('.meeting-dock .party-role, .party-role')?.textContent?.trim() || null,
     status: document.querySelector('.party-conn')?.textContent?.trim() || null,
     arm: Boolean(document.querySelector('.party-arm')),
     speaking: document.querySelector('.verse.speaking')?.querySelector('sup')?.textContent || null,
     following: document.querySelector('.verse.following')?.querySelector('sup')?.textContent || null,
     members: [...document.querySelectorAll('.party-member')].map((el) => el.textContent.trim()),
     speechError: document.querySelector('.speech-error')?.textContent || null,
+    meeting: Boolean(document.querySelector('.app-shell.meeting')),
+    tiles: document.querySelectorAll('.meeting-tile').length,
+    dock: Boolean(document.querySelector('.meeting-dock')),
   }));
   log(name, JSON.stringify(info));
   return info;
@@ -36,7 +44,11 @@ async function dump(page, name) {
 
 const browser = await chromium.launch({
   channel: 'chrome',
-  args: ['--autoplay-policy=user-gesture-required'],
+  args: [
+    '--autoplay-policy=user-gesture-required',
+    '--use-fake-ui-for-media-stream',
+    '--use-fake-device-for-media-stream',
+  ],
 });
 const hostCtx = await browser.newContext();
 const partCtx = await browser.newContext();
@@ -52,10 +64,10 @@ try {
 
   await openParty(host);
   await host.locator('.party-primary').click();
-  await host.waitForSelector('.party-code', { timeout: 20000 });
-  const code = (await host.locator('.party-code').textContent()).trim();
+  await host.waitForSelector('.meeting-dock .party-code', { timeout: 20000 });
+  await host.waitForFunction(() => document.querySelector('.meeting-dock .party-role')?.textContent === 'You are the host', null, { timeout: 20000 });
+  const code = (await host.locator('.meeting-dock .party-code').textContent()).trim();
   log('host', `party code ${code}`);
-  await host.waitForFunction(() => document.querySelector('.party-role')?.textContent === 'You are the host', null, { timeout: 20000 });
   await dump(host, 'host');
 
   await openParty(part);
@@ -72,14 +84,18 @@ try {
     throw new Error('FAIL: arm button shown after join — auto-arm did not take');
   }
   log('part', 'no arm button after join (auto-arm ok)');
+  if (!armedAtJoin.meeting || !armedAtJoin.dock || armedAtJoin.tiles < 2) {
+    throw new Error(`FAIL: meeting layout missing after join (meeting=${armedAtJoin.meeting} dock=${armedAtJoin.dock} tiles=${armedAtJoin.tiles})`);
+  }
+  log('part', `meeting layout up (${armedAtJoin.tiles} tiles)`);
 
   // Close the overlay so the host can press Read aloud.
   await host.locator('.party-panel .panel-header button').click();
   await host.waitForSelector('.party-panel', { state: 'hidden' });
 
   // Host starts reading. Participant should follow the verse without another tap.
-  await host.getByRole('button', { name: 'Read aloud' }).click();
-  log('host', 'clicked Read aloud');
+  await host.locator('.control-row button[aria-label="Listen"]').click({ force: true });
+  log('host', 'clicked Listen');
 
   await host.waitForSelector('.verse.speaking', { timeout: 90000 });
   const hostVerse = await host.locator('.verse.speaking sup').first().textContent();
@@ -124,6 +140,13 @@ try {
   if (after2.arm) throw new Error('FAIL: arm button appeared mid-reading');
   if (after2.speechError) throw new Error(`FAIL: participant speech error on verse ${hostV2}: ${after2.speechError}`);
   if (after2.speaking !== hostV2) throw new Error(`FAIL: participant did not speak host verse ${hostV2} (speaking=${after2.speaking})`);
+
+  await host.locator('.meeting-dock button[aria-label="Microphone"]').click();
+  await part.locator('.meeting-dock button[aria-label="Microphone"]').click();
+  await host.waitForSelector('.meeting-dock .meeting-av.on', { timeout: 10000 });
+  await part.waitForSelector('.meeting-dock .meeting-av.on', { timeout: 10000 });
+  log('host', 'mic on');
+  log('part', 'mic on');
 
   if (errors.length) {
     console.log('page errors:', errors);

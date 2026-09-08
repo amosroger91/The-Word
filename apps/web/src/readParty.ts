@@ -16,13 +16,18 @@
 //
 //  Unlike OpenWhisper, reading state is HOST-AUTHORITATIVE: only the
 //  host broadcasts passage/playback changes. Clients apply them
-//  locally and never echo them, so there is no feedback loop. Audio
-//  is never streamed — each device reads with its own local TTS.
+//  locally and never echo them, so there is no feedback loop.
+//
+//  Scripture TTS stays local (Piper). Live voice/video is a FULL MESH
+//  on top: members in the call dial each other directly (lower peer-id
+//  initiates). Past MESH_CAP people we keep text + verse sync but stop
+//  forming media connections.
 // ============================================================
-import { Peer, type DataConnection } from 'peerjs';
+import { Peer, type DataConnection, type MediaConnection } from 'peerjs';
+import { getLocalStream, hasMedia } from './media';
 
 export interface PartyIdentity { id: string; name: string; color: string; }
-export interface PartyMember { id: string; name: string; color: string; peerId: string; host?: boolean; }
+export interface PartyMember { id: string; name: string; color: string; peerId: string; host?: boolean; av?: boolean; }
 export interface PartyChatMessage {
   id: string;
   kind: 'chat' | 'system';
@@ -40,20 +45,23 @@ export interface ReadingState {
   bookId: number;
   chapter: number;
   verse: number | null;
-  action: 'idle' | 'playing' | 'paused';
+  action: 'idle' | 'playing' | 'paused' | 'live';
   ts: number;
 }
 
 export interface PartyHandlers {
   onStatus?(status: string): void;
   onSelf?(info: { host: boolean }): void;
-  onRoster?(members: PartyMember[], meta: { host: boolean }): void;
+  onRoster?(members: PartyMember[], meta: { host: boolean; capped: boolean }): void;
   onChat?(message: PartyChatMessage): void;
   onReading?(state: ReadingState | null): void;
   onError?(code: string): void;
+  onRemoteStream?(memberId: string, stream: MediaStream): void;
+  onRemoteEnd?(memberId: string): void;
 }
 
 const CHAT_HISTORY = 100; // chat messages handed to a new joiner
+const MESH_CAP = 8;       // max members before the A/V mesh is suspended
 
 export function partyPeerId(code: string): string {
   const slug = String(code).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
@@ -67,10 +75,13 @@ interface Envelope { t: string; d?: unknown }
 export interface PartyRoom {
   readonly isHost: boolean;
   readonly size: number;
+  readonly capped: boolean;
   sendChat(text: string): void;
   /** Host only: publish the shared reading state to everyone. No-op for clients. */
   setReadingState(state: ReadingState): void;
   updateIdentity(next: Partial<PartyIdentity>): void;
+  /** Call after setMedia(): refresh streams across the mesh and announce A/V. */
+  refreshMedia(): void;
   leave(): void;
 }
 
@@ -92,19 +103,25 @@ export function joinParty({ code, identity, handlers = {} }: {
   let leaving = false;
   let reelectTimer: ReturnType<typeof setTimeout> | null = null;
   let me = identity;
+  const mediaConns = new Map<string, MediaConnection>();
+  let reconcileTimer: ReturnType<typeof setTimeout> | null = null;
 
   const status = (s: string) => h.onStatus?.(s);
   const myPeerId = () => (peer && peer.id) || '';
+  const capped = () => members.length > MESH_CAP;
 
   function selfMember(): PartyMember {
-    return { id: me.id, name: me.name, color: me.color, peerId: myPeerId(), host: isHub };
+    return { id: me.id, name: me.name, color: me.color, peerId: myPeerId(), host: isHub, av: hasMedia() };
   }
   function upsert(m: PartyMember) {
     const i = members.findIndex((x) => x.id === m.id);
     if (i >= 0) members[i] = { ...members[i], ...m };
     else members.push(m);
   }
-  function emitRoster() { h.onRoster?.(members.slice(), { host: isHub }); }
+  function emitRoster() {
+    h.onRoster?.(members.slice(), { host: isHub, capped: capped() });
+    scheduleReconcile();
+  }
 
   function broadcast(env: Envelope, exceptPeerId?: string) {
     for (const [pid, c] of clientConns) {
@@ -131,7 +148,7 @@ export function joinParty({ code, identity, handlers = {} }: {
     if (!env || !env.t) return;
     if (env.t === 'hello') {
       const m = (env.d || {}) as Partial<PartyMember>;
-      upsert({ id: m.id!, name: m.name || 'Reader', color: m.color || '#888', peerId: fromPeerId || '' });
+      upsert({ id: m.id!, name: m.name || 'Reader', color: m.color || '#888', peerId: fromPeerId || '', av: Boolean(m.av) });
       const conn = fromPeerId ? clientConns.get(fromPeerId) : null;
       if (conn) {
         try { conn.send({ t: 'welcome', d: { roster: members.slice(), chat: chatLog.slice(-CHAT_HISTORY), reading: readingState } }); } catch { /* dropped */ }
@@ -154,6 +171,7 @@ export function joinParty({ code, identity, handlers = {} }: {
         const d = (env.d || {}) as Partial<PartyMember>;
         if (d.name != null) members[i].name = d.name;
         if (d.color != null) members[i].color = d.color;
+        if (d.av != null) members[i].av = Boolean(d.av);
         emitRoster(); broadcast({ t: 'roster', d: members.slice() });
       }
     }
@@ -181,12 +199,63 @@ export function joinParty({ code, identity, handlers = {} }: {
     }
   }
 
+  /* ---------------- A/V mesh ---------------- */
+  function resolveMemberId(peerId: string) {
+    return members.find((x) => x.peerId === peerId)?.id || peerId;
+  }
+  function trackCall(call: MediaConnection) {
+    const pid = call.peer;
+    mediaConns.set(pid, call);
+    call.on('stream', (s) => h.onRemoteStream?.(resolveMemberId(pid), s));
+    call.on('close', () => { mediaConns.delete(pid); h.onRemoteEnd?.(resolveMemberId(pid)); scheduleReconcile(); });
+    call.on('error', () => { mediaConns.delete(pid); h.onRemoteEnd?.(resolveMemberId(pid)); scheduleReconcile(); });
+  }
+  function scheduleReconcile() {
+    if (reconcileTimer) clearTimeout(reconcileTimer);
+    reconcileTimer = setTimeout(reconcileMesh, 350);
+  }
+  function reconcileMesh() {
+    if (capped() || !hasMedia() || !peer) return;
+    const stream = getLocalStream();
+    if (!stream) return;
+    for (const m of members) {
+      if (m.id === me.id || !m.av || !m.peerId) continue;
+      if (mediaConns.has(m.peerId)) continue;
+      if (myPeerId() < m.peerId) {
+        try { trackCall(peer.call(m.peerId, stream)); } catch { /* dial failed */ }
+      }
+    }
+  }
+  function pruneStaleMedia() {
+    const live = new Set(members.map((m) => m.peerId));
+    for (const [pid, call] of mediaConns) {
+      if (!live.has(pid)) {
+        try { call.close(); } catch { /* ignore */ }
+        mediaConns.delete(pid);
+        h.onRemoteEnd?.(resolveMemberId(pid));
+      }
+    }
+  }
+  function closeAllMedia() {
+    for (const [pid, call] of mediaConns) {
+      try { call.close(); } catch { /* ignore */ }
+      h.onRemoteEnd?.(resolveMemberId(pid));
+    }
+    mediaConns.clear();
+  }
+  function answerCalls() {
+    peer!.on('call', (call) => {
+      call.answer(getLocalStream() || undefined);
+      trackCall(call);
+    });
+  }
+
   /* ---------------- connection lifecycle ---------------- */
   function wireClientConn(c: DataConnection) {
     hubConn = c;
     c.on('open', () => {
       status('connected');
-      try { c.send({ t: 'hello', d: { id: me.id, name: me.name, color: me.color } }); } catch { /* dropped */ }
+      try { c.send({ t: 'hello', d: { id: me.id, name: me.name, color: me.color, av: hasMedia() } }); } catch { /* dropped */ }
     });
     c.on('data', handleFromHub);
     c.on('close', () => { if (!leaving) reelect(); });
@@ -209,10 +278,12 @@ export function joinParty({ code, identity, handlers = {} }: {
         const m = members.find((x) => x.peerId === c.peer);
         members = members.filter((x) => x.peerId !== c.peer);
         if (m) { const sm = systemMessage(`${m.name} left the party`, 'left', m.name); recordChat(sm); broadcast({ t: 'chat', d: sm }); }
+        pruneStaleMedia();
         emitRoster(); broadcast({ t: 'roster', d: members.slice() });
       });
       c.on('error', () => { /* ignore */ });
     });
+    answerCalls();
   }
 
   function startAsClient() {
@@ -220,10 +291,12 @@ export function joinParty({ code, identity, handlers = {} }: {
     status('joining');
     h.onSelf?.({ host: false });
     wireClientConn(peer!.connect(HUB_ID, { reliable: true }));
+    answerCalls();
   }
 
   function reelect() {
     if (leaving) return;
+    closeAllMedia();
     if (reelectTimer) clearTimeout(reelectTimer);
     try { peer?.destroy(); } catch { /* ignore */ }
     peer = null; hubConn = null;
@@ -260,6 +333,7 @@ export function joinParty({ code, identity, handlers = {} }: {
   return {
     get isHost() { return isHub; },
     get size() { return members.length; },
+    get capped() { return capped(); },
     sendChat(text: string) {
       const clean = String(text || '').trim();
       if (!clean) return;
@@ -280,11 +354,20 @@ export function joinParty({ code, identity, handlers = {} }: {
       const i = members.findIndex((x) => x.id === me.id);
       if (i >= 0) { members[i].name = me.name; members[i].color = me.color; }
       if (isHub) { emitRoster(); broadcast({ t: 'roster', d: members.slice() }); }
-      else toHub({ t: 'meta', d: { name: me.name, color: me.color } });
+      else toHub({ t: 'meta', d: { name: me.name, color: me.color, av: hasMedia() } });
+    },
+    refreshMedia() {
+      closeAllMedia();
+      const i = members.findIndex((x) => x.id === me.id);
+      if (i >= 0) members[i].av = hasMedia();
+      if (isHub) { emitRoster(); broadcast({ t: 'roster', d: members.slice() }); }
+      else { toHub({ t: 'meta', d: { av: hasMedia() } }); scheduleReconcile(); }
     },
     leave() {
       leaving = true;
+      closeAllMedia();
       if (reelectTimer) clearTimeout(reelectTimer);
+      if (reconcileTimer) clearTimeout(reconcileTimer);
       try { for (const c of clientConns.values()) c.close(); } catch { /* ignore */ }
       clientConns.clear();
       try { hubConn?.close(); } catch { /* ignore */ }

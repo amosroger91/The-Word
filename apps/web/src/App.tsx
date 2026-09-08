@@ -2,8 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { localBible } from '@the-word/bible';
 import { readingFonts, useWordApp, verseImageFilename, verseRuns, type Language, type WordApp } from '@the-word/core';
 import { SearchableSelect } from './SearchableSelect';
-import { BookBibleIcon, VolumeHighIcon, VolumeLowIcon } from './icons';
+import { BookBibleIcon, CamIcon, MicIcon, VolumeHighIcon, VolumeLowIcon } from './icons';
 import { CrossRefMenu } from './CrossRefMenu';
+import { FaceRail } from './FaceRail';
 import { Landing } from './Landing';
 import { Preferences } from './Preferences';
 import { VerseImageEditor, type VerseImageJob } from './VerseImageEditor';
@@ -79,7 +80,7 @@ function App() {
 
   // Highlight/scroll to the verse being read locally, or — for a Read Party
   // participant — to the verse the host is currently on.
-  const followVerse = party.hostVerse;
+  const followVerse = party.stageVerse;
   useEffect(() => {
     const verse = speakingVerse ?? followVerse;
     if (verse == null) return;
@@ -165,7 +166,7 @@ function App() {
   );
 
   return (
-    <div className="app-shell">
+    <div className={party.active ? 'app-shell meeting' : 'app-shell'}>
       <header className="topbar">
         <div className="topbar-identity">
           <button className="topbar-home" onClick={openHome} aria-label={label.home} title={label.home}>
@@ -194,6 +195,15 @@ function App() {
           </div>
         </div>
       </header>
+      {party.active && (
+        <FaceRail
+          members={party.members}
+          selfId={party.identity.id}
+          localStream={party.localStream}
+          remoteStreams={party.remoteStreams}
+          youSuffix={label.youSuffix}
+        />
+      )}
       <main className="layout">
         <aside className="sidebar">
           <div className="control-group">
@@ -231,11 +241,15 @@ function App() {
                     tabIndex={0}
                     ref={(el) => { verseRefs.current[verse.ref.verse] = el; }}
                     className={speaking ? 'verse speaking' : following ? 'verse following' : focused ? 'verse focused' : selected ? 'verse selected' : 'verse'}
-                    onClick={() => app.toggleVerse(verse.ref.verse)}
+                    onClick={() => {
+                      app.toggleVerse(verse.ref.verse);
+                      if (party.active && party.isHost) party.setFocusVerse(verse.ref.verse);
+                    }}
                     onKeyDown={(event) => {
                       if (event.key === 'Enter' || event.key === ' ') {
                         event.preventDefault();
                         app.toggleVerse(verse.ref.verse);
+                        if (party.active && party.isHost) party.setFocusVerse(verse.ref.verse);
                       }
                     }}
                   >
@@ -278,6 +292,38 @@ function App() {
           )}
         </section>
       </main>
+      {party.active && (
+        <div className="meeting-dock">
+          <div className="meeting-dock-id">
+            <span className="party-code-label">{label.partyCode}</span>
+            <strong className="party-code">{party.code}</strong>
+          </div>
+          <span className={`party-role ${party.isHost ? 'host' : ''}`}>{party.isHost ? label.youAreHost : label.followingHost}</span>
+          <button
+            className={`icon-button meeting-av ${party.micOn ? 'on' : ''}`}
+            onClick={party.toggleMic}
+            disabled={party.capped && !party.micOn}
+            aria-pressed={party.micOn}
+            aria-label={label.meetingMic}
+            title={label.meetingMic}
+          ><MicIcon /></button>
+          <button
+            className={`icon-button meeting-av ${party.camOn ? 'on' : ''}`}
+            onClick={party.toggleCam}
+            disabled={party.capped && !party.camOn}
+            aria-pressed={party.camOn}
+            aria-label={label.meetingCam}
+            title={label.meetingCam}
+          ><CamIcon /></button>
+          <button className={`icon-button ${partyOpen ? 'active' : ''}`} onClick={() => setPartyOpen((open) => !open)} aria-label={label.partyChat} title={label.partyChat}>💬</button>
+          <button className="party-leave meeting-leave" onClick={party.leaveParty}>{label.leaveParty}</button>
+        </div>
+      )}
+      {party.mediaError && <div className="speech-error" role="alert">{label.mediaDenied}</div>}
+      {party.capped && party.active && <p className="meeting-cap muted">{label.meshCapped}</p>}
+      {party.active && party.isHost && !party.liveFloor && speechState === 'idle' && (
+        <p className="meeting-hint muted">{label.tapVerseToPlace}</p>
+      )}
       {readingBarOpen && (
         <div className="reading-bar">
           <div className="reading-bar-status">

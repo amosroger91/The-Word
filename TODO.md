@@ -7,6 +7,10 @@ Deploy: `bash scripts/deploy-pages.sh` (builds `apps/web`, force-pushes `dist/` 
 
 _(none)_
 
+## Recently shipped (this session, pending deploy)
+
+- Group Study meeting: live mic/camera WebRTC mesh (OpenWhisper pattern, cap 8) + full-screen layout. Face rail around the verse, dock with code/mic/cam/chat/leave. Host tap-verse places the group (`action: 'live'`). Piper ducks while anyone is on a live mic.
+
 ## Recently shipped (committed + deployed)
 
 - Read Party i18n (en/es/fr/zh/vi): party chrome uses `packages/core` strings; connection status is a code (`hosting` / `joining` / …) mapped in the UI; join/leave chat lines carry an `event` so each client translates them. English `text` stays on the wire as a fallback.

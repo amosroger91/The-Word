@@ -90,6 +90,11 @@ export interface Strings {
   partyReconnecting: string;
   partyJoined: (name: string) => string;
   partyLeft: (name: string) => string;
+  meetingMic: string;
+  meetingCam: string;
+  mediaDenied: string;
+  meshCapped: string;
+  tapVerseToPlace: string;
   home: string;
   readTheBible: string;
   continueReading: string;
@@ -213,6 +218,11 @@ export const strings: Record<Language, Strings> = {
     partyReconnecting: 'Reconnecting…',
     partyJoined: (name) => `${name} joined the group`,
     partyLeft: (name) => `${name} left the group`,
+    meetingMic: 'Microphone',
+    meetingCam: 'Camera',
+    mediaDenied: 'Could not access the microphone or camera. Check browser permissions.',
+    meshCapped: 'Voice and video pause above 8 people so the connection stays smooth. Text and reading still work.',
+    tapVerseToPlace: 'Tap a verse to gather everyone there.',
     home: 'Home',
     readTheBible: 'Read the Bible',
     continueReading: 'Continue reading',
@@ -328,6 +338,11 @@ export const strings: Record<Language, Strings> = {
     partyReconnecting: 'Reconectando…',
     partyJoined: (name) => `${name} se unió al grupo`,
     partyLeft: (name) => `${name} salió del grupo`,
+    meetingMic: 'Micrófono',
+    meetingCam: 'Cámara',
+    mediaDenied: 'No se pudo acceder al micrófono o la cámara. Revisa los permisos del navegador.',
+    meshCapped: 'Voz y vídeo se pausan con más de 8 personas para que la conexión siga fluida. El texto y la lectura siguen.',
+    tapVerseToPlace: 'Toca un versículo para reunir al grupo ahí.',
     home: 'Inicio',
     readTheBible: 'Leer la Biblia',
     continueReading: 'Seguir leyendo',
@@ -443,6 +458,11 @@ export const strings: Record<Language, Strings> = {
     partyReconnecting: 'Reconnexion…',
     partyJoined: (name) => `${name} a rejoint la lecture`,
     partyLeft: (name) => `${name} a quitté la lecture`,
+    meetingMic: 'Microphone',
+    meetingCam: 'Caméra',
+    mediaDenied: "Impossible d'accéder au micro ou à la caméra. Vérifiez les permissions du navigateur.",
+    meshCapped: 'La voix et la vidéo se mettent en pause au-delà de 8 personnes. Le texte et la lecture continuent.',
+    tapVerseToPlace: 'Touchez un verset pour y rassembler le groupe.',
     home: 'Accueil',
     readTheBible: 'Lire la Bible',
     continueReading: 'Continuer la lecture',
@@ -558,6 +578,11 @@ export const strings: Record<Language, Strings> = {
     partyReconnecting: '正在重新连接…',
     partyJoined: (name) => `${name} 加入了读经`,
     partyLeft: (name) => `${name} 离开了读经`,
+    meetingMic: '麦克风',
+    meetingCam: '摄像头',
+    mediaDenied: '无法使用麦克风或摄像头。请检查浏览器权限。',
+    meshCapped: '超过 8 人时暂停语音和视频，以保持连接流畅。文字和读经仍可用。',
+    tapVerseToPlace: '点按一节经文，让大家聚到那里。',
     home: '首页',
     readTheBible: '阅读圣经',
     continueReading: '继续阅读',
@@ -673,6 +698,11 @@ export const strings: Record<Language, Strings> = {
     partyReconnecting: 'Đang kết nối lại…',
     partyJoined: (name) => `${name} đã tham gia nhóm`,
     partyLeft: (name) => `${name} đã rời nhóm`,
+    meetingMic: 'Micro',
+    meetingCam: 'Camera',
+    mediaDenied: 'Không thể dùng micro hoặc camera. Hãy kiểm tra quyền của trình duyệt.',
+    meshCapped: 'Giọng nói và video tạm dừng khi hơn 8 người để kết nối vẫn mượt. Văn bản và đọc vẫn hoạt động.',
+    tapVerseToPlace: 'Chạm một câu để nhóm họp tại đó.',
     home: 'Trang chủ',
     readTheBible: 'Đọc Kinh Thánh',
     continueReading: 'Tiếp tục đọc',
