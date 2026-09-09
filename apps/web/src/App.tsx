@@ -18,6 +18,9 @@ import { useDailyReminder } from './dailyReminder';
 import { useReadParty } from './useReadParty';
 import { useStudyBoard } from './useStudyBoard';
 import { takeRestoreToken } from './nostrAccount';
+import { useChapterRead, useLedger } from './useLedger';
+import { ProgressPanel } from './ProgressPanel';
+import { localized } from './badges';
 import './styles.css';
 import './landing.css';
 import './workspace.css';
@@ -47,6 +50,7 @@ function App() {
   } = app;
 
   const party = useReadParty(app);
+  const ledger = useLedger();
   // Lives at the top of the app, not inside Preferences: the schedule has to be
   // kept armed on every visit, whether or not the reader opens that panel.
   const reminder = useDailyReminder({ title: label.reminderTitle, body: label.reminderBody });
@@ -72,6 +76,8 @@ function App() {
   const partyOpen = tools.entries.some(e=>e.id==='group');
   const { list: liveGroups, advertise: advertiseGroup, retract: retractGroup } = useStudyBoard(partyOpen || (party.active && party.findable && party.isHost));
   const verseRefs = useRef<Record<number, HTMLElement | null>>({});
+  const [lastInView, setLastInView] = useState(false);
+  const lastVerse = chapter?.verses.length ? chapter.verses[chapter.verses.length - 1].ref.verse : null;
 
   useEffect(() => { if (restorePrefill) tools.open('settings'); }, [restorePrefill]);
   useEffect(() => { document.documentElement.dataset.theme = app.theme; }, [app.theme]);
@@ -103,6 +109,29 @@ function App() {
   // Preload the selected voice as soon as the page is ready (and whenever it
   // changes) so pressing Read aloud plays instantly instead of downloading first.
   useEffect(() => { speech.prewarm?.(speechVoice); }, [speech, speechVoice]);
+
+  useEffect(() => {
+    setLastInView(false);
+    const el = lastVerse ? verseRefs.current[lastVerse] : null;
+    if (!el) return;
+    const io = new IntersectionObserver(([entry]) => setLastInView(entry.isIntersecting), { threshold: 0.5 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [chapter, lastVerse, chapterLoading, view]);
+
+  useChapterRead(ledger.recordChapterRead, {
+    bookId: app.bookId,
+    chapter: chapterNumber,
+    lastVerse,
+    speakingVerse,
+    lastInView,
+  });
+
+  useEffect(() => {
+    if (!ledger.justEarned.length) return;
+    setNotice(label.badgeEarned(localized(ledger.justEarned[0].definition.title, language)));
+    ledger.clearJustEarned();
+  }, [ledger.justEarned]);
 
   // Highlight/scroll to the verse being read locally, or — for a Read Party
   // participant — to the verse the host is currently on.
@@ -220,14 +249,14 @@ function App() {
     <div className="room-controls"><button onClick={()=>{if(view==='home')openReader();openTool('sound');}}><VolumeHighIcon/><span>Sound</span></button>{party.active&&<><button onClick={()=>{if(view==='home')openReader();openTool('group');}}><ReaderIcon name="people"/><span>Group · {party.members.length}</span></button><button className="leave-button" onClick={party.leaveParty}>Leave</button></>}</div>
   </footer>;
   return <><div hidden={view!=='home'} className={party.active?'home-in-session':''}>
-    <Landing app={app} onEnterReader={()=>{app.markProgress();openReader();}} onGroupStudy={()=>{openReader();openTool('group');}} onBookmarks={()=>{openReader();openLibrary('bookmarks');}} onPreferences={()=>tools.open('settings')} partyMembers={party.active?party.members.length:0} banner={<ReminderBanner reminder={reminder}/>} />
+    <Landing app={app} onEnterReader={()=>{app.markProgress();openReader();}} onGroupStudy={()=>{openReader();openTool('group');}} onBookmarks={()=>{openReader();openLibrary('bookmarks');}} onPreferences={()=>tools.open('settings')} onProgress={()=>{openReader();openTool('progress');}} progress={{chapters:ledger.chapters,streak:ledger.streak}} partyMembers={party.active?party.members.length:0} banner={<ReminderBanner reminder={reminder}/>} />
     {view==='home'&&tools.entries.some(e=>e.id==='settings')&&preferences}
     {party.active&&<div className="home-session"><button onClick={openReader}>Return to study · {stageReference}</button>{dock}</div>}
   </div>
   <div hidden={view!=='reader'} className={`study-workspace ${tools.entries.length?'has-tools':''} ${library?'has-library':''} ${tools.expanded?'wide-tools':''}`} data-mobile-view={mobileView}>
     <header className="workspace-header"><button className="workspace-brand" onClick={openHome} aria-label={label.home}><BookBibleIcon/><span>The Word</span></button>
       <div className="passage-picker"><button onClick={()=>openLibrary('books')}>{bookName} {chapterNumber} <span>⌄</span></button><span>{app.translations.find(t=>t.id===app.translationId)?.shortName}</span></div>
-      <nav aria-label="Reader tools"><button onClick={()=>openLibrary('search')}><ReaderIcon name="search"/><span>Search</span></button><button onClick={()=>openLibrary('bookmarks')}><ReaderIcon name="bookmark"/><span>Saved</span></button><button onClick={()=>openTool('group')}><ReaderIcon name="people"/><span>Group Study</span></button><button aria-label="Settings" onClick={()=>openTool('settings')}><ReaderIcon name="settings"/></button><button aria-label={label.toggleTheme} onClick={app.toggleTheme}><ReaderIcon name={app.theme==='dark'?'sun':'moon'}/></button></nav>
+      <nav aria-label="Reader tools"><button onClick={()=>openLibrary('search')}><ReaderIcon name="search"/><span>Search</span></button><button onClick={()=>openLibrary('bookmarks')}><ReaderIcon name="bookmark"/><span>Saved</span></button><button onClick={()=>openTool('progress')}><ReaderIcon name="award"/><span>{label.progress}</span></button><button onClick={()=>openTool('group')}><ReaderIcon name="people"/><span>Group Study</span></button><button aria-label="Settings" onClick={()=>openTool('settings')}><ReaderIcon name="settings"/></button><button aria-label={label.toggleTheme} onClick={app.toggleTheme}><ReaderIcon name={app.theme==='dark'?'sun':'moon'}/></button></nav>
     </header>
     {party.active&&<section className={`session-strip ${peopleMode}`} aria-label="Study participants"><div className="session-heading"><span><i className="live-dot"/>Group Study <small>· {party.isHost?'You are hosting':`${hostName} is hosting`} · {partyStatusText(party.status,label)}</small></span><div><button onClick={()=>setPeopleMode(peopleMode==='discussion'?'compact':'discussion')} aria-pressed={peopleMode==='discussion'}>{peopleMode==='discussion'?'Reading layout':'Discussion layout'}</button><button onClick={()=>setPeopleMode(peopleMode==='collapsed'?'compact':'collapsed')}>{peopleMode==='collapsed'?'Show people':'Hide people'}</button></div></div>
       <FaceRail members={party.members} selfId={party.identity.id} selfAvatar={party.avatar} localStream={party.localStream} remoteStreams={party.remoteStreams} micOn={party.micOn} youSuffix={label.youSuffix} mutedLabel={label.muted} onPickPhoto={file=>{void party.setAvatar(file);}}/>
@@ -299,7 +328,7 @@ function App() {
         })}</article>:<div className="empty-state"><h2>{label.chapterMissingTitle}</h2><p>{label.chapterMissingBody}</p></div>}
         <div className="reader-end"><span>Continue in the Word</span><button onClick={()=>navigate(app.bookId,chapterNumber+1)} disabled={!book||chapterNumber===book.chapters}>{label.next} →</button></div>
       </section>
-      <ToolDock tools={tools}>{ {group,settings:view==='reader'?preferences:null,sound,references:<PassageTools passage={passage} app={app} onNavigate={navigate} onRefresh={()=>setPassage(snapshot(app,currentVerse))} follow={followTool} onFollow={setFollowTool}/>,guide:<PassageTools guide passage={guidePassage} app={app} onNavigate={navigate} onRefresh={()=>setGuidePassage(snapshot(app,currentVerse))} follow={followGuide} onFollow={setFollowGuide}/>,image:imageJob?<VerseImageEditor key={imageJob.reference+imageJob.text} embedded job={imageJob} fontStack={app.font.stack} label={label} onClose={()=>tools.close('image')}/>:<p>Select a verse to create an image.</p>} }</ToolDock>
+      <ToolDock tools={tools}>{ {group,settings:view==='reader'?preferences:null,sound,progress:<ProgressPanel label={label} language={language} chapters={ledger.chapters} streak={ledger.streak} events={ledger.events} earned={ledger.earned}/>,references:<PassageTools passage={passage} app={app} onNavigate={navigate} onRefresh={()=>setPassage(snapshot(app,currentVerse))} follow={followTool} onFollow={setFollowTool}/>,guide:<PassageTools guide passage={guidePassage} app={app} onNavigate={navigate} onRefresh={()=>setGuidePassage(snapshot(app,currentVerse))} follow={followGuide} onFollow={setFollowGuide}/>,image:imageJob?<VerseImageEditor key={imageJob.reference+imageJob.text} embedded job={imageJob} fontStack={app.font.stack} label={label} onClose={()=>tools.close('image')}/>:<p>Select a verse to create an image.</p>} }</ToolDock>
     </main>
     {(notice||speechError||party.mediaError||party.capped)&&<div className="workspace-notice" role="status"><span>{notice||speechError||(party.mediaError==='photo'?'That photo could not be loaded.':party.mediaError?'Microphone or camera unavailable. Check your browser permissions.':'This room is above the 8-person voice/video threshold. Chat and passage sharing remain available.')}</span>{notice&&<button onClick={()=>setNotice('')} aria-label="Dismiss message">×</button>}</div>}
     {selectedVerses.size>0&&<div className="workspace-selection" aria-label="Selected verse actions"><strong>{selectedReference}</strong><div><button onClick={app.copySelection}>Copy</button><button onClick={()=>app.selectedVerseNumbers.forEach(app.toggleBookmark)}>Bookmark</button><button onClick={()=>inspect(currentVerse,'guide')}>Explore</button><button onClick={()=>{setImageJob({reference:selectedReference,text:selectedText,translation:app.translations.find(t=>t.id===app.translationId)?.shortName??'KJV',filename:verseImageFilename(bookName,chapterNumber),seed:selectedReference});openTool('image');}}>Image</button>{(!participant||!party.following)&&<button onClick={app.speakSelection}>{party.isHost?'Read to group':'Read selection'}</button>}{party.active&&party.isHost&&<button onClick={()=>party.showGroup(app.selectedVerseNumbers)}>Show group</button>}<button onClick={app.clearSelection} aria-label="Clear selection">×</button></div></div>}

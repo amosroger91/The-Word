@@ -102,6 +102,26 @@
 .prefs-embedded .prefs-header button,.image-editor-embedded .image-editor-header button { display:none; }
 .prefs-embedded .prefs-body { padding:18px 0; }
 .prefs-embedded .prefs-field { min-width:0; }
+.progress-panel p { margin: 0 0 18px; color: var(--ws-muted); font-size: 13px; }
+.progress-panel .muted { color: var(--ws-muted); }
+.badge-block { margin-top: 18px; }
+.badge-grid { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 10px; }
+.badge-card {
+  display: grid;
+  grid-template-columns: 36px 1fr;
+  grid-template-rows: auto auto auto;
+  column-gap: 12px;
+  row-gap: 2px;
+  padding: 12px;
+  border: 1px solid var(--ws-line);
+  border-radius: 12px;
+  background: var(--ws-surface);
+}
+.badge-card svg { grid-row: 1 / span 3; align-self: center; color: var(--ws-accent); }
+.badge-card strong { font-size: 14px; }
+.badge-card small { color: var(--ws-muted); font-size: 12px; line-height: 1.45; }
+.badge-card.locked { opacity: 0.62; }
+.badge-meter { font-size: 11px; color: var(--ws-accent); letter-spacing: 0.02em; }
 .image-editor-embedded .image-editor-preview { max-height:40dvh; }
 .image-editor-embedded .image-editor-thumbs { grid-template-columns:repeat(3,1fr); }
 .join-profile { display:flex; align-items:center; gap:10px; padding:14px 0; border-block:1px solid var(--ws-line); margin:20px 0; }

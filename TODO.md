@@ -5,14 +5,10 @@ Deploy: `bash scripts/deploy-pages.sh` (builds `apps/web`, force-pushes `dist/` 
 
 ## Requested, not yet started
 
-- Guided lessons, circles (family / couple / friends / solo), badges, accounts.
-  Framework design in [`docs/study-plans-framework.md`](docs/study-plans-framework.md)
-  — data shapes and delivery order, no plan content. Stack: Nostr for accounts /
-  friends / DMs, Gun for the internal feed and circle state, and a Gun "survivor
-  relay" on a VPS. **That VPS is the project's first server** — it is what makes
-  membership unspoofable and lets circles sync when nobody is online together, and
-  it reverses the no-backend choice recorded below. Four decisions are still open
-  at the end of that doc.
+- Guided lessons, circles, and the rest of
+  [`docs/study-plans-framework.md`](docs/study-plans-framework.md). Phase 1
+  (Nostr accounts) and Phase 2 (local ledger + badges) are shipped. Next is
+  Phase 3: survivor relay + membership on a VPS — the project's first server.
 
 ## Recently shipped (this session, pending deploy)
 

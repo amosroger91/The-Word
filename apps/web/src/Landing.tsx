@@ -33,6 +33,8 @@ export function Landing({
   onGroupStudy,
   onBookmarks,
   onPreferences,
+  onProgress,
+  progress,
   partyMembers,
   banner,
 }: {
@@ -42,6 +44,8 @@ export function Landing({
   onGroupStudy?: () => void;
   onBookmarks?: () => void;
   onPreferences?: () => void;
+  onProgress?: () => void;
+  progress?: { chapters: number; streak: number };
   // Live Group Study roster, so the landing shows who is connected.
   partyMembers?: number;
 }) {
@@ -241,6 +245,17 @@ export function Landing({
               <button className="landing-group" onClick={onBookmarks}>
                 <span className="action-icon"><ReaderIcon name="bookmark" /></span><span className="action-copy"><strong>{label.bookmarks}</strong><small>{label.footerLocal}</small></span><span aria-hidden="true">↗</span>
                 {app.bookmarkList.length ? <span className="landing-count">{app.bookmarkList.length}</span> : null}
+              </button>
+            )}
+            {onProgress && (
+              <button className="landing-group" onClick={onProgress}>
+                <span className="action-icon"><ReaderIcon name="award" /></span>
+                <span className="action-copy">
+                  <strong>{label.progress}</strong>
+                  <small>{progress?.chapters ? label.chaptersReadCount(progress.chapters) : label.noBadgesYet}</small>
+                </span>
+                {progress?.streak ? <span className="landing-count">{progress.streak}</span> : null}
+                <span aria-hidden="true">↗</span>
               </button>
             )}
           </div>

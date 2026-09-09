@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { dayKey } from '@the-word/core';
 
 // A daily nudge to open Scripture, delivered as a browser notification even when
 // the page is closed. There is no server and no account, so the reminder is
@@ -83,12 +84,6 @@ export function nextReminderAt(time: string, from = new Date()): Date {
   at.setHours(hours, minutes, 0, 0);
   if (at.getTime() <= from.getTime()) at.setDate(at.getDate() + 1);
   return at;
-}
-
-function dayKey(date: Date) {
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${date.getFullYear()}-${month}-${day}`;
 }
 
 // The page the notification opens: this app, at the landing view where the verse

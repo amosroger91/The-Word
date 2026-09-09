@@ -170,6 +170,15 @@ export interface Strings {
   restoreFail: string;
   accountLoss: string;
   passwordTooShort: string;
+  progress: string;
+  progressHint: string;
+  chaptersReadCount: (count: number) => string;
+  streakCount: (days: number) => string;
+  noBadgesYet: string;
+  badgeEarned: (title: string) => string;
+  badgeProgress: (have: number, need: number) => string;
+  earnedBadges: string;
+  lockedBadges: string;
 }
 
 function verseList(verses: number[]) {
@@ -349,6 +358,15 @@ export const strings: Record<Language, Strings> = {
     restoreFail: 'Could not restore. Check the backup and the password.',
     accountLoss: 'If you lose this device and have no backup, this account is gone. There is no reset.',
     passwordTooShort: 'Use at least 8 characters.',
+    progress: 'Your reading',
+    progressHint: 'Badges come from chapters you finish — the last verse, not just opening the page.',
+    chaptersReadCount: (count) => count === 1 ? '1 chapter read' : `${count} chapters read`,
+    streakCount: (days) => days === 1 ? '1-day streak' : `${days}-day streak`,
+    noBadgesYet: 'Finish a chapter to start earning badges.',
+    badgeEarned: (title) => `You earned ${title}.`,
+    badgeProgress: (have, need) => `${have} of ${need}`,
+    earnedBadges: 'Earned',
+    lockedBadges: 'Still ahead',
   },
   es: {
     languageName: 'Español',
@@ -520,6 +538,15 @@ export const strings: Record<Language, Strings> = {
     restoreFail: 'No se pudo restaurar. Revisa el respaldo y la contraseña.',
     accountLoss: 'Si pierdes este dispositivo y no tienes un respaldo, esta cuenta desaparece. No hay restablecimiento.',
     passwordTooShort: 'Usa al menos 8 caracteres.',
+    progress: 'Tu lectura',
+    progressHint: 'Las insignias salen de capítulos que terminas: el último versículo, no solo abrir la página.',
+    chaptersReadCount: (count) => count === 1 ? '1 capítulo leído' : `${count} capítulos leídos`,
+    streakCount: (days) => days === 1 ? 'Racha de 1 día' : `Racha de ${days} días`,
+    noBadgesYet: 'Termina un capítulo para empezar a ganar insignias.',
+    badgeEarned: (title) => `Ganaste ${title}.`,
+    badgeProgress: (have, need) => `${have} de ${need}`,
+    earnedBadges: 'Conseguidas',
+    lockedBadges: 'Por delante',
   },
   fr: {
     languageName: 'Français',
@@ -691,6 +718,15 @@ export const strings: Record<Language, Strings> = {
     restoreFail: 'Impossible de restaurer. Vérifiez la sauvegarde et le mot de passe.',
     accountLoss: 'Si vous perdez cet appareil sans sauvegarde, ce compte disparaît. Il n’y a pas de réinitialisation.',
     passwordTooShort: 'Utilisez au moins 8 caractères.',
+    progress: 'Votre lecture',
+    progressHint: 'Les badges viennent des chapitres terminés — le dernier verset, pas seulement l’ouverture de la page.',
+    chaptersReadCount: (count) => count === 1 ? '1 chapitre lu' : `${count} chapitres lus`,
+    streakCount: (days) => days === 1 ? 'Série de 1 jour' : `Série de ${days} jours`,
+    noBadgesYet: 'Terminez un chapitre pour commencer à gagner des badges.',
+    badgeEarned: (title) => `Vous avez obtenu ${title}.`,
+    badgeProgress: (have, need) => `${have} sur ${need}`,
+    earnedBadges: 'Obtenus',
+    lockedBadges: 'À venir',
   },
   zh: {
     languageName: '中文',
@@ -862,6 +898,15 @@ export const strings: Record<Language, Strings> = {
     restoreFail: '无法恢复。请检查备份和密码。',
     accountLoss: '如果丢失此设备且没有备份，此账户将无法找回。无法重置。',
     passwordTooShort: '请至少使用 8 个字符。',
+    progress: '你的阅读',
+    progressHint: '徽章来自真正读完的章——读到最后一节，而不是只打开页面。',
+    chaptersReadCount: (count) => `已读 ${count} 章`,
+    streakCount: (days) => `连续 ${days} 天`,
+    noBadgesYet: '读完一章即可开始获得徽章。',
+    badgeEarned: (title) => `你获得了${title}。`,
+    badgeProgress: (have, need) => `${have} / ${need}`,
+    earnedBadges: '已获得',
+    lockedBadges: '未获得',
   },
   vi: {
     languageName: 'Tiếng Việt',
@@ -1033,6 +1078,15 @@ export const strings: Record<Language, Strings> = {
     restoreFail: 'Không khôi phục được. Hãy kiểm tra bản sao lưu và mật khẩu.',
     accountLoss: 'Nếu bạn mất thiết bị này mà không có bản sao lưu, tài khoản này sẽ mất. Không có đặt lại.',
     passwordTooShort: 'Dùng ít nhất 8 ký tự.',
+    progress: 'Việc đọc của bạn',
+    progressHint: 'Huy hiệu đến từ những đoạn bạn đọc xong — câu cuối, không chỉ mở trang.',
+    chaptersReadCount: (count) => count === 1 ? 'Đã đọc 1 đoạn' : `Đã đọc ${count} đoạn`,
+    streakCount: (days) => days === 1 ? 'Chuỗi 1 ngày' : `Chuỗi ${days} ngày`,
+    noBadgesYet: 'Đọc xong một đoạn để bắt đầu nhận huy hiệu.',
+    badgeEarned: (title) => `Bạn đã nhận ${title}.`,
+    badgeProgress: (have, need) => `${have} / ${need}`,
+    earnedBadges: 'Đã nhận',
+    lockedBadges: 'Phía trước',
   },
 };
 

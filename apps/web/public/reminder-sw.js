@@ -57,7 +57,7 @@ async function writeConfig(config) {
   }
 }
 
-// Local calendar day, so "already reminded today" means the reader's today.
+// Local calendar day. Must match dayKey() in packages/core/src/day.ts.
 function dayKey(date) {
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
