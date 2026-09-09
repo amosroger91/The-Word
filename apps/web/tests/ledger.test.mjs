@@ -145,6 +145,17 @@ test('bible, testament, and book badges follow unique chapters', () => {
   assert.equal(BADGES.filter((badge) => badge.id.startsWith('book-')).length, 66);
 });
 
+test('funny book badges fire with the matching finished book', () => {
+  const song = [];
+  for (let chapter = 1; chapter <= 8; chapter++) song.push(read('2026-05-01T12:00:00.000Z', 22, chapter, chapter));
+  const afterSong = evaluate(song, BADGES);
+  assert.ok(afterSong.some((badge) => badge.id === 'fun-casanova'));
+  assert.ok(afterSong.some((badge) => badge.id === 'book-22'));
+
+  const obadiah = [read('2026-05-02T12:00:00.000Z', 31, 1, 1)];
+  assert.ok(evaluate(obadiah, BADGES).some((badge) => badge.id === 'fun-blink'));
+});
+
 test('ledger hash changes when an event is added', () => {
   const a = [read('2026-09-01T12:00:00.000Z', 43, 1, 1)];
   const b = [...a, read('2026-09-02T12:00:00.000Z', 43, 2, 2)];
