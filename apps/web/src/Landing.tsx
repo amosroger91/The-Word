@@ -31,6 +31,7 @@ const OFFLINE_REF = parseReference('John 3:16');
 export function Landing({
   app,
   onEnterReader,
+  onBreakdown,
   onGroupStudy,
   onBookmarks,
   onPreferences,
@@ -44,6 +45,7 @@ export function Landing({
   banner?: ReactNode;
   app: WordApp;
   onEnterReader: () => void;
+  onBreakdown?: (bookId: number, chapter: number, verse: number) => void;
   onGroupStudy?: () => void;
   onBookmarks?: () => void;
   onPreferences?: () => void;
@@ -222,6 +224,7 @@ export function Landing({
                 </div>
                 <div className="verse-tools-secondary">
                   <button onClick={() => enter('none')}>{label.openThisVerse}</button>
+                  {onBreakdown && <button onClick={() => onBreakdown(parsed.bookId, parsed.chapter, parsed.verse)}>{label.breakItDown}</button>}
                   <button disabled={!displayText} onClick={() => { void app.copyPassage(spokenReference, displayText); }}>{label.copy}</button>
                   <button disabled={!displayText || exporting} onClick={() => { void saveImage(); }}>{exporting ? label.exporting : label.image}</button>
                   <button aria-pressed={bookmarked} className={bookmarked ? 'active' : ''} onClick={() => app.toggleBookmarkAt(parsed.bookId, parsed.chapter, parsed.verse)}>{label.bookmark}</button>

@@ -8,3 +8,4 @@ export * from './local';
 export * from './topics';
 export * from './parseRef';
 export * from './crossRefs';
+export * from './breakdown';

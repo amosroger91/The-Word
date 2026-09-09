@@ -19,6 +19,7 @@ apps/web/e2e-reminder/
 apps/web/e2e-settings/
 apps/web/e2e-notes/
 apps/web/e2e-readers/
+apps/web/e2e-breakdown/
 apps/web/tests/.compiled/
 services/relay/data/
 packages/bible/data/cross-references.zip

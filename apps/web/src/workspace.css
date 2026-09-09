@@ -321,3 +321,28 @@
 .plan-accept { display: grid; gap: 10px; padding: 14px; border: 1px dashed #b0632a; border-radius: 12px; }
 .plan-import { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
 .plan-import span { text-transform: none; letter-spacing: normal; font-size: 15px; font-weight: 400; color: inherit; }
+
+/* Break it down: every block names where it came from. */
+.breakdown { display: grid; gap: 20px; }
+.breakdown-section { display: grid; gap: 8px; }
+.breakdown-section h3 { margin: 0; font-size: 13px; text-transform: uppercase; letter-spacing: .12em; color: #8e806c; font-weight: 700; }
+.breakdown-ref { margin: 0; font-weight: 600; }
+.breakdown blockquote { margin: 0; padding: 10px 14px; border-left: 3px solid #947849; line-height: 1.6; }
+.breakdown-source { margin: 0; font-size: 12px; color: #8e806c; }
+.breakdown-window { margin: 0; padding: 0 0 0 4px; list-style: none; display: grid; gap: 6px; line-height: 1.5; }
+.breakdown-window sup { color: #a3895e; font-weight: 700; margin-right: 4px; }
+.breakdown-window .current { padding: 6px 10px; border-radius: 8px; background: #e7ddc9; }
+:root[data-theme='dark'] .breakdown-window .current { background: #3b3529; }
+.breakdown-claims { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+.breakdown-claims li { display: grid; gap: 3px; padding: 8px 10px; border: 1px solid var(--line, #ded9cf); border-radius: 10px; }
+:root[data-theme='dark'] .breakdown-claims li { border-color: #38352e; }
+.claim-kind { font-size: 11px; text-transform: uppercase; letter-spacing: .1em; font-weight: 700; color: #8e806c; }
+.claim-direct { border-left: 3px solid #947849; }
+.claim-structured { border-left: 3px solid #3a86ca; }
+.breakdown-refs { margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 6px; }
+.breakdown-refs button { border: 1px solid var(--line, #c9c1b3); border-radius: 999px; background: transparent; color: inherit; padding: 6px 12px; font-size: 14px; }
+.breakdown-translations { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+.breakdown-translations li { display: grid; gap: 3px; }
+.breakdown-translations em { font-size: 12px; color: #8e806c; font-style: normal; }
+.breakdown-warnings { margin: 0; padding-left: 18px; font-size: 12px; color: #8e806c; display: grid; gap: 4px; }
+.breakdown-warning { color: #b0632a; }

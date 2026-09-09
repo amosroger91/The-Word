@@ -147,6 +147,24 @@ export interface Strings {
   reminderTestSent: string;
   reminderTestBlocked: string;
   reminderTestFailed: string;
+  breakItDown: string;
+  breakdownPickVerse: string;
+  breakdownWorking: string;
+  breakdownVerse: string;
+  breakdownContext: string;
+  breakdownObservations: string;
+  breakdownRelated: string;
+  breakdownTranslations: string;
+  breakdownSourceNotes: string;
+  breakdownSays: string;
+  breakdownShape: string;
+  breakdownSourceLocal: string;
+  breakdownChapterOf: string;
+  breakdownDiffers: string;
+  breakdownSame: string;
+  breakdownNoComparison: string;
+  breakdownCompareMore: string;
+  breakdownOnlySources: string;
   importPlan: string;
   importPlanHint: string;
   planImportFailed: string;
@@ -410,6 +428,24 @@ export const strings: Record<Language, Strings> = {
     reminderTestSent: 'Sent — it should be on your desktop now.',
     reminderTestBlocked: 'Your browser sent it, but your system did not show it. Turn notifications on for your browser in your system settings (on Windows: Settings › System › Notifications), and check that do not disturb is off.',
     reminderTestFailed: 'Your browser would not show the notification.',
+    breakItDown: 'Break this down',
+    breakdownPickVerse: 'Choose a verse to break down.',
+    breakdownWorking: 'Reading the sources…',
+    breakdownVerse: 'Verse',
+    breakdownContext: 'In context',
+    breakdownObservations: 'What the text shows',
+    breakdownRelated: 'Related Scripture',
+    breakdownTranslations: 'Translation comparison',
+    breakdownSourceNotes: 'Source notes',
+    breakdownSays: 'The verse says',
+    breakdownShape: 'The text shows',
+    breakdownSourceLocal: 'Exact text from the {translation} bundled with this app.',
+    breakdownChapterOf: 'This chapter has {count} verses.',
+    breakdownDiffers: 'Wording differs',
+    breakdownSame: 'Same wording',
+    breakdownNoComparison: 'No other translation is loaded yet.',
+    breakdownCompareMore: 'Compare more translations',
+    breakdownOnlySources: 'Everything above comes from the Scripture bundled with this app. Nothing here interprets the passage for you.',
     importPlan: 'Import a plan file',
     importPlanHint: 'Imported plans stay on this device. They are not checked by us and are never added to the shared list.',
     planImportFailed: 'That file is not a valid plan.',
@@ -665,6 +701,24 @@ export const strings: Record<Language, Strings> = {
     reminderTestSent: 'Enviada: ya debería estar en tu escritorio.',
     reminderTestBlocked: 'El navegador la envió, pero el sistema no la mostró. Activa las notificaciones del navegador en los ajustes del sistema (en Windows: Configuración › Sistema › Notificaciones) y comprueba que el modo no molestar esté desactivado.',
     reminderTestFailed: 'El navegador no quiso mostrar la notificación.',
+    breakItDown: 'Analizar este versículo',
+    breakdownPickVerse: 'Elige un versículo para analizar.',
+    breakdownWorking: 'Leyendo las fuentes…',
+    breakdownVerse: 'Versículo',
+    breakdownContext: 'En contexto',
+    breakdownObservations: 'Lo que muestra el texto',
+    breakdownRelated: 'Escrituras relacionadas',
+    breakdownTranslations: 'Comparación de traducciones',
+    breakdownSourceNotes: 'Notas de origen',
+    breakdownSays: 'El versículo dice',
+    breakdownShape: 'El texto muestra',
+    breakdownSourceLocal: 'Texto exacto de la {translation} incluida en esta aplicación.',
+    breakdownChapterOf: 'Este capítulo tiene {count} versículos.',
+    breakdownDiffers: 'La redacción cambia',
+    breakdownSame: 'Misma redacción',
+    breakdownNoComparison: 'Todavía no hay otra traducción cargada.',
+    breakdownCompareMore: 'Comparar más traducciones',
+    breakdownOnlySources: 'Todo lo anterior viene de la Escritura incluida en esta aplicación. Nada de esto interpreta el pasaje por ti.',
     importPlan: 'Importar un archivo de plan',
     importPlanHint: 'Los planes importados se quedan en este dispositivo. No los revisamos y nunca se añaden a la lista compartida.',
     planImportFailed: 'Ese archivo no es un plan válido.',
@@ -920,6 +974,24 @@ export const strings: Record<Language, Strings> = {
     reminderTestSent: 'Envoyée — elle devrait être sur votre bureau.',
     reminderTestBlocked: "Le navigateur l'a envoyée, mais le système ne l'a pas affichée. Activez les notifications du navigateur dans les réglages système (sous Windows : Paramètres › Système › Notifications) et vérifiez que le mode ne pas déranger est désactivé.",
     reminderTestFailed: "Le navigateur a refusé d'afficher la notification.",
+    breakItDown: 'Décomposer ce verset',
+    breakdownPickVerse: 'Choisissez un verset à décomposer.',
+    breakdownWorking: 'Lecture des sources…',
+    breakdownVerse: 'Verset',
+    breakdownContext: 'En contexte',
+    breakdownObservations: 'Ce que le texte montre',
+    breakdownRelated: 'Écritures liées',
+    breakdownTranslations: 'Comparaison des traductions',
+    breakdownSourceNotes: 'Notes de source',
+    breakdownSays: 'Le verset dit',
+    breakdownShape: 'Le texte montre',
+    breakdownSourceLocal: 'Texte exact de la {translation} fournie avec cette application.',
+    breakdownChapterOf: 'Ce chapitre compte {count} versets.',
+    breakdownDiffers: 'La formulation diffère',
+    breakdownSame: 'Même formulation',
+    breakdownNoComparison: 'Aucune autre traduction n’est encore chargée.',
+    breakdownCompareMore: 'Comparer d’autres traductions',
+    breakdownOnlySources: 'Tout ce qui précède vient de l’Écriture fournie avec cette application. Rien ici n’interprète le passage à votre place.',
     importPlan: 'Importer un fichier de plan',
     importPlanHint: 'Les plans importés restent sur cet appareil. Nous ne les vérifions pas et ils ne rejoignent jamais la liste partagée.',
     planImportFailed: 'Ce fichier n’est pas un plan valide.',
@@ -1175,6 +1247,24 @@ export const strings: Record<Language, Strings> = {
     reminderTestSent: '已发送——它现在应该出现在你的桌面上。',
     reminderTestBlocked: '浏览器已发送，但系统没有显示。请在系统设置中为浏览器开启通知（Windows：设置 › 系统 › 通知），并确认勿扰模式已关闭。',
     reminderTestFailed: '浏览器拒绝显示该通知。',
+    breakItDown: '拆解这节经文',
+    breakdownPickVerse: '请选择要拆解的经文。',
+    breakdownWorking: '正在读取来源…',
+    breakdownVerse: '经文',
+    breakdownContext: '上下文',
+    breakdownObservations: '经文显示的内容',
+    breakdownRelated: '相关经文',
+    breakdownTranslations: '译本对照',
+    breakdownSourceNotes: '来源说明',
+    breakdownSays: '经文说',
+    breakdownShape: '文本显示',
+    breakdownSourceLocal: '取自本应用内置的{translation}原文。',
+    breakdownChapterOf: '本章共 {count} 节。',
+    breakdownDiffers: '措辞不同',
+    breakdownSame: '措辞相同',
+    breakdownNoComparison: '尚未加载其他译本。',
+    breakdownCompareMore: '对照更多译本',
+    breakdownOnlySources: '以上内容均来自本应用内置的圣经文本。这里不替你解释经文。',
     importPlan: '导入计划文件',
     importPlanHint: '导入的计划只留在本设备。我们不会审核它们，也不会加入共享列表。',
     planImportFailed: '该文件不是有效的计划。',
@@ -1430,6 +1520,24 @@ export const strings: Record<Language, Strings> = {
     reminderTestSent: 'Đã gửi — nó sẽ hiện trên màn hình của bạn ngay bây giờ.',
     reminderTestBlocked: 'Trình duyệt đã gửi, nhưng hệ thống không hiển thị. Hãy bật thông báo cho trình duyệt trong cài đặt hệ thống (trên Windows: Cài đặt › Hệ thống › Thông báo) và kiểm tra chế độ không làm phiền đã tắt.',
     reminderTestFailed: 'Trình duyệt đã từ chối hiển thị thông báo.',
+    breakItDown: 'Phân tích câu này',
+    breakdownPickVerse: 'Hãy chọn một câu để phân tích.',
+    breakdownWorking: 'Đang đọc nguồn…',
+    breakdownVerse: 'Câu',
+    breakdownContext: 'Trong ngữ cảnh',
+    breakdownObservations: 'Điều bản văn cho thấy',
+    breakdownRelated: 'Kinh Thánh liên quan',
+    breakdownTranslations: 'So sánh bản dịch',
+    breakdownSourceNotes: 'Ghi chú nguồn',
+    breakdownSays: 'Câu này nói',
+    breakdownShape: 'Bản văn cho thấy',
+    breakdownSourceLocal: 'Văn bản chính xác từ {translation} đi kèm ứng dụng này.',
+    breakdownChapterOf: 'Chương này có {count} câu.',
+    breakdownDiffers: 'Cách diễn đạt khác',
+    breakdownSame: 'Cùng cách diễn đạt',
+    breakdownNoComparison: 'Chưa tải bản dịch nào khác.',
+    breakdownCompareMore: 'So sánh thêm bản dịch',
+    breakdownOnlySources: 'Mọi điều ở trên đến từ Kinh Thánh đi kèm ứng dụng. Không có gì ở đây diễn giải đoạn văn thay bạn.',
     importPlan: 'Nhập tệp kế hoạch',
     importPlanHint: 'Kế hoạch đã nhập chỉ nằm trên thiết bị này. Chúng tôi không kiểm duyệt và chúng không bao giờ vào danh sách chung.',
     planImportFailed: 'Tệp đó không phải là kế hoạch hợp lệ.',
