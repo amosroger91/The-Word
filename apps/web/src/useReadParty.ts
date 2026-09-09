@@ -174,15 +174,14 @@ export function useReadParty(app: WordApp) {
     }
   }, [app.autoplayBlocked, isHost, armed]);
 
-  // Live mics take the floor over playback a device did not start itself: the
-  // follow-through below stops a participant's Piper as soon as anyone goes live,
-  // so it is never read aloud over someone speaking. A press of Listen is never
-  // that — reading Scripture aloud while the room talks is the point of the
-  // room — so a device that started its own playback keeps it.
+  // A live mic never silences Scripture. Read-aloud is not streamed — each device
+  // speaks the verse with its own Piper voice — and the host's own playback is
+  // cancelled out of their microphone by echo cancellation, so suppressing it on
+  // a live floor left the room watching a highlight in silence. When the host
+  // presses Listen, everyone reads along aloud, mics open or not.
 
   // PARTICIPANT: apply the host's shared reading state to this device — follow the
-  // host's passage AND current verse, reading each verse with the local TTS
-  // unless someone is on a live mic (then we only highlight).
+  // host's passage AND current verse, reading each verse with the local TTS.
   useEffect(() => {
     if (!room || isHost || !remoteReading || !following) return;
     const rs = remoteReading;
@@ -198,7 +197,9 @@ export function useReadParty(app: WordApp) {
       spokenVerseRef.current = null;
       return;
     }
-    if (rs.action === 'live' || liveFloor) {
+    // 'live' means the host is talking rather than reading: place everyone on the
+    // verse, but do not put words in their ears.
+    if (rs.action === 'live') {
       if (app.speechState !== 'idle') app.stopSpeech();
       spokenVerseRef.current = null;
       return;
@@ -216,7 +217,7 @@ export function useReadParty(app: WordApp) {
     } else if (app.speechState === 'paused') {
       app.resumeSpeech();
     }
-  }, [room, isHost, following, armed, remoteReading, liveFloor, app.bookId, app.chapterNumber, app.chapterLoading, app.chapter, app.speechState]);
+  }, [room, isHost, following, armed, remoteReading, app.bookId, app.chapterNumber, app.chapterLoading, app.chapter, app.speechState]);
 
   // A participant who is following and hasn't armed audio, while the host is playing.
   const needsArm = Boolean(room) && !isHost && following && !armed && remoteReading?.action === 'playing';

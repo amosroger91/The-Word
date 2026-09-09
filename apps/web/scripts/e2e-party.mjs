@@ -148,15 +148,27 @@ try {
   log('host', 'mic on');
   log('part', 'mic on');
 
-  // Live mics must not silence read-aloud. The host keeps reading; the
-  // participant keeps tracking the verse, with its own Piper quiet so it does
-  // not read over the people talking.
+  // Live mics must not silence read-aloud. Read-aloud is never streamed, so the
+  // guest has to speak the verse with its own Piper — a highlight alone means
+  // the room is watching in silence.
   await host.waitForTimeout(2500);
   const hostLive = await dump(host, 'host-live');
   if (!hostLive.speaking) throw new Error('FAIL: host read-aloud stopped when the mics went live');
   const partLive = await dump(part, 'part-live');
-  if (!partLive.following && !partLive.speaking) throw new Error('FAIL: participant lost the host verse when the mics went live');
-  log('both', `reading continues on a live floor (host=${hostLive.speaking} part=${partLive.following || partLive.speaking})`);
+  if (!partLive.speaking) throw new Error(`FAIL: guest stopped reading aloud on a live floor (following=${partLive.following})`);
+  log('both', `both read aloud on a live floor (host=${hostLive.speaking} part=${partLive.speaking})`);
+
+  // Remote voice must play through exactly one element. An unmuted <video>
+  // alongside the <audio> plays every remote peer twice, slightly out of step.
+  const doubled = await part.evaluate(() => [...document.querySelectorAll('.meeting-tile')]
+    .filter((tile) => !tile.classList.contains('self'))
+    .map((tile) => ({
+      video: tile.querySelector('video') ? !tile.querySelector('video').muted : false,
+      audio: Boolean(tile.querySelector('audio')?.srcObject),
+    }))
+    .filter((t) => t.video && t.audio).length);
+  if (doubled) throw new Error(`FAIL: ${doubled} remote tile(s) play the same stream through both <video> and <audio>`);
+  log('part', 'remote voice plays through one element only');
 
   // And Listen must still start from scratch while the floor is already live —
   // the case that used to stop itself the instant it began.
@@ -165,11 +177,9 @@ try {
   await host.locator('.control-row button[aria-label="Listen"]').click({ force: true });
   await host.waitForSelector('.verse.speaking', { timeout: 90000 });
   const restarted = await host.locator('.verse.speaking sup').first().textContent();
-  await part.waitForFunction((expected) => {
-    const el = document.querySelector('.verse.following sup') || document.querySelector('.verse.speaking sup');
-    return el?.textContent === expected;
-  }, restarted, { timeout: 30000 });
-  log('both', `Listen started on a live floor and synced verse ${restarted}`);
+  await part.waitForFunction((expected) => document.querySelector('.verse.speaking sup')?.textContent === expected,
+    restarted, { timeout: 60000 });
+  log('both', `Listen started on a live floor and the guest read verse ${restarted} aloud`);
 
   if (errors.length) {
     console.log('page errors:', errors);
