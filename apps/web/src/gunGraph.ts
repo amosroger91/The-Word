@@ -147,23 +147,48 @@ async function pushRelays(node: GraphNode, relays: RelayConfig) {
   }
 }
 
+const CURSOR_KEY = 'word.relayCursor';
+
+function cursors(): Record<string, string> {
+  try { return JSON.parse(localStorage.getItem(CURSOR_KEY) || '{}') as Record<string, string>; } catch { return {}; }
+}
+
+function rememberCursor(url: string, at: string) {
+  try {
+    localStorage.setItem(CURSOR_KEY, JSON.stringify({ ...cursors(), [url]: at }));
+  } catch { /* storage blocked: we re-pull from the start next time, which is correct if wasteful */ }
+}
+
 export async function pullRelays(relays = loadRelays()): Promise<number> {
   let added = 0;
   for (const url of relays.urls) {
+    const base = url.replace(/\/$/, '');
     try {
-      const res = await fetch(`${url.replace(/\/$/, '')}/v1/since?t=0`);
-      if (!res.ok) continue;
-      const rows = await res.json() as GraphNode[];
-      const nodes = await loadGraph();
-      for (const node of rows) {
-        if (!verifyNodeSignature(node)) continue;
-        const prev = nodes.get(node.soul);
-        if (prev && prev.at >= node.at) continue;
-        nodes.set(node.soul, node);
-        added += 1;
-        emit(node);
+      // Page from where this device left off. The relay used to return the whole
+      // graph on every sync, so bandwidth grew with history times syncs.
+      let cursor = cursors()[base] || '';
+      for (let page = 0; page < 50; page += 1) {
+        const res = await fetch(`${base}/v1/since?t=${encodeURIComponent(cursor)}`);
+        if (!res.ok) break;
+        const payload = await res.json() as { nodes?: GraphNode[]; next?: string; more?: boolean } | GraphNode[];
+        // Older relays answered with a bare array; keep reading those too.
+        const rows = Array.isArray(payload) ? payload : payload.nodes ?? [];
+        if (!rows.length) break;
+        const nodes = await loadGraph();
+        for (const node of rows) {
+          if (!verifyNodeSignature(node)) continue;
+          const prev = nodes.get(node.soul);
+          if (prev && prev.at >= node.at) continue;
+          nodes.set(node.soul, node);
+          added += 1;
+          emit(node);
+        }
+        await persist(nodes);
+        if (Array.isArray(payload)) break;
+        cursor = payload.next || cursor;
+        rememberCursor(base, cursor);
+        if (!payload.more) break;
       }
-      await persist(nodes);
     } catch { /* try next */ }
   }
   return added;
