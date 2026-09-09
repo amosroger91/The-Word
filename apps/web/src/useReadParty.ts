@@ -174,10 +174,11 @@ export function useReadParty(app: WordApp) {
     }
   }, [app.autoplayBlocked, isHost, armed]);
 
-  // Live mics take the floor: don't let Piper talk over people.
-  useEffect(() => {
-    if (liveFloor && app.speechState !== 'idle') app.stopSpeech();
-  }, [liveFloor, app.speechState, app.stopSpeech]);
+  // Live mics take the floor over playback a device did not start itself: the
+  // follow-through below stops a participant's Piper as soon as anyone goes live,
+  // so it is never read aloud over someone speaking. A press of Listen is never
+  // that — reading Scripture aloud while the room talks is the point of the
+  // room — so a device that started its own playback keeps it.
 
   // PARTICIPANT: apply the host's shared reading state to this device — follow the
   // host's passage AND current verse, reading each verse with the local TTS

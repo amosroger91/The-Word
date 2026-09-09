@@ -148,6 +148,29 @@ try {
   log('host', 'mic on');
   log('part', 'mic on');
 
+  // Live mics must not silence read-aloud. The host keeps reading; the
+  // participant keeps tracking the verse, with its own Piper quiet so it does
+  // not read over the people talking.
+  await host.waitForTimeout(2500);
+  const hostLive = await dump(host, 'host-live');
+  if (!hostLive.speaking) throw new Error('FAIL: host read-aloud stopped when the mics went live');
+  const partLive = await dump(part, 'part-live');
+  if (!partLive.following && !partLive.speaking) throw new Error('FAIL: participant lost the host verse when the mics went live');
+  log('both', `reading continues on a live floor (host=${hostLive.speaking} part=${partLive.following || partLive.speaking})`);
+
+  // And Listen must still start from scratch while the floor is already live —
+  // the case that used to stop itself the instant it began.
+  await host.locator('.control-row button[aria-label="Stop"]').click({ force: true });
+  await host.waitForFunction(() => !document.querySelector('.verse.speaking'), null, { timeout: 20000 });
+  await host.locator('.control-row button[aria-label="Listen"]').click({ force: true });
+  await host.waitForSelector('.verse.speaking', { timeout: 90000 });
+  const restarted = await host.locator('.verse.speaking sup').first().textContent();
+  await part.waitForFunction((expected) => {
+    const el = document.querySelector('.verse.following sup') || document.querySelector('.verse.speaking sup');
+    return el?.textContent === expected;
+  }, restarted, { timeout: 30000 });
+  log('both', `Listen started on a live floor and synced verse ${restarted}`);
+
   if (errors.length) {
     console.log('page errors:', errors);
   }
