@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { localBible } from '@the-word/bible';
-import { readingFonts, useWordApp, verseImageFilename, verseRuns, type Language, type WordApp } from '@the-word/core';
+import { useWordApp, verseImageFilename, verseRuns, type WordApp } from '@the-word/core';
 import { SearchableSelect } from './SearchableSelect';
 import { BookBibleIcon, CamIcon, MicIcon, VolumeHighIcon, VolumeLowIcon } from './icons';
 import { CrossRefMenu } from './CrossRefMenu';
 import { FaceRail } from './FaceRail';
 import { Landing } from './Landing';
 import { Preferences } from './Preferences';
-import { ProfileControl } from './ProfileControl';
 import { VerseImageEditor, type VerseImageJob } from './VerseImageEditor';
 import { unlockRemoteAudio } from './media';
 import { createWebSpeech, webClipboard, webStorage } from './platform';
@@ -38,7 +37,7 @@ function App() {
   const app = useWordApp(platform, window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
   const {
     label, language, chapter, chapterLoading, book, bookName, chapterNumber, selectedVerses, selectedText, selectedReference,
-    speechState, speakingVerse, speechError, speechRate, speechRateRange, speechVolume, speechVolumeRange, voiceOptions, speechVoice, setSpeechVoice,
+    speechState, speakingVerse, speechError, speechRate, speechRateRange, speechVolume, speechVolumeRange, speechVoice,
   } = app;
 
   const party = useReadParty(app);
@@ -53,14 +52,12 @@ function App() {
   const [partyChat, setPartyChat] = useState('');
   const [createFindable, setCreateFindable] = useState(false);
   const { list: liveGroups, advertise: advertiseGroup, retract: retractGroup } = useStudyBoard(partyOpen || (party.active && party.findable && party.isHost));
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [prefsOpen, setPrefsOpen] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
   const [view, setView] = useState<'home' | 'reader'>(viewFromHash);
   const [xrefMenu, setXrefMenu] = useState<{ verse: number; x: number; y: number } | null>(null);
   const [imageJob, setImageJob] = useState<VerseImageJob | null>(null);
   const controlsRef = useRef<HTMLDivElement>(null);
-  const settingsRef = useRef<HTMLDivElement>(null);
   const verseRefs = useRef<Record<number, HTMLElement | null>>({});
 
   useEffect(() => { document.documentElement.dataset.theme = app.theme; }, [app.theme]);
@@ -119,16 +116,6 @@ function App() {
     return () => observer.disconnect();
   }, [view]);
 
-  useEffect(() => {
-    if (!settingsOpen) return;
-    function onPointerDown(event: MouseEvent) {
-      const target = event.target as HTMLElement;
-      if (!settingsRef.current?.contains(target) && !target.closest?.('.settings-toggle')) setSettingsOpen(false);
-    }
-    document.addEventListener('mousedown', onPointerDown);
-    return () => document.removeEventListener('mousedown', onPointerDown);
-  }, [settingsOpen]);
-
   const readingBarOpen = speechState !== 'idle' && !controlsVisible && selectedVerses.size === 0;
   const advertisedCode = useRef('');
 
@@ -159,6 +146,21 @@ function App() {
     }
   }, [retractGroup, party.active, party.isHost, party.findable, party.code]);
 
+  // One settings surface for the whole app: the landing page and the reader open
+  // this same element, so neither can drift into a second set of controls.
+  const preferences = prefsOpen && (
+    <Preferences
+      app={app}
+      name={party.name}
+      color={party.identity.color}
+      avatar={party.avatar}
+      reminder={reminder}
+      onNameChange={party.setName}
+      onAvatarChange={(file) => { void party.setAvatar(file); }}
+      onClose={() => setPrefsOpen(false)}
+    />
+  );
+
   if (view === 'home') {
     return (
       <>
@@ -170,18 +172,7 @@ function App() {
           onPreferences={() => setPrefsOpen(true)}
           partyMembers={party.active ? party.members.length : 0}
         />
-        {prefsOpen && (
-          <Preferences
-            app={app}
-            name={party.name}
-            color={party.identity.color}
-            avatar={party.avatar}
-            reminder={reminder}
-            onNameChange={party.setName}
-            onAvatarChange={(file) => { void party.setAvatar(file); }}
-            onClose={() => setPrefsOpen(false)}
-          />
-        )}
+        {preferences}
       </>
     );
   }
@@ -223,26 +214,9 @@ function App() {
         </div>
         <div className="topbar-controls" ref={controlsRef}>
           <div className="control-row">
-            <div className={settingsOpen ? 'control-settings open' : 'control-settings'} ref={settingsRef}>
-              <SearchableSelect compact className="font-select" value={app.fontId} onChange={app.setFontId} label={label.font} filterPlaceholder={label.filterPlaceholder} options={readingFonts.map((font) => ({ value: font.id, label: font.name }))} />
-              <button className="icon-button" onClick={() => app.setFontSize(app.fontSize - 1)} aria-label={label.decreaseText} title={label.decreaseText}>A−</button>
-              <button className="icon-button" onClick={() => app.setFontSize(app.fontSize + 1)} aria-label={label.increaseText} title={label.increaseText}>A+</button>
-              <SearchableSelect compact className="language-select" value={language} onChange={(value) => app.changeLanguage(value as Language)} label={label.interfaceLanguage} filterPlaceholder={label.filterPlaceholder} options={app.languageOptions} />
-              <SearchableSelect compact className="voice-select" value={speechVoice} onChange={setSpeechVoice} label={label.voice} filterPlaceholder={label.filterPlaceholder} options={voiceOptions.map((voice) => ({ value: voice.id, label: voice.isDefault ? label.defaultVoice : voice.name }))} />
-              {speedControl}
-              {volumeControl}
-              <ProfileControl
-                name={party.name}
-                color={party.identity.color}
-                avatar={party.avatar}
-                nameLabel={label.displayName}
-                photoLabel={label.changePhoto}
-                onNameChange={party.setName}
-                onAvatarChange={(file) => { void party.setAvatar(file); }}
-              />
-            </div>
             {speechControls}
-            <button className={`icon-button settings-toggle ${settingsOpen ? 'active' : ''}`} onClick={() => setSettingsOpen((open) => !open)} aria-label={label.settings} title={label.settings} aria-expanded={settingsOpen}>⚙</button>
+            {/* The one settings surface, shared with the landing page. */}
+            <button className={`icon-button settings-toggle ${prefsOpen ? 'active' : ''}`} onClick={() => setPrefsOpen(true)} aria-label={label.settings} title={label.settings} aria-expanded={prefsOpen}>⚙</button>
             <button className="icon-button" onClick={() => setSearchOpen((open) => !open)} aria-label={label.search} title={label.search}>⌕</button>
             <button className={`icon-button ${bookmarksOpen ? 'active' : ''}`} onClick={() => setBookmarksOpen((open) => !open)} aria-label={label.bookmarks} title={label.bookmarks}>◈</button>
             <button className={`icon-button party-toggle ${party.active ? 'active' : ''}`} onClick={() => setPartyOpen((open) => !open)} aria-label={label.readParty} title={label.readParty}>☍{party.active && <span className="party-count">{party.members.length}</span>}</button>
@@ -562,18 +536,7 @@ function App() {
           )}
         </div>
       )}
-      {prefsOpen && (
-        <Preferences
-          app={app}
-          name={party.name}
-          color={party.identity.color}
-          avatar={party.avatar}
-          reminder={reminder}
-          onNameChange={party.setName}
-          onAvatarChange={(file) => { void party.setAvatar(file); }}
-          onClose={() => setPrefsOpen(false)}
-        />
-      )}
+      {preferences}
     </div>
   );
 }

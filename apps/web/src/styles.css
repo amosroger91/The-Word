@@ -26,8 +26,6 @@ button { cursor: pointer; }
 .topbar-home { flex: 0 0 auto; }
 .topbar-controls { display: flex; justify-content: flex-end; min-width: 0; }
 .control-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: stretch; justify-content: flex-end; }
-.control-settings { display: contents; }
-.settings-toggle { display: none; }
 .icon-button, .chapter-nav button, .selection-bar button, .reading-bar button, .control-row button { border: 1px solid #c9c1b3; border-radius: 8px; background: transparent; color: inherit; padding: 8px 12px; }
 .icon-button.active { background: #d9cbb3; color: #2c261d; }
 .control-row button:disabled, .chapter-nav button:disabled, .reading-bar button:disabled { opacity: .4; }
@@ -101,10 +99,6 @@ select, input { border: 1px solid #c9c1b3; border-radius: 8px; background: trans
 .selection-bar span, .reading-bar-status span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #d9d0c2; font-size: 13px; }
 .selection-bar button, .reading-bar button { border-color: #746955; color: inherit; white-space: nowrap; }
 .speed-control { display: flex; align-items: center; gap: 6px; border: 1px solid #c9c1b3; border-radius: 8px; padding: 3px 8px; }
-.profile-control { display: flex; align-items: center; gap: 8px; border: 1px solid #c9c1b3; border-radius: 8px; padding: 3px 8px 3px 4px; }
-.profile-avatar { width: 30px; height: 30px; flex: 0 0 auto; border: 0; border-radius: 50%; padding: 0; color: #fff; font-size: 14px; font-weight: 600; background-size: cover; background-position: center; }
-.profile-name { width: 96px; border: 0; padding: 6px 0; background: transparent; }
-.profile-name:focus { outline: none; }
 .speed-control span { font-variant-numeric: tabular-nums; font-size: 13px; min-width: 40px; text-align: center; }
 .speed-control button { border: 0; background: transparent; color: inherit; padding: 4px 6px; font-size: 15px; line-height: 1; }
 .reading-bar .speed-control { border-color: #746955; }
@@ -149,16 +143,6 @@ select, input { border: 1px solid #c9c1b3; border-radius: 8px; background: trans
   .topbar-identity { flex: 1 1 auto; min-width: 0; }
   .topbar-controls { flex: 0 0 auto; }
   .control-row { gap: 6px; }
-  .settings-toggle { display: block; }
-  /* Everything but the reading and panel buttons collapses into the ⚙ sheet so the bar stays one line. */
-  .control-settings { display: none; }
-  .control-settings.open { display: flex; flex-wrap: wrap; gap: 8px; position: absolute; z-index: 24; right: 18px; top: calc(100% - 4px); width: min(320px, calc(100vw - 36px)); padding: 12px; border: 1px solid #c9c1b3; border-radius: 12px; background: var(--background, #f7f4ee); box-shadow: 0 14px 32px #0003; }
-  :root[data-theme='dark'] .control-settings.open { border-color: #4a453b; }
-  .control-settings.open .combo-compact { flex: 1 1 130px; }
-  .control-settings.open .combo-compact .combo-value { width: 100%; min-width: 0; }
-  .control-settings.open .speed-control { flex: 1 1 auto; justify-content: center; }
-  .control-settings.open .profile-control { flex: 1 1 100%; }
-  .control-settings.open .profile-name { width: 100%; min-width: 0; }
   .combo-compact .combo-value { min-width: 0; }
   .layout { display: block; padding: 22px 18px 120px; }
   .sidebar { margin-bottom: 32px; gap: 16px; }
@@ -170,7 +154,6 @@ select, input { border: 1px solid #c9c1b3; border-radius: 8px; background: trans
 @media (max-width: 520px) {
   .topbar-reference { font-size: 24px; }
   .control-row > button { padding: 8px 9px; }
-  .control-settings.open { right: 12px; width: calc(100vw - 24px); }
   .selection-bar button, .reading-bar button { flex: 1 1 auto; }
 }
 
