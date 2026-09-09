@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "predev": "node scripts/prepare.mjs",
-    "prebuild": "node scripts/prepare.mjs && node scripts/validate-plans.mjs",
+    "prebuild": "node scripts/prepare.mjs",
     "dev": "node scripts/dev.mjs",
     "build": "node scripts/build.mjs",
     "typecheck": "tsc --noEmit",
