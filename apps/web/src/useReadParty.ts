@@ -35,6 +35,7 @@ export function useReadParty(app: WordApp) {
   const [mediaError, setMediaError] = useState('');
   const [capped, setCapped] = useState(false);
   const [focusVerse, setFocusVerseState] = useState<number | null>(null);
+  const [findable, setFindable] = useState(false);
 
   const identityRef = useRef(loadIdentity());
   const [name, setNameValue] = useState(identityRef.current.name);
@@ -45,13 +46,14 @@ export function useReadParty(app: WordApp) {
   // same verse on every heartbeat (which would stutter). Reset when position resets.
   const spokenVerseRef = useRef<number | null>(null);
 
-  const startParty = useCallback((joinCode: string, opts?: { armed?: boolean }) => {
+  const startParty = useCallback((joinCode: string, opts?: { armed?: boolean; findable?: boolean }) => {
     const clean = joinCode.trim().toLowerCase();
     if (!clean) return;
     setError(''); setMessages([]); setMembers([]); setRemoteReading(null);
     setArmed(Boolean(opts?.armed)); setFollowing(true); lastSentRef.current = '';
     spokenVerseRef.current = null;
     setRemoteStreams({}); setMediaError(''); setCapped(false); setFocusVerseState(null);
+    setFindable(Boolean(opts?.findable));
     const r = joinParty({
       code: clean,
       identity: identityRef.current,
@@ -74,7 +76,7 @@ export function useReadParty(app: WordApp) {
     setRoom(r);
   }, []);
 
-  const createParty = useCallback(() => startParty(randomCode()), [startParty]);
+  const createParty = useCallback((opts?: { findable?: boolean }) => startParty(randomCode(), { findable: opts?.findable }), [startParty]);
 
   const leaveParty = useCallback(() => {
     room?.leave();
@@ -82,7 +84,7 @@ export function useReadParty(app: WordApp) {
     setLocalStream(null); setMicOn(false); setCamOn(false); setRemoteStreams({});
     setRoom(null); setIsHost(false); setMembers([]); setMessages([]);
     setStatus(''); setError(''); setCode(''); setRemoteReading(null); setArmed(false);
-    setMediaError(''); setCapped(false); setFocusVerseState(null);
+    setMediaError(''); setCapped(false); setFocusVerseState(null); setFindable(false);
     lastSentRef.current = '';
   }, [room]);
 
@@ -277,6 +279,7 @@ export function useReadParty(app: WordApp) {
     liveFloor,
     setFocusVerse,
     stageVerse,
+    findable,
   };
 }
 

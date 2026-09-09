@@ -10,6 +10,7 @@ import { Preferences } from './Preferences';
 import { VerseImageEditor, type VerseImageJob } from './VerseImageEditor';
 import { createWebSpeech, webClipboard, webStorage } from './platform';
 import { useReadParty } from './useReadParty';
+import { useStudyBoard } from './useStudyBoard';
 import './styles.css';
 import './landing.css';
 
@@ -44,6 +45,8 @@ function App() {
   const [partyOpen, setPartyOpen] = useState(false);
   const [partyCode, setPartyCode] = useState('');
   const [partyChat, setPartyChat] = useState('');
+  const [createFindable, setCreateFindable] = useState(false);
+  const { list: liveGroups, advertise: advertiseGroup, retract: retractGroup } = useStudyBoard(partyOpen || (party.active && party.findable && party.isHost));
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [prefsOpen, setPrefsOpen] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
@@ -121,6 +124,34 @@ function App() {
   }, [settingsOpen]);
 
   const readingBarOpen = speechState !== 'idle' && !controlsVisible && selectedVerses.size === 0;
+  const advertisedCode = useRef('');
+
+  useEffect(() => {
+    if (!party.active || !party.isHost || !party.findable || !party.code) return;
+    const send = () => advertiseGroup({
+      code: party.code,
+      hostName: party.name,
+      members: party.members.length,
+      bookId: app.bookId,
+      chapter: app.chapterNumber,
+      verse: party.stageVerse,
+      ts: Date.now(),
+    });
+    send();
+    const timer = window.setInterval(send, 5000);
+    return () => window.clearInterval(timer);
+  }, [advertiseGroup, party.active, party.isHost, party.findable, party.code, party.name, party.members.length, party.stageVerse, app.bookId, app.chapterNumber]);
+
+  useEffect(() => {
+    if (party.active && party.isHost && party.findable && party.code) {
+      advertisedCode.current = party.code;
+      return;
+    }
+    if (advertisedCode.current) {
+      retractGroup(advertisedCode.current);
+      advertisedCode.current = '';
+    }
+  }, [retractGroup, party.active, party.isHost, party.findable, party.code]);
 
   if (view === 'home') {
     return (
@@ -434,7 +465,33 @@ function App() {
           {!party.active ? (
             <div className="party-setup">
               <p className="muted">{label.partyIntro}</p>
-              <button className="party-primary" onClick={() => { speech.unlock?.(); party.createParty(); }}>{label.startParty}</button>
+              <label className="party-findable">
+                <input type="checkbox" checked={createFindable} onChange={(event) => setCreateFindable(event.target.checked)} />
+                <span>
+                  <strong>{label.findableGroup}</strong>
+                  <small>{label.findableHint}</small>
+                </span>
+              </label>
+              <button className="party-primary" onClick={() => { speech.unlock?.(); party.createParty({ findable: createFindable }); }}>{label.startParty}</button>
+              <div className="party-live-list">
+                <span className="section-label">{label.liveGroups}</span>
+                {liveGroups.length ? liveGroups.map((item) => {
+                  const passage = localBible.getBook(item.bookId, app.translationId);
+                  const where = passage ? `${passage.name} ${item.chapter}${item.verse ? `:${item.verse}` : ''}` : '';
+                  return (
+                    <button
+                      type="button"
+                      className="party-live-item"
+                      key={item.code}
+                      onClick={() => { speech.unlock?.(); party.joinParty(item.code); }}
+                    >
+                      <strong>{item.hostName}</strong>
+                      <span>{label.peopleHere(item.members)}{where ? ` · ${where}` : ''}</span>
+                      <em>{label.joinThisGroup}</em>
+                    </button>
+                  );
+                }) : <p className="muted">{label.noLiveGroups}</p>}
+              </div>
               <div className="party-or"><span>{label.orJoinParty}</span></div>
               <form className="party-join" onSubmit={(event) => { event.preventDefault(); speech.unlock?.(); party.joinParty(partyCode); }}>
                 <input placeholder={label.partyCodePlaceholder} value={partyCode} onChange={(event) => setPartyCode(event.target.value)} />
@@ -447,6 +504,7 @@ function App() {
               <div className="party-status">
                 <div><span className="party-code-label">{label.partyCode}</span><strong className="party-code">{party.code}</strong></div>
                 <span className={`party-role ${party.isHost ? 'host' : ''}`}>{party.isHost ? label.youAreHost : label.followingHost}</span>
+                {party.isHost && <span className="party-findable-tag">{party.findable ? label.groupFindable : label.groupUnlisted}</span>}
               </div>
               {party.status && <p className="muted party-conn">{partyStatusText(party.status, label)}</p>}
               {party.isHost

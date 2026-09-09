@@ -72,6 +72,14 @@ export interface Strings {
   closeParty: string;
   partyIntro: string;
   startParty: string;
+  findableGroup: string;
+  findableHint: string;
+  liveGroups: string;
+  noLiveGroups: string;
+  peopleHere: (count: number) => string;
+  joinThisGroup: string;
+  groupUnlisted: string;
+  groupFindable: string;
   orJoinParty: string;
   partyCodePlaceholder: string;
   joinParty: string;
@@ -206,7 +214,15 @@ export const strings: Record<Language, Strings> = {
     closeParty: 'Close',
     partyIntro: 'Study Scripture together in real time. Everyone follows the host to the same passage and reads it aloud on their own device.',
     startParty: 'Start a group',
-    orJoinParty: 'or join one',
+    findableGroup: 'Anyone can find this group',
+    findableHint: 'Turn this off to keep the group unlisted. People will need the code.',
+    liveGroups: 'Live groups',
+    noLiveGroups: 'No public groups are live right now.',
+    peopleHere: (count) => count === 1 ? '1 person' : `${count} people`,
+    joinThisGroup: 'Join',
+    groupUnlisted: 'Unlisted',
+    groupFindable: 'Findable',
+    orJoinParty: 'or join with a code',
     partyCodePlaceholder: 'Group code',
     joinParty: 'Join',
     partyConnectFailed: (error) => `Could not connect (${error}). Try again.`,
@@ -332,7 +348,15 @@ export const strings: Record<Language, Strings> = {
     closeParty: 'Cerrar',
     partyIntro: 'Lean la Escritura juntos en tiempo real. Todos siguen al anfitrión al mismo pasaje y lo leen en voz alta en su propio dispositivo.',
     startParty: 'Empezar un grupo',
-    orJoinParty: 'o únete a uno',
+    findableGroup: 'Cualquiera puede encontrar este grupo',
+    findableHint: 'Desactívalo para que el grupo no aparezca en la lista. Hará falta el código.',
+    liveGroups: 'Grupos en vivo',
+    noLiveGroups: 'No hay grupos públicos en vivo ahora.',
+    peopleHere: (count) => count === 1 ? '1 persona' : `${count} personas`,
+    joinThisGroup: 'Unirse',
+    groupUnlisted: 'Oculto',
+    groupFindable: 'Visible',
+    orJoinParty: 'o únete con un código',
     partyCodePlaceholder: 'Código del grupo',
     joinParty: 'Unirse',
     partyConnectFailed: (error) => `No se pudo conectar (${error}). Inténtalo de nuevo.`,
@@ -458,7 +482,15 @@ export const strings: Record<Language, Strings> = {
     closeParty: 'Fermer',
     partyIntro: "Lisez l'Écriture ensemble en temps réel. Tout le monde suit l'hôte vers le même passage et le lit à voix haute sur son propre appareil.",
     startParty: 'Démarrer une lecture',
-    orJoinParty: 'ou en rejoindre une',
+    findableGroup: 'Tout le monde peut trouver ce groupe',
+    findableHint: 'Désactivez pour le garder hors liste. Il faudra le code.',
+    liveGroups: 'Groupes en direct',
+    noLiveGroups: 'Aucun groupe public n’est en direct pour le moment.',
+    peopleHere: (count) => count === 1 ? '1 personne' : `${count} personnes`,
+    joinThisGroup: 'Rejoindre',
+    groupUnlisted: 'Non listé',
+    groupFindable: 'Visible',
+    orJoinParty: 'ou rejoindre avec un code',
     partyCodePlaceholder: 'Code de lecture',
     joinParty: 'Rejoindre',
     partyConnectFailed: (error) => `Impossible de se connecter (${error}). Réessayez.`,
@@ -584,7 +616,15 @@ export const strings: Record<Language, Strings> = {
     closeParty: '关闭',
     partyIntro: '实时一起读经。所有人跟随主持者到同一段经文，并在自己的设备上朗读。',
     startParty: '发起读经',
-    orJoinParty: '或加入已有的读经',
+    findableGroup: '任何人都能找到这个小组',
+    findableHint: '关闭后小组不会出现在列表中，需要代码才能加入。',
+    liveGroups: '正在进行的小组',
+    noLiveGroups: '现在没有公开的小组。',
+    peopleHere: (count) => `${count} 人`,
+    joinThisGroup: '加入',
+    groupUnlisted: '不公开',
+    groupFindable: '可找到',
+    orJoinParty: '或用代码加入',
     partyCodePlaceholder: '房间代码',
     joinParty: '加入',
     partyConnectFailed: (error) => `无法连接（${error}）。请重试。`,
@@ -710,7 +750,15 @@ export const strings: Record<Language, Strings> = {
     closeParty: 'Đóng',
     partyIntro: 'Đọc Kinh Thánh cùng nhau theo thời gian thực. Mọi người theo người chủ trì đến cùng một đoạn và đọc to trên thiết bị của mình.',
     startParty: 'Bắt đầu nhóm đọc',
-    orJoinParty: 'hoặc tham gia nhóm',
+    findableGroup: 'Ai cũng có thể tìm thấy nhóm này',
+    findableHint: 'Tắt để nhóm không hiện trong danh sách. Cần mã để tham gia.',
+    liveGroups: 'Nhóm đang họp',
+    noLiveGroups: 'Hiện không có nhóm công khai nào.',
+    peopleHere: (count) => count === 1 ? '1 người' : `${count} người`,
+    joinThisGroup: 'Tham gia',
+    groupUnlisted: 'Không công khai',
+    groupFindable: 'Có thể tìm',
+    orJoinParty: 'hoặc tham gia bằng mã',
     partyCodePlaceholder: 'Mã nhóm',
     joinParty: 'Tham gia',
     partyConnectFailed: (error) => `Không thể kết nối (${error}). Hãy thử lại.`,
