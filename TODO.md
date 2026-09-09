@@ -5,11 +5,14 @@ Deploy: `bash scripts/deploy-pages.sh` (builds `apps/web`, force-pushes `dist/` 
 
 ## Requested, not yet started
 
-- Guided lessons, circles (family / couple / friends / solo), badges, and portable
-  accounts. Framework design in [`docs/study-plans-framework.md`](docs/study-plans-framework.md)
-  — data shapes and delivery order, no plan content. Four decisions are still open
-  at the end of that doc; the family-on-one-device question is the one that changes
-  the account model, so settle it before Phase 3.
+- Guided lessons, circles (family / couple / friends / solo), badges, accounts.
+  Framework design in [`docs/study-plans-framework.md`](docs/study-plans-framework.md)
+  — data shapes and delivery order, no plan content. Stack: Nostr for accounts /
+  friends / DMs, Gun for the internal feed and circle state, and a Gun "survivor
+  relay" on a VPS. **That VPS is the project's first server** — it is what makes
+  membership unspoofable and lets circles sync when nobody is online together, and
+  it reverses the no-backend choice recorded below. Four decisions are still open
+  at the end of that doc.
 
 ## Recently shipped (this session, pending deploy)
 

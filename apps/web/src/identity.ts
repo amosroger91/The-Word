@@ -1,11 +1,7 @@
-// Accountless Group Study identity: a name, color, and optional photo that
-// live only in this browser's localStorage. No signup, no server.
-const IDENTITY_KEY = 'word.partyIdentity';
-const NAME_KEY = 'word.partyName';
-
-const ADJECTIVES = ['Gentle', 'Faithful', 'Bright', 'Humble', 'Steady', 'Kind', 'Quiet', 'Joyful', 'Patient', 'Bold'];
-const NOUNS = ['Lamp', 'Cedar', 'River', 'Dove', 'Shepherd', 'Vine', 'Anchor', 'Harvest', 'Pilgrim', 'Beacon'];
-const COLORS = ['#947849', '#5c7cfa', '#2f9e6f', '#c2571e', '#9b5cb4', '#3a86ca', '#c04b5a', '#6a8a2f'];
+// Display profile for Group Study. The login itself is the Nostr account in
+// nostrAccount.ts; this stays as the thin name/photo wrapper existing rooms
+// and tests already import.
+import { loadAccount, updateProfile } from './nostrAccount';
 
 export interface LocalIdentity {
   id: string;
@@ -14,46 +10,22 @@ export interface LocalIdentity {
   avatar: string | null;
 }
 
-function randomFrom<T>(list: T[]): T { return list[Math.floor(Math.random() * list.length)]; }
-
-function mint(): LocalIdentity {
+export function loadIdentity(): LocalIdentity {
+  const account = loadAccount();
   return {
-    id: 'me-' + Math.random().toString(36).slice(2, 7),
-    name: `${randomFrom(ADJECTIVES)} ${randomFrom(NOUNS)}`,
-    color: randomFrom(COLORS),
-    avatar: null,
+    id: account.npub,
+    name: account.name,
+    color: account.color,
+    avatar: account.avatar,
   };
 }
 
-export function loadIdentity(): LocalIdentity {
-  try {
-    const raw = localStorage.getItem(IDENTITY_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw) as Partial<LocalIdentity>;
-      if (parsed?.id && parsed.name) {
-        return {
-          id: String(parsed.id),
-          name: String(parsed.name).trim().slice(0, 40) || mint().name,
-          color: parsed.color || randomFrom(COLORS),
-          avatar: parsed.avatar || null,
-        };
-      }
-    }
-    const legacy = localStorage.getItem(NAME_KEY)?.trim();
-    const fresh = mint();
-    if (legacy) fresh.name = legacy.slice(0, 40);
-    saveIdentity(fresh);
-    return fresh;
-  } catch {
-    return mint();
-  }
-}
-
 export function saveIdentity(identity: LocalIdentity) {
-  try {
-    localStorage.setItem(IDENTITY_KEY, JSON.stringify(identity));
-    localStorage.setItem(NAME_KEY, identity.name);
-  } catch { /* storage blocked */ }
+  updateProfile({
+    name: identity.name,
+    color: identity.color,
+    avatar: identity.avatar,
+  });
 }
 
 // Square center-crop to a small JPEG so the photo can ride the roster channel.

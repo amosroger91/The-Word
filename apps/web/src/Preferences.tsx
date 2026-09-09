@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { readingFonts, type Language, type WordApp } from '@the-word/core';
 import { SearchableSelect } from './SearchableSelect';
+import { AccountSettings } from './AccountSettings';
 import type { DailyReminder } from './dailyReminder';
 
 // Everything a reader sets once and forgets: how Scripture looks, how it sounds,
@@ -11,6 +12,7 @@ export function Preferences({
   color,
   avatar,
   reminder,
+  restorePrefill,
   onNameChange,
   onAvatarChange,
   onClose,
@@ -22,6 +24,7 @@ export function Preferences({
   color: string;
   avatar: string | null;
   reminder: DailyReminder;
+  restorePrefill?: string;
   onNameChange: (name: string) => void;
   onAvatarChange: (file: File | null) => void;
   onClose: () => void;
@@ -210,7 +213,7 @@ export function Preferences({
               <div className="prefs-photo-actions">
                 <button type="button" onClick={() => fileRef.current?.click()}>{label.changePhoto}</button>
                 {avatar ? <button type="button" onClick={() => onAvatarChange(null)}>{label.removePhoto}</button> : null}
-                <p className="muted">Stored in this browser, without a server account. Clearing this site’s cookies and site data removes your profile. Your name and photo are shared with people in a study you join; a public group also lists the host’s name.</p>
+                <p className="muted">{label.photoHint}</p>
               </div>
               <input
                 ref={fileRef}
@@ -225,6 +228,8 @@ export function Preferences({
               />
             </div>
           </div>
+
+          <AccountSettings label={label} restorePrefill={restorePrefill} />
         </div>
       </div>
     </div>

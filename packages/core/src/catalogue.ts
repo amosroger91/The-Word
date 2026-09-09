@@ -13,6 +13,7 @@ export const storageKeys = {
   book: 'word.book',
   chapter: 'word.chapter',
   progress: 'word.progress',
+  account: 'word.account',
 };
 
 export const defaults = { translationId: 'kjv', bookId: 43, chapter: 3, fontSize: 20, fontId: 'system', rate: 1, volume: 1 };

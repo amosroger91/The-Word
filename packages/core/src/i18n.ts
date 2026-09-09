@@ -147,6 +147,29 @@ export interface Strings {
   reminderTestFailed: string;
   reminderTitle: string;
   reminderBody: string;
+  account: string;
+  accountHint: string;
+  yourPublicKey: string;
+  copyPublicKey: string;
+  keyCopied: string;
+  backupAccount: string;
+  backupPassword: string;
+  backupPasswordHint: string;
+  createBackup: string;
+  backupQrHint: string;
+  backupSecret: string;
+  copyBackup: string;
+  downloadBackup: string;
+  backupCopied: string;
+  restoreAccount: string;
+  restoreSecret: string;
+  restorePassword: string;
+  restoreAction: string;
+  restoreWarn: string;
+  restoreOk: string;
+  restoreFail: string;
+  accountLoss: string;
+  passwordTooShort: string;
 }
 
 function verseList(verses: number[]) {
@@ -178,7 +201,7 @@ export const strings: Record<Language, Strings> = {
     profilePhoto: 'Profile photo',
     changePhoto: 'Change photo',
     removePhoto: 'Remove photo',
-    photoHint: 'Saved on this device only. No account needed.',
+    photoHint: 'Your name and photo stay on this device. They are shared with people in a study you join; a public group also lists the host’s name. Clearing this site’s data removes them unless you restore a backup.',
     photoFailed: 'Could not use that image.',
     muted: 'Muted',
     speed: 'Reading speed',
@@ -303,6 +326,29 @@ export const strings: Record<Language, Strings> = {
     reminderTestFailed: 'Your browser would not show the notification.',
     reminderTitle: 'Time in the Word',
     reminderBody: "Today's verse is waiting for you.",
+    account: 'Account',
+    accountHint: 'This device created a Nostr key for you. It is how you sign in, here and on any other device you restore to. There is no password reset.',
+    yourPublicKey: 'Your public key',
+    copyPublicKey: 'Copy public key',
+    keyCopied: 'Public key copied.',
+    backupAccount: 'Back up this account',
+    backupPassword: 'Backup password',
+    backupPasswordHint: 'Pick a password you will remember. We cannot recover it for you.',
+    createBackup: 'Create encrypted backup',
+    backupQrHint: 'Scan this on another device, then type the same password there. The QR does not contain the password.',
+    backupSecret: 'Encrypted backup',
+    copyBackup: 'Copy backup',
+    downloadBackup: 'Download backup',
+    backupCopied: 'Backup copied.',
+    restoreAccount: 'Restore on this device',
+    restoreSecret: 'Encrypted backup',
+    restorePassword: 'Backup password',
+    restoreAction: 'Restore account',
+    restoreWarn: 'This replaces the account currently on this device.',
+    restoreOk: 'Account restored. Reloading…',
+    restoreFail: 'Could not restore. Check the backup and the password.',
+    accountLoss: 'If you lose this device and have no backup, this account is gone. There is no reset.',
+    passwordTooShort: 'Use at least 8 characters.',
   },
   es: {
     languageName: 'Español',
@@ -326,7 +372,7 @@ export const strings: Record<Language, Strings> = {
     profilePhoto: 'Foto de perfil',
     changePhoto: 'Cambiar foto',
     removePhoto: 'Quitar foto',
-    photoHint: 'Se guarda solo en este dispositivo. No hace falta una cuenta.',
+    photoHint: 'Tu nombre y foto se quedan en este dispositivo. Se comparten con quienes se unan a un estudio; un grupo público también muestra el nombre del anfitrión. Borrar los datos de este sitio los elimina, salvo que restaures un respaldo.',
     photoFailed: 'No se pudo usar esa imagen.',
     muted: 'Silenciado',
     speed: 'Velocidad de lectura',
@@ -451,6 +497,29 @@ export const strings: Record<Language, Strings> = {
     reminderTestFailed: 'El navegador no quiso mostrar la notificación.',
     reminderTitle: 'Un momento con la Palabra',
     reminderBody: 'El versículo de hoy te espera.',
+    account: 'Cuenta',
+    accountHint: 'Este dispositivo creó una clave Nostr para ti. Es tu inicio de sesión, aquí y en cualquier otro dispositivo donde la restaures. No hay restablecimiento de contraseña.',
+    yourPublicKey: 'Tu clave pública',
+    copyPublicKey: 'Copiar clave pública',
+    keyCopied: 'Clave pública copiada.',
+    backupAccount: 'Respalda esta cuenta',
+    backupPassword: 'Contraseña del respaldo',
+    backupPasswordHint: 'Elige una contraseña que vas a recordar. No podemos recuperarla por ti.',
+    createBackup: 'Crear respaldo cifrado',
+    backupQrHint: 'Escanea esto en otro dispositivo y escribe la misma contraseña allí. El código QR no contiene la contraseña.',
+    backupSecret: 'Respaldo cifrado',
+    copyBackup: 'Copiar respaldo',
+    downloadBackup: 'Descargar respaldo',
+    backupCopied: 'Respaldo copiado.',
+    restoreAccount: 'Restaurar en este dispositivo',
+    restoreSecret: 'Respaldo cifrado',
+    restorePassword: 'Contraseña del respaldo',
+    restoreAction: 'Restaurar cuenta',
+    restoreWarn: 'Esto reemplaza la cuenta que hay ahora en este dispositivo.',
+    restoreOk: 'Cuenta restaurada. Recargando…',
+    restoreFail: 'No se pudo restaurar. Revisa el respaldo y la contraseña.',
+    accountLoss: 'Si pierdes este dispositivo y no tienes un respaldo, esta cuenta desaparece. No hay restablecimiento.',
+    passwordTooShort: 'Usa al menos 8 caracteres.',
   },
   fr: {
     languageName: 'Français',
@@ -474,7 +543,7 @@ export const strings: Record<Language, Strings> = {
     profilePhoto: 'Photo de profil',
     changePhoto: 'Changer la photo',
     removePhoto: 'Retirer la photo',
-    photoHint: 'Enregistrée uniquement sur cet appareil. Aucun compte nécessaire.',
+    photoHint: 'Votre nom et votre photo restent sur cet appareil. Ils sont partagés avec les personnes d’un groupe que vous rejoignez ; un groupe public affiche aussi le nom de l’hôte. Effacer les données de ce site les supprime, sauf si vous restaurez une sauvegarde.',
     photoFailed: "Impossible d'utiliser cette image.",
     muted: 'Muet',
     speed: 'Vitesse de lecture',
@@ -599,6 +668,29 @@ export const strings: Record<Language, Strings> = {
     reminderTestFailed: "Le navigateur a refusé d'afficher la notification.",
     reminderTitle: 'Un temps dans la Parole',
     reminderBody: "Le verset du jour vous attend.",
+    account: 'Compte',
+    accountHint: 'Cet appareil a créé une clé Nostr pour vous. C’est votre connexion, ici et sur tout autre appareil où vous la restaurez. Il n’y a pas de réinitialisation de mot de passe.',
+    yourPublicKey: 'Votre clé publique',
+    copyPublicKey: 'Copier la clé publique',
+    keyCopied: 'Clé publique copiée.',
+    backupAccount: 'Sauvegarder ce compte',
+    backupPassword: 'Mot de passe de la sauvegarde',
+    backupPasswordHint: 'Choisissez un mot de passe dont vous vous souviendrez. Nous ne pourrons pas le récupérer pour vous.',
+    createBackup: 'Créer une sauvegarde chiffrée',
+    backupQrHint: 'Scannez ceci sur un autre appareil, puis saisissez le même mot de passe. Le QR ne contient pas le mot de passe.',
+    backupSecret: 'Sauvegarde chiffrée',
+    copyBackup: 'Copier la sauvegarde',
+    downloadBackup: 'Télécharger la sauvegarde',
+    backupCopied: 'Sauvegarde copiée.',
+    restoreAccount: 'Restaurer sur cet appareil',
+    restoreSecret: 'Sauvegarde chiffrée',
+    restorePassword: 'Mot de passe de la sauvegarde',
+    restoreAction: 'Restaurer le compte',
+    restoreWarn: 'Cela remplace le compte actuellement sur cet appareil.',
+    restoreOk: 'Compte restauré. Rechargement…',
+    restoreFail: 'Impossible de restaurer. Vérifiez la sauvegarde et le mot de passe.',
+    accountLoss: 'Si vous perdez cet appareil sans sauvegarde, ce compte disparaît. Il n’y a pas de réinitialisation.',
+    passwordTooShort: 'Utilisez au moins 8 caractères.',
   },
   zh: {
     languageName: '中文',
@@ -622,7 +714,7 @@ export const strings: Record<Language, Strings> = {
     profilePhoto: '头像',
     changePhoto: '更换头像',
     removePhoto: '移除头像',
-    photoHint: '仅保存在此设备上。无需账户。',
+    photoHint: '你的名字和头像保存在此设备上。加入学习小组时会分享给其他人；公开小组还会列出主持者的名字。清除本站数据会删除它们，除非你恢复了备份。',
     photoFailed: '无法使用该图片。',
     muted: '已静音',
     speed: '朗读速度',
@@ -747,6 +839,29 @@ export const strings: Record<Language, Strings> = {
     reminderTestFailed: '浏览器拒绝显示该通知。',
     reminderTitle: '与圣言同在的时刻',
     reminderBody: '今日经文正等着你。',
+    account: '账户',
+    accountHint: '此设备已为你生成一把 Nostr 密钥。它就是你的登录方式，可在本机以及你恢复到的任何设备上使用。无法重置密码。',
+    yourPublicKey: '你的公钥',
+    copyPublicKey: '复制公钥',
+    keyCopied: '公钥已复制。',
+    backupAccount: '备份此账户',
+    backupPassword: '备份密码',
+    backupPasswordHint: '请选择一个你会记住的密码。我们无法帮你找回。',
+    createBackup: '创建加密备份',
+    backupQrHint: '在另一台设备上扫描，然后输入同一密码。二维码不含密码。',
+    backupSecret: '加密备份',
+    copyBackup: '复制备份',
+    downloadBackup: '下载备份',
+    backupCopied: '备份已复制。',
+    restoreAccount: '在此设备上恢复',
+    restoreSecret: '加密备份',
+    restorePassword: '备份密码',
+    restoreAction: '恢复账户',
+    restoreWarn: '这将替换此设备上当前的账户。',
+    restoreOk: '账户已恢复。正在重新加载…',
+    restoreFail: '无法恢复。请检查备份和密码。',
+    accountLoss: '如果丢失此设备且没有备份，此账户将无法找回。无法重置。',
+    passwordTooShort: '请至少使用 8 个字符。',
   },
   vi: {
     languageName: 'Tiếng Việt',
@@ -770,7 +885,7 @@ export const strings: Record<Language, Strings> = {
     profilePhoto: 'Ảnh đại diện',
     changePhoto: 'Đổi ảnh',
     removePhoto: 'Xóa ảnh',
-    photoHint: 'Chỉ lưu trên thiết bị này. Không cần tài khoản.',
+    photoHint: 'Tên và ảnh của bạn ở lại trên thiết bị này. Chúng được chia sẻ với người trong nhóm bạn tham gia; nhóm công khai cũng hiện tên người chủ trì. Xóa dữ liệu trang này sẽ mất chúng, trừ khi bạn khôi phục bản sao lưu.',
     photoFailed: 'Không dùng được ảnh đó.',
     muted: 'Đã tắt tiếng',
     speed: 'Tốc độ đọc',
@@ -895,6 +1010,29 @@ export const strings: Record<Language, Strings> = {
     reminderTestFailed: 'Trình duyệt đã từ chối hiển thị thông báo.',
     reminderTitle: 'Giờ ở trong Lời Chúa',
     reminderBody: 'Câu Kinh Thánh hôm nay đang chờ bạn.',
+    account: 'Tài khoản',
+    accountHint: 'Thiết bị này đã tạo một khóa Nostr cho bạn. Đó là cách bạn đăng nhập, trên máy này và mọi thiết bị bạn khôi phục sang. Không có đặt lại mật khẩu.',
+    yourPublicKey: 'Khóa công khai của bạn',
+    copyPublicKey: 'Sao chép khóa công khai',
+    keyCopied: 'Đã sao chép khóa công khai.',
+    backupAccount: 'Sao lưu tài khoản này',
+    backupPassword: 'Mật khẩu sao lưu',
+    backupPasswordHint: 'Hãy chọn mật khẩu bạn sẽ nhớ. Chúng tôi không thể lấy lại giúp bạn.',
+    createBackup: 'Tạo bản sao lưu đã mã hóa',
+    backupQrHint: 'Quét mã này trên thiết bị khác, rồi nhập cùng mật khẩu. Mã QR không chứa mật khẩu.',
+    backupSecret: 'Bản sao lưu đã mã hóa',
+    copyBackup: 'Sao chép bản sao lưu',
+    downloadBackup: 'Tải bản sao lưu',
+    backupCopied: 'Đã sao chép bản sao lưu.',
+    restoreAccount: 'Khôi phục trên thiết bị này',
+    restoreSecret: 'Bản sao lưu đã mã hóa',
+    restorePassword: 'Mật khẩu sao lưu',
+    restoreAction: 'Khôi phục tài khoản',
+    restoreWarn: 'Thao tác này thay tài khoản hiện có trên thiết bị này.',
+    restoreOk: 'Đã khôi phục tài khoản. Đang tải lại…',
+    restoreFail: 'Không khôi phục được. Hãy kiểm tra bản sao lưu và mật khẩu.',
+    accountLoss: 'Nếu bạn mất thiết bị này mà không có bản sao lưu, tài khoản này sẽ mất. Không có đặt lại.',
+    passwordTooShort: 'Dùng ít nhất 8 ký tự.',
   },
 };
 

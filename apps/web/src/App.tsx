@@ -17,6 +17,7 @@ import { createWebSpeech, webClipboard, webStorage } from './platform';
 import { useDailyReminder } from './dailyReminder';
 import { useReadParty } from './useReadParty';
 import { useStudyBoard } from './useStudyBoard';
+import { takeRestoreToken } from './nostrAccount';
 import './styles.css';
 import './landing.css';
 import './workspace.css';
@@ -51,6 +52,7 @@ function App() {
   const reminder = useDailyReminder({ title: label.reminderTitle, body: label.reminderBody });
   const activeTopic = app.topics.find((topic) => topic.id === app.selectedTopic);
   const tools = useTools();
+  const restorePrefill = useMemo(() => takeRestoreToken() ?? '', []);
   const welcome = useWelcome();
   const [library, setLibrary] = useState<'books'|'search'|'bookmarks'|null>(null);
   const [partyCode, setPartyCode] = useState('');
@@ -71,6 +73,7 @@ function App() {
   const { list: liveGroups, advertise: advertiseGroup, retract: retractGroup } = useStudyBoard(partyOpen || (party.active && party.findable && party.isHost));
   const verseRefs = useRef<Record<number, HTMLElement | null>>({});
 
+  useEffect(() => { if (restorePrefill) tools.open('settings'); }, [restorePrefill]);
   useEffect(() => { document.documentElement.dataset.theme = app.theme; }, [app.theme]);
   useEffect(() => { document.documentElement.lang = language; }, [language]);
   useEffect(() => { document.documentElement.style.setProperty('--app-font', app.font.stack); }, [app.font]);
@@ -193,7 +196,7 @@ function App() {
     <button onClick={()=>openTool('settings')}>Choose a narration voice</button>
     <DeviceSettings party={party}/>
   </div>;
-  const preferences = <Preferences embedded={view==='reader'} app={app} name={party.name} color={party.identity.color} avatar={party.avatar} reminder={reminder} onNameChange={party.setName} onAvatarChange={file=>{void party.setAvatar(file);}} onClose={()=>tools.close('settings')} />;
+  const preferences = <Preferences embedded={view==='reader'} app={app} name={party.name} color={party.identity.color} avatar={party.avatar} reminder={reminder} restorePrefill={restorePrefill} onNameChange={party.setName} onAvatarChange={file=>{void party.setAvatar(file);}} onClose={()=>tools.close('settings')} />;
   const group = <div className="group-content">
     {!party.active ? <><span className="workspace-eyebrow">Read. Reflect. Together.</span><h2>A seat at the table.</h2><p>Share a passage, talk face to face, and follow the host’s reading.</p>
       <div className="join-profile">{party.avatar && <img src={party.avatar} alt="Your profile"/>}<div><strong>{party.name}</strong><small>Your microphone and camera start off.</small></div><button onClick={()=>openTool('settings')}>Edit profile</button></div>

@@ -466,7 +466,7 @@ select, input { border: 1px solid #c9c1b3; border-radius: 8px; background: trans
 .prefs-body { display: grid; gap: 18px; padding: 18px 20px 24px; }
 .prefs-field { display: grid; gap: 8px; }
 .prefs-field input[type='range'] { width: 100%; accent-color: var(--accent); }
-.prefs-field input[type='text'] { min-height: 44px; }
+.prefs-field input[type='text'], .prefs-field input[type='password'] { min-height: 44px; }
 .prefs-photo { display: flex; align-items: center; gap: 14px; }
 .prefs-avatar {
   width: 72px; height: 72px; flex: 0 0 auto; border: 0; border-radius: 50%;
@@ -494,6 +494,38 @@ select, input { border: 1px solid #c9c1b3; border-radius: 8px; background: trans
 .prefs-reminder button { border: 1px solid var(--line, #c9c1b3); border-radius: 10px; background: var(--surface, transparent); color: inherit; padding: 8px 14px; min-height: 44px; }
 .prefs-reminder button:hover { border-color: var(--accent); }
 .prefs-field .muted { margin: 0; font-size: 12px; }
+.prefs-npub {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-family: ui-monospace, 'Cascadia Code', 'SF Mono', Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  word-break: break-all;
+  background: var(--surface, transparent);
+}
+.prefs-account-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.prefs-account-actions button {
+  border: 1px solid var(--line, #c9c1b3);
+  border-radius: 10px;
+  background: var(--surface, transparent);
+  color: inherit;
+  padding: 8px 14px;
+  min-height: 44px;
+}
+.prefs-account-actions button:hover { border-color: var(--accent); }
+.prefs-qr { width: min(220px, 100%); background: #fff; border-radius: 12px; padding: 8px; }
+.prefs-qr svg { display: block; width: 100%; height: auto; }
+.prefs-secret {
+  width: 100%;
+  min-height: 88px;
+  resize: vertical;
+  font-family: ui-monospace, 'Cascadia Code', 'SF Mono', Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.4;
+  word-break: break-all;
+}
 
 .image-editor-backdrop { position: fixed; inset: 0; z-index: 50; background: #0008; display: flex; align-items: center; justify-content: center; padding: 16px; }
 .image-editor { width: min(560px, 100%); max-height: calc(100vh - 32px); overflow: auto; background: var(--background, #f7f4ee); color: inherit; border-radius: 16px; padding: 16px 16px 20px; display: grid; gap: 14px; }
