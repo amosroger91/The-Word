@@ -19,6 +19,12 @@ export interface Strings {
   preferences: string;
   closePreferences: string;
   displayName: string;
+  profilePhoto: string;
+  changePhoto: string;
+  removePhoto: string;
+  photoHint: string;
+  photoFailed: string;
+  muted: string;
   speed: string;
   decreaseSpeed: string;
   increaseSpeed: string;
@@ -147,6 +153,12 @@ export const strings: Record<Language, Strings> = {
     preferences: 'Preferences',
     closePreferences: 'Close preferences',
     displayName: 'Your name in Group Study',
+    profilePhoto: 'Profile photo',
+    changePhoto: 'Change photo',
+    removePhoto: 'Remove photo',
+    photoHint: 'Saved on this device only. No account needed.',
+    photoFailed: 'Could not use that image.',
+    muted: 'Muted',
     speed: 'Reading speed',
     decreaseSpeed: 'Decrease reading speed',
     increaseSpeed: 'Increase reading speed',
@@ -267,6 +279,12 @@ export const strings: Record<Language, Strings> = {
     preferences: 'Preferencias',
     closePreferences: 'Cerrar preferencias',
     displayName: 'Tu nombre en el grupo',
+    profilePhoto: 'Foto de perfil',
+    changePhoto: 'Cambiar foto',
+    removePhoto: 'Quitar foto',
+    photoHint: 'Se guarda solo en este dispositivo. No hace falta una cuenta.',
+    photoFailed: 'No se pudo usar esa imagen.',
+    muted: 'Silenciado',
     speed: 'Velocidad de lectura',
     decreaseSpeed: 'Reducir la velocidad de lectura',
     increaseSpeed: 'Aumentar la velocidad de lectura',
@@ -387,6 +405,12 @@ export const strings: Record<Language, Strings> = {
     preferences: 'Préférences',
     closePreferences: 'Fermer les préférences',
     displayName: 'Votre nom dans le groupe',
+    profilePhoto: 'Photo de profil',
+    changePhoto: 'Changer la photo',
+    removePhoto: 'Retirer la photo',
+    photoHint: 'Enregistrée uniquement sur cet appareil. Aucun compte nécessaire.',
+    photoFailed: "Impossible d'utiliser cette image.",
+    muted: 'Muet',
     speed: 'Vitesse de lecture',
     decreaseSpeed: 'Réduire la vitesse de lecture',
     increaseSpeed: 'Augmenter la vitesse de lecture',
@@ -507,6 +531,12 @@ export const strings: Record<Language, Strings> = {
     preferences: '偏好设置',
     closePreferences: '关闭偏好设置',
     displayName: '小组学习中的名字',
+    profilePhoto: '头像',
+    changePhoto: '更换头像',
+    removePhoto: '移除头像',
+    photoHint: '仅保存在此设备上。无需账户。',
+    photoFailed: '无法使用该图片。',
+    muted: '已静音',
     speed: '朗读速度',
     decreaseSpeed: '减慢朗读速度',
     increaseSpeed: '加快朗读速度',
@@ -627,6 +657,12 @@ export const strings: Record<Language, Strings> = {
     preferences: 'Tùy chọn',
     closePreferences: 'Đóng tùy chọn',
     displayName: 'Tên của bạn trong nhóm',
+    profilePhoto: 'Ảnh đại diện',
+    changePhoto: 'Đổi ảnh',
+    removePhoto: 'Xóa ảnh',
+    photoHint: 'Chỉ lưu trên thiết bị này. Không cần tài khoản.',
+    photoFailed: 'Không dùng được ảnh đó.',
+    muted: 'Đã tắt tiếng',
     speed: 'Tốc độ đọc',
     decreaseSpeed: 'Giảm tốc độ đọc',
     increaseSpeed: 'Tăng tốc độ đọc',

@@ -134,7 +134,15 @@ function App() {
           partyMembers={party.active ? party.members.length : 0}
         />
         {prefsOpen && (
-          <Preferences app={app} name={party.name} onNameChange={party.setName} onClose={() => setPrefsOpen(false)} />
+          <Preferences
+            app={app}
+            name={party.name}
+            color={party.identity.color}
+            avatar={party.avatar}
+            onNameChange={party.setName}
+            onAvatarChange={(file) => { void party.setAvatar(file); }}
+            onClose={() => setPrefsOpen(false)}
+          />
         )}
       </>
     );
@@ -199,9 +207,13 @@ function App() {
         <FaceRail
           members={party.members}
           selfId={party.identity.id}
+          selfAvatar={party.avatar}
           localStream={party.localStream}
           remoteStreams={party.remoteStreams}
+          micOn={party.micOn}
           youSuffix={label.youSuffix}
+          mutedLabel={label.muted}
+          onPickPhoto={(file) => { void party.setAvatar(file); }}
         />
       )}
       <main className="layout">
@@ -316,10 +328,12 @@ function App() {
             title={label.meetingCam}
           ><CamIcon /></button>
           <button className={`icon-button ${partyOpen ? 'active' : ''}`} onClick={() => setPartyOpen((open) => !open)} aria-label={label.partyChat} title={label.partyChat}>💬</button>
+          <button className="icon-button" onClick={() => setPrefsOpen(true)} aria-label={label.preferences} title={label.preferences}>☺</button>
           <button className="party-leave meeting-leave" onClick={party.leaveParty}>{label.leaveParty}</button>
         </div>
       )}
-      {party.mediaError && <div className="speech-error" role="alert">{label.mediaDenied}</div>}
+      {party.mediaError === 'denied' && <div className="speech-error" role="alert">{label.mediaDenied}</div>}
+      {party.mediaError === 'photo' && <div className="speech-error" role="alert">{label.photoFailed}</div>}
       {party.capped && party.active && <p className="meeting-cap muted">{label.meshCapped}</p>}
       {party.active && party.isHost && !party.liveFloor && speechState === 'idle' && (
         <p className="meeting-hint muted">{label.tapVerseToPlace}</p>
@@ -447,7 +461,9 @@ function App() {
                 <span className="section-label">{label.inTheRoom(party.members.length)}</span>
                 {party.members.map((member) => (
                   <div className="party-member" key={member.id}>
-                    <span className="party-dot" style={{ background: member.color }} />
+                    {member.avatar
+                      ? <span className="party-dot photo" style={{ backgroundImage: `url("${member.avatar}")` }} />
+                      : <span className="party-dot" style={{ background: member.color }} />}
                     <span>{member.name}{member.id === party.identity.id ? label.youSuffix : ''}</span>
                     {member.host && <span className="party-host-tag">{label.hostTag}</span>}
                   </div>
@@ -471,6 +487,17 @@ function App() {
             </div>
           )}
         </div>
+      )}
+      {prefsOpen && (
+        <Preferences
+          app={app}
+          name={party.name}
+          color={party.identity.color}
+          avatar={party.avatar}
+          onNameChange={party.setName}
+          onAvatarChange={(file) => { void party.setAvatar(file); }}
+          onClose={() => setPrefsOpen(false)}
+        />
       )}
     </div>
   );

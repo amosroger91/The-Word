@@ -26,8 +26,8 @@
 import { Peer, type DataConnection, type MediaConnection } from 'peerjs';
 import { getLocalStream, hasMedia } from './media';
 
-export interface PartyIdentity { id: string; name: string; color: string; }
-export interface PartyMember { id: string; name: string; color: string; peerId: string; host?: boolean; av?: boolean; }
+export interface PartyIdentity { id: string; name: string; color: string; avatar?: string | null; }
+export interface PartyMember { id: string; name: string; color: string; peerId: string; host?: boolean; av?: boolean; avatar?: string | null; }
 export interface PartyChatMessage {
   id: string;
   kind: 'chat' | 'system';
@@ -111,7 +111,7 @@ export function joinParty({ code, identity, handlers = {} }: {
   const capped = () => members.length > MESH_CAP;
 
   function selfMember(): PartyMember {
-    return { id: me.id, name: me.name, color: me.color, peerId: myPeerId(), host: isHub, av: hasMedia() };
+    return { id: me.id, name: me.name, color: me.color, avatar: me.avatar || null, peerId: myPeerId(), host: isHub, av: hasMedia() };
   }
   function upsert(m: PartyMember) {
     const i = members.findIndex((x) => x.id === m.id);
@@ -148,7 +148,7 @@ export function joinParty({ code, identity, handlers = {} }: {
     if (!env || !env.t) return;
     if (env.t === 'hello') {
       const m = (env.d || {}) as Partial<PartyMember>;
-      upsert({ id: m.id!, name: m.name || 'Reader', color: m.color || '#888', peerId: fromPeerId || '', av: Boolean(m.av) });
+      upsert({ id: m.id!, name: m.name || 'Reader', color: m.color || '#888', avatar: m.avatar || null, peerId: fromPeerId || '', av: Boolean(m.av) });
       const conn = fromPeerId ? clientConns.get(fromPeerId) : null;
       if (conn) {
         try { conn.send({ t: 'welcome', d: { roster: members.slice(), chat: chatLog.slice(-CHAT_HISTORY), reading: readingState } }); } catch { /* dropped */ }
@@ -171,6 +171,7 @@ export function joinParty({ code, identity, handlers = {} }: {
         const d = (env.d || {}) as Partial<PartyMember>;
         if (d.name != null) members[i].name = d.name;
         if (d.color != null) members[i].color = d.color;
+        if ('avatar' in d) members[i].avatar = d.avatar || null;
         if (d.av != null) members[i].av = Boolean(d.av);
         emitRoster(); broadcast({ t: 'roster', d: members.slice() });
       }
@@ -255,7 +256,7 @@ export function joinParty({ code, identity, handlers = {} }: {
     hubConn = c;
     c.on('open', () => {
       status('connected');
-      try { c.send({ t: 'hello', d: { id: me.id, name: me.name, color: me.color, av: hasMedia() } }); } catch { /* dropped */ }
+      try { c.send({ t: 'hello', d: { id: me.id, name: me.name, color: me.color, avatar: me.avatar || null, av: hasMedia() } }); } catch { /* dropped */ }
     });
     c.on('data', handleFromHub);
     c.on('close', () => { if (!leaving) reelect(); });
@@ -352,9 +353,9 @@ export function joinParty({ code, identity, handlers = {} }: {
     updateIdentity(next: Partial<PartyIdentity>) {
       me = { ...me, ...next };
       const i = members.findIndex((x) => x.id === me.id);
-      if (i >= 0) { members[i].name = me.name; members[i].color = me.color; }
+      if (i >= 0) { members[i].name = me.name; members[i].color = me.color; members[i].avatar = me.avatar || null; }
       if (isHub) { emitRoster(); broadcast({ t: 'roster', d: members.slice() }); }
-      else toHub({ t: 'meta', d: { name: me.name, color: me.color, av: hasMedia() } });
+      else toHub({ t: 'meta', d: { name: me.name, color: me.color, avatar: me.avatar || null, av: hasMedia() } });
     },
     refreshMedia() {
       closeAllMedia();

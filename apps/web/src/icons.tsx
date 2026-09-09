@@ -32,6 +32,15 @@ export function MicIcon(props: IconProps) {
   );
 }
 
+// fa-microphone-slash — muted participant.
+export function MicOffIcon(props: IconProps) {
+  return (
+    <svg viewBox="0 0 640 512" width="1em" height="1em" fill="currentColor" aria-hidden="true" focusable="false" {...props}>
+      <path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L381.9 274c48.5-19.4 85.1-64.1 92-117.2 2.5-19.8-13.6-36.8-33.6-36.8-16.5 0-30.3 11.9-33.2 27.9C401.4 191.5 365.9 224 324.4 224h-5.6L233.7 148.4C251.9 129.3 264 104.1 264 76.8 264 34.4 229.6 0 187.2 0c-31.2 0-58 18.8-69.5 45.8L38.8 5.1zM162.7 204.7 324.4 332.1c-4.5.6-9.1.9-13.8.9-53 0-96-43-96-96 0-11.4 2-22.3 5.6-32.4zM64 216c0-6.8.7-13.5 2-19.9L22.5 161.4C8.5 177.4 0 197.8 0 220v36c0 89.1 66.2 162.7 152 174.4V496H88c-13.3 0-24 10.7-24 24s10.7 24 24 24h192c13.3 0 24-10.7 24-24s-10.7-24-24-24H216V430.4c24.1-3.3 46.8-11.3 67.2-23.1L90.3 197.1C74.5 200.3 64 207.2 64 216z" />
+    </svg>
+  );
+}
+
 // fa-video — meeting camera on.
 export function CamIcon(props: IconProps) {
   return (

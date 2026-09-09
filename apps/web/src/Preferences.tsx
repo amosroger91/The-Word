@@ -7,16 +7,23 @@ import { SearchableSelect } from './SearchableSelect';
 export function Preferences({
   app,
   name,
+  color,
+  avatar,
   onNameChange,
+  onAvatarChange,
   onClose,
 }: {
   app: WordApp;
   name: string;
+  color: string;
+  avatar: string | null;
   onNameChange: (name: string) => void;
+  onAvatarChange: (file: File | null) => void;
   onClose: () => void;
 }) {
   const { label } = app;
   const panelRef = useRef<HTMLDivElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   // The field keeps its own text so a half-typed (or briefly empty) name still
   // shows; only non-empty values are committed to the party identity.
   const [draft, setDraft] = useState(name);
@@ -136,6 +143,37 @@ export function Preferences({
               onBlur={() => setDraft(name)}
             />
           </label>
+
+          <div className="prefs-field">
+            <span className="section-label">{label.profilePhoto}</span>
+            <div className="prefs-photo">
+              <button
+                type="button"
+                className={avatar ? 'prefs-avatar has-photo' : 'prefs-avatar'}
+                style={avatar ? { backgroundImage: `url("${avatar}")` } : { background: color }}
+                onClick={() => fileRef.current?.click()}
+                aria-label={label.changePhoto}
+              >
+                {!avatar ? (name.trim().slice(0, 1) || '?') : null}
+              </button>
+              <div className="prefs-photo-actions">
+                <button type="button" onClick={() => fileRef.current?.click()}>{label.changePhoto}</button>
+                {avatar ? <button type="button" onClick={() => onAvatarChange(null)}>{label.removePhoto}</button> : null}
+                <p className="muted">{label.photoHint}</p>
+              </div>
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/*"
+                hidden
+                onChange={(event) => {
+                  const file = event.target.files?.[0] ?? null;
+                  event.target.value = '';
+                  if (file) onAvatarChange(file);
+                }}
+              />
+            </div>
+          </div>
         </div>
       </div>
     </div>

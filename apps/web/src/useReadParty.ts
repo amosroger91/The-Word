@@ -6,27 +6,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { WordApp } from '@the-word/core';
 import { joinParty, type PartyChatMessage, type PartyMember, type PartyRoom, type ReadingState } from './readParty';
+import { compressAvatar, loadIdentity, saveIdentity } from './identity';
 import { getLocalStream, setMedia, stopLocal } from './media';
 
-const ADJECTIVES = ['Gentle', 'Faithful', 'Bright', 'Humble', 'Steady', 'Kind', 'Quiet', 'Joyful', 'Patient', 'Bold'];
-const NOUNS = ['Lamp', 'Cedar', 'River', 'Dove', 'Shepherd', 'Vine', 'Anchor', 'Harvest', 'Pilgrim', 'Beacon'];
-const COLORS = ['#947849', '#5c7cfa', '#2f9e6f', '#c2571e', '#9b5cb4', '#3a86ca', '#c04b5a', '#6a8a2f'];
-
-function randomFrom<T>(list: T[]): T { return list[Math.floor(Math.random() * list.length)]; }
-function randomName(): string { return `${randomFrom(ADJECTIVES)} ${randomFrom(NOUNS)}`; }
 function randomCode(): string { return Math.random().toString(36).slice(2, 7); }
-
-const NAME_KEY = 'word.partyName';
-
-// The name other readers see. Chosen at random the first time, then kept — and
-// editable in Preferences — so a returning reader is recognisable.
-function storedName(): string {
-  try {
-    const saved = localStorage.getItem(NAME_KEY)?.trim();
-    if (saved) return saved.slice(0, 40);
-  } catch { /* storage blocked */ }
-  return randomName();
-}
 
 function actionFor(speechState: WordApp['speechState']): ReadingState['action'] {
   return speechState === 'speaking' ? 'playing' : speechState === 'paused' ? 'paused' : 'idle';
@@ -53,8 +36,9 @@ export function useReadParty(app: WordApp) {
   const [capped, setCapped] = useState(false);
   const [focusVerse, setFocusVerseState] = useState<number | null>(null);
 
-  const identityRef = useRef({ id: 'me-' + randomCode(), name: storedName(), color: randomFrom(COLORS) });
+  const identityRef = useRef(loadIdentity());
   const [name, setNameValue] = useState(identityRef.current.name);
+  const [avatar, setAvatarValue] = useState<string | null>(identityRef.current.avatar);
   // The last reading state the HOST broadcast, so we don't re-send identical updates.
   const lastSentRef = useRef<string>('');
   // Last verse this device actually started speaking, so we don't re-trigger the
@@ -236,14 +220,27 @@ export function useReadParty(app: WordApp) {
   const hostVerse = (Boolean(room) && !isHost && following && remoteReading && remoteReading.action !== 'idle') ? (remoteReading.verse ?? null) : null;
   const stageVerse = isHost ? (app.speakingVerse ?? focusVerse) : hostVerse;
 
-  // Renaming applies live: the roster in an open room updates too.
+  // Name and photo live in this browser only — renaming/uploading applies
+  // live to the roster in an open room, and sticks for the next visit.
   const setName = useCallback((next: string) => {
     const clean = next.trim().slice(0, 40);
     if (!clean) return;
     identityRef.current.name = clean;
     setNameValue(clean);
-    try { localStorage.setItem(NAME_KEY, clean); } catch { /* storage blocked */ }
+    saveIdentity(identityRef.current);
     room?.updateIdentity({ name: clean });
+  }, [room]);
+
+  const setAvatar = useCallback(async (file: File | null) => {
+    try {
+      const dataUrl = file ? await compressAvatar(file) : null;
+      identityRef.current.avatar = dataUrl;
+      setAvatarValue(dataUrl);
+      saveIdentity(identityRef.current);
+      room?.updateIdentity({ avatar: dataUrl });
+    } catch {
+      setMediaError('photo');
+    }
   }, [room]);
 
   return {
@@ -263,6 +260,8 @@ export function useReadParty(app: WordApp) {
     identity: identityRef.current,
     name,
     setName,
+    avatar,
+    setAvatar,
     createParty,
     joinParty: (code: string) => startParty(code, { armed: true }),
     leaveParty,
