@@ -31,12 +31,17 @@ export function Preferences({
   // shows; only non-empty values are committed to the party identity.
   const [draft, setDraft] = useState(name);
 
+  // Move focus into the dialog once, when it opens. This must not depend on
+  // anything that changes while it is open: re-running it snatches focus back
+  // from whatever field is being typed in, which let the name field take exactly
+  // one letter before every keystroke re-rendered the app and stole the caret.
+  useEffect(() => { panelRef.current?.focus(); }, []);
+
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') onClose();
     }
     document.addEventListener('keydown', onKeyDown);
-    panelRef.current?.focus();
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [onClose]);
 

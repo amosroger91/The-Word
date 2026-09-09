@@ -146,6 +146,8 @@ function App() {
     }
   }, [retractGroup, party.active, party.isHost, party.findable, party.code]);
 
+  const closePrefs = useCallback(() => setPrefsOpen(false), []);
+
   // One settings surface for the whole app: the landing page and the reader open
   // this same element, so neither can drift into a second set of controls.
   const preferences = prefsOpen && (
@@ -157,7 +159,7 @@ function App() {
       reminder={reminder}
       onNameChange={party.setName}
       onAvatarChange={(file) => { void party.setAvatar(file); }}
-      onClose={() => setPrefsOpen(false)}
+      onClose={closePrefs}
     />
   );
 

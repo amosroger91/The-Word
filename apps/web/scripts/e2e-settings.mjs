@@ -46,6 +46,23 @@ for (const needed of ['Daily reminder', 'Profile photo']) {
 }
 console.log('both gears open the same panel');
 
+// Typing a name re-renders the app on every keystroke. The dialog must not grab
+// focus back when it does, or the field takes exactly one letter and stops.
+const nameField = page.locator('.prefs input[type="text"]');
+await nameField.click();
+await page.keyboard.press('Control+A');
+await page.keyboard.type('Roger H', { delay: 60 });
+const typed = await page.evaluate(() => ({
+  value: document.querySelector('.prefs input[type="text"]').value,
+  stillFocused: document.activeElement?.tagName === 'INPUT',
+  saved: JSON.parse(localStorage.getItem('word.partyIdentity') || '{}').name,
+}));
+console.log(JSON.stringify(typed));
+if (typed.value !== 'Roger H') throw new Error(`FAIL: name field kept "${typed.value}" instead of "Roger H"`);
+if (!typed.stillFocused) throw new Error('FAIL: the dialog stole focus from the name field while typing');
+if (typed.saved !== 'Roger H') throw new Error(`FAIL: name saved as "${typed.saved}"`);
+console.log('name field accepts a full name and saves it');
+
 // The gear has to be reachable at phone width too, where it used to be the only
 // way to reach a row of controls that no longer exists.
 await page.keyboard.press('Escape');
