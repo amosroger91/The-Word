@@ -1,158 +1,99 @@
 # The Word
 
-A quiet, ad-free Bible reader built around free local Scripture, privacy, and readability.
+Live demo: https://amosroger91.github.io/The-Word/#
 
-Web, Android, and iOS share one reader brain in `packages/core`. The web client is Vite + React. The phone clients are one Expo app.
+The Word is a cross-platform, privacy-focused Scripture reader that combines fast local access to translations, high-quality text-to-speech, collaborative "Read Party" sessions, and expressive verse-sharing tools. The repository uses a monorepo layout so the reader logic lives once in `packages/core` and is reused by the web and mobile clients.
 
-## What works today
+Why this project is different
 
-- Landing page: read the Bible, or today's verse from the [Daily Discovery Bible Study](https://discoverybiblestudy.org/daily/get-api/) API
-- Local KJV, ASV, WEB, Reina-Valera 1909, Valera 1602 Purificada, Louis Segond 1910, CUV, and Vietnamese 1934 (all 66 books)
-- Translation data is lazy-loaded: a translation is fetched only when first chosen
-- Book and chapter navigation, local search, topics, bookmarks, and OpenBible.info cross-references
-- Verse selection, copy, and shareable verse images
-- Words of Jesus in red
-- Light and dark themes, reading fonts including OpenDyslexic
-- Read-aloud with speed and volume controls (five UI languages)
-- Web read-aloud uses local Piper WASM. Android/iOS use the device speech engine
-- Web Group Study: a P2P room so several devices follow one host's passage and read it aloud locally, with optional live microphone and camera around the verse (WebRTC mesh, capped at 8)
-- Daily reading reminder: an optional browser notification at a time you choose (7:00 by default), scheduled by the browser so it arrives with the page closed. No server and no account — see `apps/web/src/dailyReminder.ts` for the three delivery paths and what each browser can promise
+- One reader brain: shared app logic in `packages/core` drives both `apps/web` and `apps/mobile`, reducing duplication and ensuring consistent behavior.
+- Read Party: lightweight P2P group reading with follow/host controls, chat, and optional microphone/camera for small groups.
+- Local/fast TTS: the web uses an in-browser Piper WASM runtime while mobile uses the device speech engine, with prewarm and per-device voice handling for low latency.
+- Verse images: `VerseImageEditor` + seeded backgrounds for on-brand, shareable images.
+- Accessibility & readability: dyslexia-friendly fonts, readable defaults, ARIA and accessibility labels throughout.
 
-KJV is sourced from the aruljohn/Bible-kjv repository. ASV is sourced from Scrollmapper’s public Bible database. WEB is sourced from eBible.org’s public-domain WEB Protestant USFM release. Copyrighted translations such as ESV are not bundled.
+Features (at a glance)
 
-## Architecture
+- Offline-capable local Scripture (multiple public-domain translations)
+- Fast local search, topics, bookmarks, and cross-references
+- Read-aloud with speed and volume controls, per-device voice selection
+- Shared group reading with optional live audio/video (peer-to-peer mesh)
+- Create and share verse images (custom background, font, translation)
+- Local-first preferences and progress tracking (no account required)
 
-| Path | Role |
-|---|---|
-| `apps/web` | Vite + React web client |
-| `apps/mobile` | Expo + React Native client (Android and iOS) |
-| `packages/core` | Shared reader state, speech queue, i18n, theme, verse-image layout |
-| `packages/bible` | Local Scripture assets and repository |
-| `packages/shared` | Shared domain types |
-| `packages/ui` | Placeholder |
-| `services/backend` | Reserved for a future account/sync API |
+Repository layout
 
-SQLite lives only in import tooling. The apps do not use it at runtime.
+- `apps/web` — Vite + React web client (demo hosted at the link above)
+- `apps/mobile` — Expo + React Native client for Android/iOS
+- `packages/core` — shared reader logic, `useWordApp`, speech queue, i18n
+- `packages/bible` — local Scripture sources, parsing, and search
+- `packages/shared` — shared TypeScript types
+- `services/relay` — optional relay service used in some P2P flows
 
-## Requirements
+Prerequisites
 
-- Node.js 20 or newer and npm
-- First-time install from the repo root:
+- Node.js 20+ and npm
+
+Quick start
+
+Install dependencies for each workspace package (convenience script):
 
 ```bash
 npm run install:all
 ```
 
-## Start: web
-
-From the repo root:
+Run the web app locally:
 
 ```bash
 npm run dev:web
+# then open http://localhost:5173
 ```
 
-Open [http://localhost:5173](http://localhost:5173).
+Run the mobile app (Expo):
 
-On first read-aloud, Piper downloads a local voice model (about 75 MB) and then runs entirely in the browser.
+```bash
+npm run dev:mobile
+# or for Android emulator
+npm run dev:android
+```
+
+Build and typecheck:
 
 ```bash
 npm run build:web
 npm run typecheck
 ```
 
-## Start: Android
-
-This repo is developed on Windows. The AVD in use is **`eleazarcam`**: Pixel 6 skin, Android 14 (API 34, x86_64). SDK: `C:\Android\Sdk`. Expo Go is already installed on that emulator.
-
-1. Start the emulator if it is not running:
+Run web tests (from the repo root):
 
 ```bash
-"%ANDROID_HOME%\emulator\emulator.exe" -avd eleazarcam
+npm --prefix apps/web run test
 ```
 
-If `ANDROID_HOME` is unset, use `C:\Android\Sdk`.
+Developer notes
 
-2. From the repo root:
+- Shared app logic lives in `packages/core`. When changing behavior, prefer updating hooks there so both clients benefit.
+- `useWordApp` exposes delta-style speech controls (`changeSpeechRate(delta)` and `changeSpeechVolume(delta)`) — UI code computes deltas relative to current values.
+- Mobile styles must avoid unsupported RN `gap` usage; prefer margin-based spacing for cross-device consistency.
+- `apps/mobile/src/platform.ts` contains device-specific adapters (speech, storage, clipboard). `createNativeSpeech()` should be resilient to concurrent calls; the speech queue lives in `packages/core`.
 
-```bash
-npm run dev:android
-```
+Contributing
 
-Or:
+- Create an issue for large changes or discuss on a PR.
+- Keep changes small and focused; update types in `packages/shared` when public shapes change.
+- Run `npm run typecheck` and `npm --prefix apps/web run test` before opening a PR.
 
-```bash
-npm run dev:mobile
-```
+Security & privacy
 
-then press `a` in the Expo CLI.
+This app is intentionally local-first: no analytics SDKs or advertising SDKs are bundled. Group features use P2P/WebRTC; consider the privacy implications of demoing group audio/video publicly.
 
-3. If Expo Go cannot reach Metro, reverse the packager port:
+Credits & data sources
 
-```bash
-adb reverse tcp:8081 tcp:8081
-adb shell am start -a android.intent.action.VIEW -d "exp://127.0.0.1:8081" host.exp.exponent
-```
+- Piper TTS: `piper-tts-web` (local WASM) for browser narration
+- Public-domain translations are included; each translation's source is cited in `packages/bible`.
 
-A physical Android phone can scan the Expo QR code instead of using the emulator.
+License
 
-In-app read-aloud volume is stored and shown on Android. Expo Go’s speech engine does not expose TTS gain, so the device volume buttons still govern how loud Android TTS is until a development build wires `TextToSpeech` `KEY_PARAM_VOLUME`. Web volume is a real in-app gain.
+See `LICENSE` in the repository root if present. If no license file is included this repo should be considered unlicensed until one is added.
 
-## Start: iOS
-
-There is no separate iOS app. iOS is the same Expo project as Android (`apps/mobile`). This Windows machine cannot run the iOS Simulator.
-
-### Physical iPhone from this Windows repo (Expo Go)
-
-1. Install Expo Go from the App Store.
-2. Phone and PC on the same LAN.
-3. From the repo root:
-
-```bash
-npm run dev:mobile
-```
-
-4. Scan the QR code with the iPhone Camera app (or Expo Go). Metro must be reachable at the printed `exp://` URL.
-
-### Mac + Simulator (required for `expo start --ios`)
-
-On a Mac with Xcode 15+, CocoaPods, and an Apple ID:
-
-```bash
-cd apps/mobile
-npm install
-npx expo start --ios
-```
-
-Or from the repo root on that Mac: `npm run dev:ios`.
-
-First native compile:
-
-```bash
-cd apps/mobile
-npx expo run:ios
-```
-
-That uses bundle id `com.theword.reader`.
-
-### iOS port plan
-
-The reader logic is already shared. What iOS still needs:
-
-1. **A Mac (or EAS Build)** to compile or archive. Windows can only drive Expo Go on a device.
-2. **Xcode signing** — Apple Developer team, bundle id `com.theword.reader`, devices / simulator.
-3. **App icon and splash** — `app.json` has no icon or splash assets yet; App Store and TestFlight will reject a build without them.
-4. **Safe area** — React Native `SafeAreaView` already applies on iOS. Confirm Dynamic Island / home indicator spacing on a real phone.
-5. **Speech** — `expo-speech` pause/resume already works on iOS. Wire `AVSpeechUtterance.volume` in a development build so the in-app volume control actually changes TTS gain (Expo Go ignores it). Confirm enhanced voices for en/es/fr/zh/vi.
-6. **Sharing verse images** — `expo-sharing` works on iOS; confirm the share sheet and Files/Photos. Saving directly to Camera Roll would need `expo-media-library` and a photo-library usage string; share-sheet save does not.
-7. **Fonts** — Literata, Lexend, Atkinson Hyperlegible, and OpenDyslexic are already loaded through `expo-font`. Confirm they appear in the iOS font picker.
-8. **Bundle size** — a release build currently inlines all eight translations (tens of MB). Before the store, download translations on demand into `expo-file-system`.
-9. **Store extras** — privacy nutrition label (no ads, no tracking, local Scripture), screenshots, and a 1024×1024 icon.
-10. **EAS** — from Windows, `eas build --platform ios` is the path to an IPA without a local Mac, still requiring an Apple team.
-
-Check iOS on a device before calling the port done: open John 3, red letters, search, bookmarks, dark mode, read-aloud pause/resume, volume, verse image share, and a non-English translation.
-
-## Data and licensing
-
-Public-domain translation targets are bundled, but source files should be checked before redistribution. Assets are split so the app loads only the selected translation.
-
-No advertising SDK or analytics SDK is used. Web read-aloud uses `piper-tts-web` and the local Piper WASM runtime.
+Questions or want help running the project locally? Tell me whether you'd like CI added for `typecheck` and web tests and I can scaffold a GitHub Actions workflow.
