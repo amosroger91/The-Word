@@ -9,7 +9,14 @@ Deploy: `bash scripts/deploy-pages.sh` (builds `apps/web`, force-pushes `dist/` 
   issuer public key in Settings. Until then, plans, badges, and circles work
   on-device; shared feed and apart-sync wait on that server. The four open
   decisions at the end of [`docs/study-plans-framework.md`](docs/study-plans-framework.md)
-  still stand (family-on-one-device, key-loss story, relay retention, plan authoring).
+  are now resolved in §14 (key loss, readers on a shared tablet, relay cost, plan
+  import).
+- **Harden `services/relay` before it is deployed.** `/v1/put` checks that `sig`
+  and `gunPub` are *present* but never verifies either, so the endpoint is an open
+  write to anyone who finds the URL. Clients are unaffected — `gunGraph.ts`
+  verifies signature and membership on read — but the relay would be storing
+  anyone's bytes. Also: `persistGraph()` rewrites the whole graph per put, and
+  `/v1/since` ignores `t` and dumps everything. Fix order and reasoning in §14c.
 
 ## Recently shipped (this session, pending deploy)
 

@@ -413,18 +413,153 @@ knowingly.
 7. **Resilience.** Second relay, WebRTC transport over the PeerJS broker,
    deliberate testing of the §11 matrix.
 
-## 14. Decisions still open
+## 14. The four decisions, resolved
 
-- **Family on one device.** If a family shares a tablet, are answers attributed
-  per person (profile switching, and therefore multiple keypairs on one device)
-  or to the household? This is the biggest fork in the family experience and it
-  changes the account model, so settle it before Phase 4.
-- **Key loss is account loss.** Nostr keys cannot be rotated: no reset, no
-  revocation, no recovery. We are auto-creating keys for users who do not know
-  they have one. What does the app do the first time someone loses theirs? A
-  clear answer is needed before launch, not after.
-- **Retention on the survivor relay.** Gun's radisk files only grow. Decide a
-  policy — and who pays — before the first circle fills it.
-- **Plan content: in-repo or user-importable?** In-repo is curated and
-  translated; importable makes the app a platform and gives up control of what a
-  "plan" says. Not exclusive, but which leads shapes the authoring tooling.
+Each was open when the framework was written. All four are settled below, with
+the reasoning kept so a later reader can judge whether it still holds.
+
+### 14a. Key loss
+
+**Decision: make loss rare, make it recoverable while any device still works,
+and be honest that a total loss is total.**
+
+Nostr keys cannot be rotated — no reset, no revocation, no recovery — and we mint
+them for people who do not know they have one. `exportBackup()` already produces
+a NIP-49 `ncryptsec` with a passphrase, downloadable and shown as a QR. That is
+the right primitive; what is missing is everything around it.
+
+Three layers, ordered by how many people each one saves:
+
+1. **Make the backup non-optional in practice.** A key never exported is a key
+   that will be lost. Do not prompt at first launch, when the user has nothing
+   invested and will dismiss it — block at the first moment the account is worth
+   something: the first badge earned, or joining a first circle. Re-prompt until
+   done, and record `backedUpAt` so the nag stops permanently once it is.
+2. **Treat every signed-in device as a replica.** A family with a phone and a
+   tablet already holds two copies of the secret, so losing one device is not
+   losing the account. This layer saves the most people because it demands no
+   foresight from them — which makes pairing worth more attention than backup UI.
+3. **A passphrase is a second thing to lose.** Forgetting it destroys the backup
+   exactly as thoroughly as losing the key. Also offer a passphrase-free export —
+   the raw `nsec` in a file, labelled *anyone who opens this file is you*. For
+   something dropped into a password manager, that beats a forgotten passphrase.
+
+**When it is genuinely gone**, do not pretend otherwise. Mint a fresh account and
+request a fresh membership — the relay issues one for any valid binding, and
+nothing about issuance is tied to the old key — then say plainly what carried
+over and what did not: preferences and anything still on this device survive; the
+ledger, badges, and circle history under the old key do not. Offer to import a
+stale backup later if one turns up, since the merge is a set union and a late
+import is harmless.
+
+**Not doing:** social recovery, or splitting the key across circle members. Both
+are real designs and both are far too much machinery for this audience. Revisit
+only if key loss proves common.
+
+### 14b. A family sharing one tablet
+
+**Decision: one key per device, several *readers* inside it. Separate accounts
+are for separate people with separate devices — not for people sharing one.**
+
+`nostrAccount.ts` keeps a single `word.account` behind a module-level cache, so a
+shared tablet has one identity and attributes everything to it. The tempting fix,
+several keypairs with a switcher, multiplies every hard thing by the number of
+family members: N backups, N passphrases, N memberships, N chances to lose a key.
+For a nine-year-old who will never own that key, it is all cost and no benefit.
+
+So the device keeps one cryptographic identity and the ledger gains a reader:
+
+```ts
+interface Reader { id: string; name: string; color: string; avatar: string | null }
+// every LedgerEvent gains:  readerId: string
+```
+
+- Badges evaluate per `readerId`, so each person earns their own.
+- Circle membership stays per *account*: the tablet appears once in a circle with
+  its readers shown inside it. Four families is four devices, not sixteen members.
+- A reader who later gets their own device graduates cleanly — mint an account
+  there and transplant their slice of the ledger by `readerId`. Events are
+  immutable and union-merged, so the slice moves without conflict.
+
+**The part needing care is privacy, not attribution.** A plan asking what you are
+struggling with is answered honestly only if a teenager knows a sibling cannot
+read it. Two defences, both required: a per-reader PIN gating the switch, and
+private answers encrypted to a key derived from that PIN so they stay unreadable
+to someone poking at storage. A PIN is weak against a determined attacker holding
+the device — say so plainly — but it is correctly weighted for the actual threat,
+which is a curious brother.
+
+Default to household attribution, which is what ships today, and let families add
+readers when they want them. Do not force a setup flow on people who share a
+device and do not care.
+
+### 14c. Who pays for relay disk
+
+**Decision: disk is not the cost. The current write and read patterns are. Bound
+those, and the bill is too small to need a policy.**
+
+Reading `services/relay/server.mjs` against this question turns up three things
+that matter more than storage pricing:
+
+- **`/v1/put` verifies nothing.** It checks that `soul`, `sig`, and `gunPub` are
+  *present* — never that the signature is valid or that the writer holds a
+  membership. Clients are safe, since `gunGraph.ts` verifies both on read and
+  forged nodes never render, but as a storage endpoint this is an open write to
+  anyone who finds the URL. Whoever pays for the disk currently pays for the
+  whole internet's.
+- **`persistGraph()` rewrites all of `graph.json` on every put** — O(n) work per
+  write. At ten thousand nodes every write rewrites megabytes. This collapses
+  long before a disk fills.
+- **`/v1/since` ignores its `t` parameter and returns every node**, so each client
+  pulls the entire graph on every sync and bandwidth grows with history times
+  syncs.
+
+Fix in this order, which is also cheapest-first:
+
+1. Verify signature *and* membership at `/v1/put` — the same check `gunGraph.ts`
+   already performs, moved to the door.
+2. A per-account quota, bytes and nodes per day, so a buggy or hostile client
+   cannot run away with the disk.
+3. Incremental persistence — an append-only log or per-soul files — instead of a
+   whole-file rewrite.
+4. A real `since` cursor so sync is incremental.
+
+Only then is retention worth a policy, and the arithmetic is reassuring. Ledger
+events are small text: a heavy reader writes a few kilobytes a day, so a thousand
+active users is on the order of a couple of gigabytes a year — well inside the
+25GB a $5/month VPS ships with. **The founder pays, and it stays under a tenner a
+month for years.**
+
+That makes funding premature. Build no billing, donations, or paid tier now;
+build the quota and the cursor so cost stays bounded and predictable, and revisit
+only if the graph outgrows the arithmetic above. Default retention is *keep
+everything*, with a hard per-account ceiling — better than deleting history
+nobody expected to lose.
+
+### 14d. Curated in-repo plans, or user-imported
+
+**Decision: both, with a trust boundary between them. Curated leads; imported
+stays local until a human accepts it.**
+
+`public/plans/index.json` lists the curated set, fetched at runtime and checked by
+`validatePlan()` from `prepare.mjs` at prebuild. Keep that as the default
+catalogue: in-repo plans are translated, validated in the build, and carry the
+app's voice.
+
+Add import, because authoring should not require a deploy and `validatePlan()`
+already does the work. But hold two lines:
+
+- **An imported plan is local to the device that imported it.** It never joins the
+  curated list and is visibly marked unverified.
+- **A circle cannot silently push a plan onto a member.** When a circle starts an
+  imported plan, every other member sees what it is and accepts explicitly before
+  a word of it renders. A plan is content that *teaches*; a host must not be able
+  to put arbitrary text in front of someone's child because they share a study.
+
+Treat plan text as untrusted input once import exists: render prose as plain
+text, or through a strict allowlist if it ever becomes markdown.
+
+**Not doing: a plan store.** Hosting other people's studies means moderating them,
+and moderation is a far larger and more permanent commitment than the code that
+would enable it. Import covers authors and small circles. Revisit only with a
+real answer for who reviews what gets published.
