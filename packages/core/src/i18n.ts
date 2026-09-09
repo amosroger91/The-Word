@@ -147,6 +147,13 @@ export interface Strings {
   reminderTestSent: string;
   reminderTestBlocked: string;
   reminderTestFailed: string;
+  importPlan: string;
+  importPlanHint: string;
+  planImportFailed: string;
+  planUnverified: string;
+  planAccept: string;
+  planDecline: string;
+  planAcceptHint: string;
   backUpNow: string;
   backupWhyBadge: string;
   backupWhyCircle: string;
@@ -403,6 +410,13 @@ export const strings: Record<Language, Strings> = {
     reminderTestSent: 'Sent — it should be on your desktop now.',
     reminderTestBlocked: 'Your browser sent it, but your system did not show it. Turn notifications on for your browser in your system settings (on Windows: Settings › System › Notifications), and check that do not disturb is off.',
     reminderTestFailed: 'Your browser would not show the notification.',
+    importPlan: 'Import a plan file',
+    importPlanHint: 'Imported plans stay on this device. They are not checked by us and are never added to the shared list.',
+    planImportFailed: 'That file is not a valid plan.',
+    planUnverified: 'Unverified — imported',
+    planAccept: 'Read this plan',
+    planDecline: 'Not now',
+    planAcceptHint: 'This plan did not come from us. Read who wrote it and what it says before you begin — a plan teaches, so treat it like any other text a stranger handed you.',
     backUpNow: 'Save your account now',
     backupWhyBadge: 'You have earned something. Save your account so it is not lost with this browser.',
     backupWhyCircle: 'You have joined a circle. Save your account so it is not lost with this browser.',
@@ -651,6 +665,13 @@ export const strings: Record<Language, Strings> = {
     reminderTestSent: 'Enviada: ya debería estar en tu escritorio.',
     reminderTestBlocked: 'El navegador la envió, pero el sistema no la mostró. Activa las notificaciones del navegador en los ajustes del sistema (en Windows: Configuración › Sistema › Notificaciones) y comprueba que el modo no molestar esté desactivado.',
     reminderTestFailed: 'El navegador no quiso mostrar la notificación.',
+    importPlan: 'Importar un archivo de plan',
+    importPlanHint: 'Los planes importados se quedan en este dispositivo. No los revisamos y nunca se añaden a la lista compartida.',
+    planImportFailed: 'Ese archivo no es un plan válido.',
+    planUnverified: 'Sin verificar — importado',
+    planAccept: 'Leer este plan',
+    planDecline: 'Ahora no',
+    planAcceptHint: 'Este plan no viene de nosotros. Mira quién lo escribió y qué dice antes de empezar: un plan enseña, así que trátalo como cualquier texto que te da un desconocido.',
     backUpNow: 'Guarda tu cuenta ahora',
     backupWhyBadge: 'Has ganado algo. Guarda tu cuenta para no perderla con este navegador.',
     backupWhyCircle: 'Te has unido a un círculo. Guarda tu cuenta para no perderla con este navegador.',
@@ -899,6 +920,13 @@ export const strings: Record<Language, Strings> = {
     reminderTestSent: 'Envoyée — elle devrait être sur votre bureau.',
     reminderTestBlocked: "Le navigateur l'a envoyée, mais le système ne l'a pas affichée. Activez les notifications du navigateur dans les réglages système (sous Windows : Paramètres › Système › Notifications) et vérifiez que le mode ne pas déranger est désactivé.",
     reminderTestFailed: "Le navigateur a refusé d'afficher la notification.",
+    importPlan: 'Importer un fichier de plan',
+    importPlanHint: 'Les plans importés restent sur cet appareil. Nous ne les vérifions pas et ils ne rejoignent jamais la liste partagée.',
+    planImportFailed: 'Ce fichier n’est pas un plan valide.',
+    planUnverified: 'Non vérifié — importé',
+    planAccept: 'Lire ce plan',
+    planDecline: 'Pas maintenant',
+    planAcceptHint: 'Ce plan ne vient pas de nous. Regardez qui l’a écrit et ce qu’il dit avant de commencer : un plan enseigne, traitez-le comme tout texte remis par un inconnu.',
     backUpNow: 'Sauvegardez votre compte',
     backupWhyBadge: 'Vous avez gagné quelque chose. Sauvegardez votre compte pour ne pas le perdre avec ce navigateur.',
     backupWhyCircle: 'Vous avez rejoint un cercle. Sauvegardez votre compte pour ne pas le perdre avec ce navigateur.',
@@ -1147,6 +1175,13 @@ export const strings: Record<Language, Strings> = {
     reminderTestSent: '已发送——它现在应该出现在你的桌面上。',
     reminderTestBlocked: '浏览器已发送，但系统没有显示。请在系统设置中为浏览器开启通知（Windows：设置 › 系统 › 通知），并确认勿扰模式已关闭。',
     reminderTestFailed: '浏览器拒绝显示该通知。',
+    importPlan: '导入计划文件',
+    importPlanHint: '导入的计划只留在本设备。我们不会审核它们，也不会加入共享列表。',
+    planImportFailed: '该文件不是有效的计划。',
+    planUnverified: '未经验证 — 导入',
+    planAccept: '阅读此计划',
+    planDecline: '暂时不用',
+    planAcceptHint: '这个计划不是我们提供的。开始前请看清是谁写的、写了什么——计划是会教导人的，请像对待陌生人递来的文字一样谨慎。',
     backUpNow: '现在保存你的账户',
     backupWhyBadge: '你已经有所收获。保存账户，别让它随这个浏览器一起消失。',
     backupWhyCircle: '你加入了一个小组。保存账户，别让它随这个浏览器一起消失。',
@@ -1395,6 +1430,13 @@ export const strings: Record<Language, Strings> = {
     reminderTestSent: 'Đã gửi — nó sẽ hiện trên màn hình của bạn ngay bây giờ.',
     reminderTestBlocked: 'Trình duyệt đã gửi, nhưng hệ thống không hiển thị. Hãy bật thông báo cho trình duyệt trong cài đặt hệ thống (trên Windows: Cài đặt › Hệ thống › Thông báo) và kiểm tra chế độ không làm phiền đã tắt.',
     reminderTestFailed: 'Trình duyệt đã từ chối hiển thị thông báo.',
+    importPlan: 'Nhập tệp kế hoạch',
+    importPlanHint: 'Kế hoạch đã nhập chỉ nằm trên thiết bị này. Chúng tôi không kiểm duyệt và chúng không bao giờ vào danh sách chung.',
+    planImportFailed: 'Tệp đó không phải là kế hoạch hợp lệ.',
+    planUnverified: 'Chưa kiểm chứng — đã nhập',
+    planAccept: 'Đọc kế hoạch này',
+    planDecline: 'Chưa phải lúc',
+    planAcceptHint: 'Kế hoạch này không đến từ chúng tôi. Hãy xem ai viết và nội dung ra sao trước khi bắt đầu — một kế hoạch có tính dạy dỗ, hãy cẩn trọng như với văn bản do người lạ đưa.',
     backUpNow: 'Lưu tài khoản của bạn ngay',
     backupWhyBadge: 'Bạn đã đạt được điều gì đó. Hãy lưu tài khoản để không mất cùng trình duyệt này.',
     backupWhyCircle: 'Bạn đã tham gia một nhóm. Hãy lưu tài khoản để không mất cùng trình duyệt này.',

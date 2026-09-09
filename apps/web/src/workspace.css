@@ -316,3 +316,8 @@
 .verse-note-mark { color: #6a8a2f; font-size: .6em; margin-left: 5px; vertical-align: top; }
 :root[data-theme='dark'] .verse-note-mark { color: #a9c46f; }
 .bookmark-note { display: block; font-size: 13px; line-height: 1.45; opacity: .85; margin-top: 4px; white-space: pre-wrap; }
+.plan-unverified { color: #b0632a; font-size: 12px; font-weight: 600; }
+:root[data-theme='dark'] .plan-unverified { color: #e0a165; }
+.plan-accept { display: grid; gap: 10px; padding: 14px; border: 1px dashed #b0632a; border-radius: 12px; }
+.plan-import { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+.plan-import span { text-transform: none; letter-spacing: normal; font-size: 15px; font-weight: 400; color: inherit; }

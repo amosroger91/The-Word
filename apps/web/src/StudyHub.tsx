@@ -48,7 +48,20 @@ export function StudyHub({
         ))}
       </div>
 
-      {tab === 'plans' && (
+      {tab === 'plans' && plan && study.needsAcceptance(plan.id) ? (
+        <div className="plan-accept">
+          <strong>{localized(plan.title, language)}</strong>
+          <p className="plan-unverified">{label.planUnverified}</p>
+          <p>{localized(plan.summary, language)}</p>
+          <p className="muted">{label.planAcceptHint}</p>
+          <div className="verse-note-actions">
+            <button type="button" className="primary" onClick={() => study.acceptPlan(plan.id)}>{label.planAccept}</button>
+            <button type="button" onClick={() => { setPlan(null); setSessionId(''); }}>{label.planDecline}</button>
+          </div>
+        </div>
+      ) : null}
+
+      {tab === 'plans' && !(plan && study.needsAcceptance(plan.id)) && (
         plan && session ? (
           <PlanSessionView
             app={app}
@@ -69,6 +82,29 @@ export function StudyHub({
               </button>
             ))}
             {!study.plans.length ? <p className="muted">{label.noPlans}</p> : null}
+
+            {study.imported.map((row) => (
+              <button type="button" className="plan-card" key={row.plan.id} onClick={() => { setPlan(row.plan); setSessionId(row.plan.sessions[0]?.id || ''); }}>
+                <strong>{localized(row.plan.title, language)}</strong>
+                <small>{localized(row.plan.summary, language)}</small>
+                <small className="plan-unverified">{label.planUnverified}</small>
+              </button>
+            ))}
+
+            <label className="plan-import">
+              <span>{label.importPlan}</span>
+              <input
+                type="file"
+                accept="application/json,.json"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  event.target.value = '';
+                  if (!file) return;
+                  void study.importPlan(file).catch((error: Error) => study.setError(label.planImportFailed + ' ' + error.message));
+                }}
+              />
+            </label>
+            <p className="muted">{label.importPlanHint}</p>
           </div>
         )
       )}

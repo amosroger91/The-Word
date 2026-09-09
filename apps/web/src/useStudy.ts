@@ -13,6 +13,7 @@ import {
 import { loadEvents, mergeLedgers, saveEvents, appendEvent, eventsForActor, type DraftEvent, type LedgerEvent } from './ledger';
 import { getNode, loadGraph, nodesWithPrefix, pullRelays, putNode, signNode, startGraphGossip, userSoul } from './gunGraph';
 import { loadPlan, loadPlanIndex, type StudyPlan } from './plans';
+import { accept, addImported, importPlanFile, loadImported, needsAcceptance, removeImported, type ImportedPlan } from './importedPlans';
 import {
   admitMember,
   circleFromNode,
@@ -36,6 +37,8 @@ export function useStudy(earned: EarnedBadge[]) {
   const [membership, setMembership] = useState<Membership | null>(loadMembership);
   const [relayState, setRelayState] = useState<'off' | 'down' | 'ok'>('off');
   const [plans, setPlans] = useState<StudyPlan[]>([]);
+  const [curatedIds, setCuratedIds] = useState<string[]>([]);
+  const [imported, setImported] = useState<ImportedPlan[]>(loadImported);
   const [circles, setCircles] = useState<Circle[]>([]);
   const [feed, setFeed] = useState<FeedItem[]>([]);
   const [friends, setFriends] = useState<Friend[]>([]);
@@ -115,12 +118,25 @@ export function useStudy(earned: EarnedBadge[]) {
     error,
     setError,
     refresh,
+    imported,
+    // Curated plans are the app's own voice; imported ones sit beside them but
+    // are always identifiable as unverified.
+    isCurated: (id: string) => curatedIds.includes(id),
+    needsAcceptance: (id: string) => needsAcceptance(id, curatedIds),
+    acceptPlan: (id: string) => { accept(id); setImported(loadImported()); },
+    importPlan: async (file: File) => {
+      const plan = await importPlanFile(file);
+      setImported(addImported(plan));
+      return plan;
+    },
+    forgetPlan: (id: string) => { setImported(removeImported(id)); },
     loadPlans: async () => {
       const ids = await loadPlanIndex();
       const loaded: StudyPlan[] = [];
       for (const id of ids) {
         try { loaded.push(await loadPlan(id)); } catch { /* skip bad */ }
       }
+      setCuratedIds(loaded.map((plan) => plan.id));
       setPlans(loaded);
       return loaded;
     },
