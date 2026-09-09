@@ -7,10 +7,11 @@
     "dev:mobile": "npm --prefix apps/mobile run dev",
     "dev:android": "npm --prefix apps/mobile exec -- expo start --android",
     "dev:ios": "npm --prefix apps/mobile exec -- expo start --ios",
-    "dev:backend": "npm --prefix services/backend run dev",
+    "dev:backend": "npm --prefix services/relay run dev",
+    "dev:relay": "npm --prefix services/relay run dev",
     "build:web": "npm --prefix apps/web run build",
     "typecheck": "npm --prefix packages/shared run typecheck && npm --prefix packages/bible run typecheck && npm --prefix packages/core run typecheck && npm --prefix apps/web run typecheck && npm --prefix apps/mobile run typecheck",
-    "install:all": "npm --prefix packages/shared install && npm --prefix packages/bible install && npm --prefix packages/core install && npm --prefix apps/web install && npm --prefix apps/mobile install",
+    "install:all": "npm --prefix packages/shared install && npm --prefix packages/bible install && npm --prefix packages/core install && npm --prefix apps/web install && npm --prefix apps/mobile install && npm --prefix services/relay install",
     "build:data": "node packages/bible/scripts/build-usfm.mjs"
   },
   "devDependencies": {

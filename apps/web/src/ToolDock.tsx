@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
-export type ToolId = 'group' | 'references' | 'guide' | 'image' | 'settings' | 'sound' | 'progress';
-export const toolNames: Record<ToolId,string> = { group:'Group Study', references:'References', guide:'Passage guide', image:'Verse image', settings:'Settings', sound:'Sound', progress:'Your reading' };
+export type ToolId = 'group' | 'references' | 'guide' | 'image' | 'settings' | 'sound' | 'progress' | 'study';
+export const toolNames: Record<ToolId,string> = { group:'Group Study', references:'References', guide:'Passage guide', image:'Verse image', settings:'Settings', sound:'Sound', progress:'Your reading', study:'Plans & circles' };
 type Entry = { id: ToolId; slot: number };
 export function useTools() {
   const [entries,setEntries] = useState<Entry[]>([]);

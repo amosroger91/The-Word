@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "predev": "node scripts/prepare.mjs",
-    "prebuild": "node scripts/prepare.mjs",
+    "prebuild": "node scripts/prepare.mjs && node scripts/validate-plans.mjs",
     "dev": "node scripts/dev.mjs",
     "build": "node scripts/build.mjs",
     "typecheck": "tsc --noEmit",
@@ -16,6 +16,7 @@
     "@fontsource/lexend": "^5.3.0",
     "@fontsource/literata": "^5.3.0",
     "@fontsource/opendyslexic": "^5.3.0",
+    "@noble/ciphers": "^2.1.1",
     "@noble/curves": "^2.4.0",
     "@noble/hashes": "^2.4.0",
     "nostr-tools": "^2.25.2",

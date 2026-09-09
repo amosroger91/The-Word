@@ -5,10 +5,11 @@ Deploy: `bash scripts/deploy-pages.sh` (builds `apps/web`, force-pushes `dist/` 
 
 ## Requested, not yet started
 
-- Guided lessons, circles, and the rest of
-  [`docs/study-plans-framework.md`](docs/study-plans-framework.md). Phase 1
-  (Nostr accounts) and Phase 2 (local ledger + badges) are shipped. Next is
-  Phase 3: survivor relay + membership on a VPS — the project's first server.
+- Run the survivor relay on a real VPS (`services/relay`) and pin its URL plus
+  issuer public key in Settings. Until then, plans, badges, and circles work
+  on-device; shared feed and apart-sync wait on that server. The four open
+  decisions at the end of [`docs/study-plans-framework.md`](docs/study-plans-framework.md)
+  still stand (family-on-one-device, key-loss story, relay retention, plan authoring).
 
 ## Recently shipped (this session, pending deploy)
 

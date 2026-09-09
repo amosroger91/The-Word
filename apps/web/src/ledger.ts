@@ -23,7 +23,7 @@ export type ReadEvent = Extract<LedgerEvent, { kind: 'read' }>;
 export type AnswerEvent = Extract<LedgerEvent, { kind: 'answer' }>;
 export type SessionEvent = Extract<LedgerEvent, { kind: 'session' }>;
 export type PlanEvent = Extract<LedgerEvent, { kind: 'plan' }>;
-type DraftEvent = LedgerEvent extends infer Event ? Event extends LedgerEvent ? Omit<Event, 'id'> : never : never;
+export type DraftEvent = LedgerEvent extends infer Event ? Event extends LedgerEvent ? Omit<Event, 'id'> : never : never;
 
 const DB_NAME = 'word-ledger';
 const STORE = 'events';

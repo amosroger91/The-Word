@@ -122,6 +122,11 @@
 .badge-card small { color: var(--ws-muted); font-size: 12px; line-height: 1.45; }
 .badge-card.locked { opacity: 0.62; }
 .badge-meter { font-size: 11px; color: var(--ws-accent); letter-spacing: 0.02em; }
+.study-hub .study-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 16px; }
+.study-hub .study-tabs button[aria-pressed='true'] { background: var(--ws-accent); color: var(--ws-surface); border-color: var(--ws-accent); }
+.plan-card,.circle-card,.feed-card { display: grid; gap: 4px; width: 100%; text-align: left; padding: 12px; margin: 8px 0; border: 1px solid var(--ws-line); border-radius: 12px; background: var(--ws-surface); }
+.plan-session label,.circle-list label,.feed-list label,.friend-list label { display: grid; gap: 6px; margin: 12px 0; }
+.plan-session textarea,.friend-list textarea { min-height: 80px; }
 .image-editor-embedded .image-editor-preview { max-height:40dvh; }
 .image-editor-embedded .image-editor-thumbs { grid-template-columns:repeat(3,1fr); }
 .join-profile { display:flex; align-items:center; gap:10px; padding:14px 0; border-block:1px solid var(--ws-line); margin:20px 0; }

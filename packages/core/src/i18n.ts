@@ -179,6 +179,34 @@ export interface Strings {
   badgeProgress: (have: number, need: number) => string;
   earnedBadges: string;
   lockedBadges: string;
+  study: string;
+  plans: string;
+  planHint: string;
+  noPlans: string;
+  completeSession: string;
+  circles: string;
+  circleSolo: string;
+  circleName: string;
+  createCircle: string;
+  joinCircle: string;
+  inviteCode: string;
+  readTogether: string;
+  feed: string;
+  feedEmpty: string;
+  friends: string;
+  addFriend: string;
+  friendNpub: string;
+  shareVerse: string;
+  directMessages: string;
+  messagePlaceholder: string;
+  relayNone: string;
+  relayDown: string;
+  membershipOk: string;
+  membershipPending: string;
+  requestMembership: string;
+  relays: string;
+  saveRelays: string;
+  issuerPub: string;
 }
 
 function verseList(verses: number[]) {
@@ -367,6 +395,34 @@ export const strings: Record<Language, Strings> = {
     badgeProgress: (have, need) => `${have} of ${need}`,
     earnedBadges: 'Earned',
     lockedBadges: 'Still ahead',
+    study: 'Plans & circles',
+    plans: 'Plans',
+    planHint: 'Guided hours in Scripture. Answers stay on this device, and sync when a relay is configured.',
+    noPlans: 'No plans are installed yet.',
+    completeSession: 'Mark this session finished',
+    circles: 'Circles',
+    circleSolo: 'Just you',
+    circleName: 'Circle name',
+    createCircle: 'New circle',
+    joinCircle: 'Join with a code',
+    inviteCode: 'Invite code',
+    readTogether: 'Read together',
+    feed: 'Feed',
+    feedEmpty: 'Nothing in the feed yet.',
+    friends: 'Friends',
+    addFriend: 'Add a public key',
+    friendNpub: 'npub',
+    shareVerse: 'Share this verse',
+    directMessages: 'Messages',
+    messagePlaceholder: 'Write a message…',
+    relayNone: 'No survivor relay is configured. Solo reading still works.',
+    relayDown: 'The relay is unreachable. Everything local still works.',
+    membershipOk: 'This device carries a membership credential.',
+    membershipPending: 'Ask the relay to attest this account to appear in the shared feed.',
+    requestMembership: 'Request membership',
+    relays: 'Relays',
+    saveRelays: 'Save relays',
+    issuerPub: 'Issuer public key',
   },
   es: {
     languageName: 'Español',
@@ -547,6 +603,34 @@ export const strings: Record<Language, Strings> = {
     badgeProgress: (have, need) => `${have} de ${need}`,
     earnedBadges: 'Conseguidas',
     lockedBadges: 'Por delante',
+    study: 'Planes y círculos',
+    plans: 'Planes',
+    planHint: 'Horas guiadas en las Escrituras. Las respuestas quedan en este dispositivo y se sincronizan si hay un relé.',
+    noPlans: 'Aún no hay planes instalados.',
+    completeSession: 'Marcar esta sesión como terminada',
+    circles: 'Círculos',
+    circleSolo: 'Solo tú',
+    circleName: 'Nombre del círculo',
+    createCircle: 'Nuevo círculo',
+    joinCircle: 'Unirse con un código',
+    inviteCode: 'Código de invitación',
+    readTogether: 'Leer juntos',
+    feed: 'Muro',
+    feedEmpty: 'Aún no hay nada en el muro.',
+    friends: 'Amigos',
+    addFriend: 'Añadir una clave pública',
+    friendNpub: 'npub',
+    shareVerse: 'Compartir este versículo',
+    directMessages: 'Mensajes',
+    messagePlaceholder: 'Escribe un mensaje…',
+    relayNone: 'No hay relé superviviente configurado. La lectura en solitario sigue funcionando.',
+    relayDown: 'El relé no responde. Todo lo local sigue funcionando.',
+    membershipOk: 'Este dispositivo tiene una credencial de miembro.',
+    membershipPending: 'Pide al relé que atestigüe esta cuenta para aparecer en el muro compartido.',
+    requestMembership: 'Pedir membresía',
+    relays: 'Relés',
+    saveRelays: 'Guardar relés',
+    issuerPub: 'Clave pública del emisor',
   },
   fr: {
     languageName: 'Français',
@@ -727,6 +811,34 @@ export const strings: Record<Language, Strings> = {
     badgeProgress: (have, need) => `${have} sur ${need}`,
     earnedBadges: 'Obtenus',
     lockedBadges: 'À venir',
+    study: 'Plans et cercles',
+    plans: 'Plans',
+    planHint: 'Des heures guidées dans les Écritures. Les réponses restent sur cet appareil et se synchronisent si un relais est configuré.',
+    noPlans: 'Aucun plan n’est encore installé.',
+    completeSession: 'Marquer cette session comme terminée',
+    circles: 'Cercles',
+    circleSolo: 'Vous seul',
+    circleName: 'Nom du cercle',
+    createCircle: 'Nouveau cercle',
+    joinCircle: 'Rejoindre avec un code',
+    inviteCode: 'Code d’invitation',
+    readTogether: 'Lire ensemble',
+    feed: 'Fil',
+    feedEmpty: 'Rien dans le fil pour l’instant.',
+    friends: 'Amis',
+    addFriend: 'Ajouter une clé publique',
+    friendNpub: 'npub',
+    shareVerse: 'Partager ce verset',
+    directMessages: 'Messages',
+    messagePlaceholder: 'Écrire un message…',
+    relayNone: 'Aucun relais survivant n’est configuré. La lecture en solo fonctionne toujours.',
+    relayDown: 'Le relais est injoignable. Tout ce qui est local fonctionne encore.',
+    membershipOk: 'Cet appareil porte une attestation de membre.',
+    membershipPending: 'Demandez au relais d’attester ce compte pour apparaître dans le fil partagé.',
+    requestMembership: 'Demander l’appartenance',
+    relays: 'Relais',
+    saveRelays: 'Enregistrer les relais',
+    issuerPub: 'Clé publique de l’émetteur',
   },
   zh: {
     languageName: '中文',
@@ -907,6 +1019,34 @@ export const strings: Record<Language, Strings> = {
     badgeProgress: (have, need) => `${have} / ${need}`,
     earnedBadges: '已获得',
     lockedBadges: '未获得',
+    study: '计划与圈子',
+    plans: '计划',
+    planHint: '有引导的读经时光。回答保存在本机，配置中继后才会同步。',
+    noPlans: '尚未安装任何计划。',
+    completeSession: '将本课标为完成',
+    circles: '圈子',
+    circleSolo: '仅自己',
+    circleName: '圈子名称',
+    createCircle: '新建圈子',
+    joinCircle: '用代码加入',
+    inviteCode: '邀请码',
+    readTogether: '一起读',
+    feed: '动态',
+    feedEmpty: '动态里还没有内容。',
+    friends: '朋友',
+    addFriend: '添加公钥',
+    friendNpub: 'npub',
+    shareVerse: '分享这节经文',
+    directMessages: '私信',
+    messagePlaceholder: '写下一条消息…',
+    relayNone: '尚未配置幸存中继。单独阅读仍可用。',
+    relayDown: '中继无法连接。本地功能仍可用。',
+    membershipOk: '此设备已持有成员凭证。',
+    membershipPending: '请中继为此账户作证，才能出现在共享动态中。',
+    requestMembership: '申请成员资格',
+    relays: '中继',
+    saveRelays: '保存中继',
+    issuerPub: '签发者公钥',
   },
   vi: {
     languageName: 'Tiếng Việt',
@@ -1087,6 +1227,34 @@ export const strings: Record<Language, Strings> = {
     badgeProgress: (have, need) => `${have} / ${need}`,
     earnedBadges: 'Đã nhận',
     lockedBadges: 'Phía trước',
+    study: 'Kế hoạch & vòng tròn',
+    plans: 'Kế hoạch',
+    planHint: 'Giờ đọc có hướng dẫn. Câu trả lời ở lại trên thiết bị này, và đồng bộ khi có relay.',
+    noPlans: 'Chưa có kế hoạch nào được cài.',
+    completeSession: 'Đánh dấu buổi này đã xong',
+    circles: 'Vòng tròn',
+    circleSolo: 'Một mình bạn',
+    circleName: 'Tên vòng tròn',
+    createCircle: 'Vòng tròn mới',
+    joinCircle: 'Tham gia bằng mã',
+    inviteCode: 'Mã mời',
+    readTogether: 'Đọc cùng nhau',
+    feed: 'Bảng tin',
+    feedEmpty: 'Bảng tin còn trống.',
+    friends: 'Bạn bè',
+    addFriend: 'Thêm khóa công khai',
+    friendNpub: 'npub',
+    shareVerse: 'Chia sẻ câu này',
+    directMessages: 'Tin nhắn',
+    messagePlaceholder: 'Viết một tin nhắn…',
+    relayNone: 'Chưa cấu hình relay sống sót. Đọc một mình vẫn được.',
+    relayDown: 'Không liên lạc được relay. Mọi thứ trên máy vẫn chạy.',
+    membershipOk: 'Thiết bị này đang mang chứng nhận thành viên.',
+    membershipPending: 'Nhờ relay chứng thực tài khoản này để hiện trên bảng tin chung.',
+    requestMembership: 'Xin thành viên',
+    relays: 'Relay',
+    saveRelays: 'Lưu relay',
+    issuerPub: 'Khóa công khai của bên cấp',
   },
 };
 

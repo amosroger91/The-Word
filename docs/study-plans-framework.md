@@ -3,7 +3,8 @@
 Design for the framework only. No plan *content* is specified here: this document
 defines the shapes a plan must fit into, not the studies themselves.
 
-Status: proposed, nothing implemented.
+Status: Phases 1–7 implemented in the web client. Membership issuance and
+Gun-shaped sync still need a running survivor relay (`services/relay`).
 
 ## 1. What we are building
 

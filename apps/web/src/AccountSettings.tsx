@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { renderSVG } from 'uqr';
 import type { WordApp } from '@the-word/core';
 import { exportBackup, loadAccount, MIN_BACKUP_PASSWORD, restoreBackup } from './nostrAccount';
+import { loadMembership, loadRelays, requestMembership, saveRelays } from './membership';
 
 export function AccountSettings({
   label,
@@ -20,6 +21,10 @@ export function AccountSettings({
   const [restoreStatus, setRestoreStatus] = useState('');
   const [restoreError, setRestoreError] = useState('');
   const [busy, setBusy] = useState(false);
+  const relays = loadRelays();
+  const [relayUrls, setRelayUrls] = useState(relays.urls.join('\n'));
+  const [issuerPub, setIssuerPub] = useState(relays.issuerPub);
+  const [memberStatus, setMemberStatus] = useState(loadMembership() ? 'ok' : '');
 
   async function copy(text: string, ok: string) {
     try {
@@ -146,6 +151,20 @@ export function AccountSettings({
         </div>
         {restoreStatus ? <p className="muted" role="status">{restoreStatus}</p> : null}
         {restoreError ? <p className="muted" role="alert">{restoreError}</p> : null}
+      </div>
+
+      <div className="prefs-field">
+        <span className="section-label">{label.relays}</span>
+        <textarea className="prefs-secret" value={relayUrls} onChange={(event) => setRelayUrls(event.target.value)} aria-label={label.relays} placeholder="http://127.0.0.1:8787" />
+        <label>
+          <span className="section-label">{label.issuerPub}</span>
+          <input value={issuerPub} onChange={(event) => setIssuerPub(event.target.value)} aria-label={label.issuerPub} />
+        </label>
+        <div className="prefs-account-actions">
+          <button type="button" onClick={() => { saveRelays({ urls: relayUrls.split(/\s+/).map((row) => row.trim()).filter(Boolean), issuerPub: issuerPub.trim() }); }}>{label.saveRelays}</button>
+          <button type="button" onClick={() => { void requestMembership().then(() => setMemberStatus('ok')).catch(() => setMemberStatus('down')); }}>{label.requestMembership}</button>
+        </div>
+        <p className="muted">{memberStatus === 'ok' ? label.membershipOk : memberStatus === 'down' ? label.relayDown : label.relayNone}</p>
       </div>
     </>
   );
