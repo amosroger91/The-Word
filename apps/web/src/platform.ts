@@ -200,7 +200,10 @@ export function createWebSpeech(): SpeechAdapter {
     prewarm(voice: string) {
       if (!voice || warmedVoice === voice) return;
       warmedVoice = voice;
-      void ensureEngine().generate('Amen.', voice, 0).catch(() => { warmedVoice = null; });
+      window.dispatchEvent(new CustomEvent('word-voice-state', { detail: { voice, state: 'preparing' } }));
+      void ensureEngine().generate('Amen.', voice, 0).then(() => {
+        window.dispatchEvent(new CustomEvent('word-voice-state', { detail: { voice, state: 'ready' } }));
+      }).catch(() => { warmedVoice = null; window.dispatchEvent(new CustomEvent('word-voice-state', { detail: { voice, state: 'unavailable' } })); });
     },
     // Play silence on the persistent element during a user gesture so later
     // verse playback (after TTS generation) is allowed without another tap.

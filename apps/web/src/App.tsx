@@ -3,18 +3,23 @@ import { localBible } from '@the-word/bible';
 import { useWordApp, verseImageFilename, verseRuns, type WordApp } from '@the-word/core';
 import { SearchableSelect } from './SearchableSelect';
 import { BookBibleIcon, CamIcon, MicIcon, VolumeHighIcon, VolumeLowIcon } from './icons';
-import { CrossRefMenu } from './CrossRefMenu';
+import { ToolDock, useTools, type ToolId } from './ToolDock';
+import { PassageTools, snapshot, type PassageSnapshot } from './PassageTools';
+import { Welcome, useWelcome, ReminderBanner } from './Welcome';
+import { DeviceSettings } from './DeviceSettings';
+import { ReaderIcon } from './ReaderIcon';
 import { FaceRail } from './FaceRail';
 import { Landing } from './Landing';
 import { Preferences } from './Preferences';
 import { VerseImageEditor, type VerseImageJob } from './VerseImageEditor';
-import { unlockRemoteAudio } from './media';
+import { unlockRemoteAudio, setRemoteVolume } from './media';
 import { createWebSpeech, webClipboard, webStorage } from './platform';
 import { useDailyReminder } from './dailyReminder';
 import { useReadParty } from './useReadParty';
 import { useStudyBoard } from './useStudyBoard';
 import './styles.css';
 import './landing.css';
+import './workspace.css';
 
 function viewFromHash(): 'home' | 'reader' {
   return window.location.hash === '#read' ? 'reader' : 'home';
@@ -45,19 +50,25 @@ function App() {
   // kept armed on every visit, whether or not the reader opens that panel.
   const reminder = useDailyReminder({ title: label.reminderTitle, body: label.reminderBody });
   const activeTopic = app.topics.find((topic) => topic.id === app.selectedTopic);
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [bookmarksOpen, setBookmarksOpen] = useState(false);
-  const [partyOpen, setPartyOpen] = useState(false);
+  const tools = useTools();
+  const welcome = useWelcome();
+  const [library, setLibrary] = useState<'books'|'search'|'bookmarks'|null>(null);
   const [partyCode, setPartyCode] = useState('');
   const [partyChat, setPartyChat] = useState('');
   const [createFindable, setCreateFindable] = useState(false);
+  const [view, setView] = useState<'home'|'reader'>(viewFromHash);
+  const [mobileView,setMobileView] = useState<'reader'|'library'|'tools'>('reader');
+  const [peopleMode,setPeopleMode] = useState<'compact'|'discussion'|'collapsed'>('compact');
+  const [peopleVolume,setPeopleVolume] = useState(1);
+  const [passage,setPassage] = useState<PassageSnapshot|null>(null);
+  const [guidePassage,setGuidePassage] = useState<PassageSnapshot|null>(null);
+  const [followTool,setFollowTool] = useState(false);
+  const [followGuide,setFollowGuide] = useState(false);
+  const [imageJob,setImageJob] = useState<VerseImageJob|null>(null);
+  const [voiceState,setVoiceState] = useState('preparing');
+  const [notice,setNotice] = useState('');
+  const partyOpen = tools.entries.some(e=>e.id==='group');
   const { list: liveGroups, advertise: advertiseGroup, retract: retractGroup } = useStudyBoard(partyOpen || (party.active && party.findable && party.isHost));
-  const [prefsOpen, setPrefsOpen] = useState(false);
-  const [controlsVisible, setControlsVisible] = useState(true);
-  const [view, setView] = useState<'home' | 'reader'>(viewFromHash);
-  const [xrefMenu, setXrefMenu] = useState<{ verse: number; x: number; y: number } | null>(null);
-  const [imageJob, setImageJob] = useState<VerseImageJob | null>(null);
-  const controlsRef = useRef<HTMLDivElement>(null);
   const verseRefs = useRef<Record<number, HTMLElement | null>>({});
 
   useEffect(() => { document.documentElement.dataset.theme = app.theme; }, [app.theme]);
@@ -80,6 +91,12 @@ function App() {
     else setView('home');
   }, []);
 
+  useEffect(()=>{
+    const onVoice=(event:Event)=>{const data=(event as CustomEvent).detail;if(data.voice===speechVoice)setVoiceState(data.state);};
+    window.addEventListener('word-voice-state',onVoice);
+    return ()=>window.removeEventListener('word-voice-state',onVoice);
+  },[speechVoice]);
+
   // Preload the selected voice as soon as the page is ready (and whenever it
   // changes) so pressing Read aloud plays instantly instead of downloading first.
   useEffect(() => { speech.prewarm?.(speechVoice); }, [speech, speechVoice]);
@@ -88,35 +105,28 @@ function App() {
   // participant — to the verse the host is currently on.
   const followVerse = party.stageVerse;
   useEffect(() => {
-    const verse = speakingVerse ?? followVerse;
+    const verse = party.active && !party.isHost && !party.following ? null : speakingVerse ?? followVerse;
     if (verse == null) return;
     // The first verse means the chapter is being read from the start, so show
     // the chapter heading rather than centring verse 1 halfway down.
     if (verse === chapter?.verses[0]?.ref.verse) {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      document.querySelector('.reader-column')?.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
-    verseRefs.current[verse]?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    const target=verseRefs.current[verse], reader=document.querySelector<HTMLElement>('.reader-column');
+    if(target&&reader) reader.scrollTo({top:reader.scrollTop+target.getBoundingClientRect().top-reader.getBoundingClientRect().top-reader.clientHeight/3,behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});
   }, [speakingVerse, followVerse, app.bookId, chapterNumber, chapter]);
 
   useEffect(() => {
     if (chapterLoading || app.focusedVerse == null) return;
     const verse = app.focusedVerse;
     const id = window.setTimeout(() => {
-      verseRefs.current[verse]?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      const target=verseRefs.current[verse], reader=document.querySelector<HTMLElement>('.reader-column');
+    if(target&&reader) reader.scrollTo({top:reader.scrollTop+target.getBoundingClientRect().top-reader.getBoundingClientRect().top-reader.clientHeight/3,behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});
     }, 50);
     return () => window.clearTimeout(id);
   }, [chapterLoading, app.focusedVerse, app.bookId, chapterNumber]);
 
-  useEffect(() => {
-    const element = controlsRef.current;
-    if (!element) return;
-    const observer = new IntersectionObserver(([entry]) => setControlsVisible(entry.isIntersecting));
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, [view]);
-
-  const readingBarOpen = speechState !== 'idle' && !controlsVisible && selectedVerses.size === 0;
   const advertisedCode = useRef('');
 
   useEffect(() => {
@@ -146,245 +156,85 @@ function App() {
     }
   }, [retractGroup, party.active, party.isHost, party.findable, party.code]);
 
-  const closePrefs = useCallback(() => setPrefsOpen(false), []);
-
-  // One settings surface for the whole app: the landing page and the reader open
-  // this same element, so neither can drift into a second set of controls.
-  const preferences = prefsOpen && (
-    <Preferences
-      app={app}
-      name={party.name}
-      color={party.identity.color}
-      avatar={party.avatar}
-      reminder={reminder}
-      onNameChange={party.setName}
-      onAvatarChange={(file) => { void party.setAvatar(file); }}
-      onClose={closePrefs}
-    />
-  );
-
-  if (view === 'home') {
-    return (
-      <>
-        <Landing
-          app={app}
-          onEnterReader={() => { app.markProgress(); openReader(); }}
-          onGroupStudy={() => { app.markProgress(); setPartyOpen(true); openReader(); }}
-          onBookmarks={() => { app.markProgress(); setBookmarksOpen(true); openReader(); }}
-          onPreferences={() => setPrefsOpen(true)}
-          partyMembers={party.active ? party.members.length : 0}
-        />
-        {preferences}
-      </>
-    );
-  }
-
-  const speedControl = (
-    <div className="speed-control">
-      <button onClick={() => app.changeSpeechRate(-speechRateRange.step)} disabled={speechRate <= speechRateRange.min} aria-label={label.decreaseSpeed} title={label.decreaseSpeed}>−</button>
-      <span aria-live="polite">{speechRate.toFixed(1)}×</span>
-      <button onClick={() => app.changeSpeechRate(speechRateRange.step)} disabled={speechRate >= speechRateRange.max} aria-label={label.increaseSpeed} title={label.increaseSpeed}>+</button>
+  const openTool = (id:ToolId) => { tools.open(id); if(window.innerWidth<=950)setLibrary(null); setMobileView('tools'); };
+  const openLibrary = (next:'books'|'search'|'bookmarks') => { setLibrary(next); setMobileView('library'); };
+  const navigate = (bookId:number, nextChapter:number, verse=1) => {
+    party.browseIndependently(); app.goToVerse(bookId,nextChapter,verse); setMobileView('reader');
+  };
+  const currentVerse = app.selectedVerseNumbers[0] ?? party.stageVerse ?? app.focusedVerse ?? chapter?.verses[0]?.ref.verse ?? 1;
+  const inspect = (verse:number, id:'references'|'guide') => { if(id==='guide'){setFollowGuide(false);setGuidePassage(snapshot(app,verse));}else{setFollowTool(false);setPassage(snapshot(app,verse));}openTool(id); };
+  useEffect(()=>{
+    if (!chapterLoading && chapter) {
+      if(followTool)setPassage(snapshot(app,party.stageVerse ?? speakingVerse ?? 1));
+      if(followGuide)setGuidePassage(snapshot(app,party.stageVerse ?? speakingVerse ?? 1));
+    }
+  },[followTool,followGuide,party.stageVerse,speakingVerse,app.bookId,chapterNumber,app.translationId,chapterLoading,chapter]);
+  useEffect(()=>{setRemoteVolume(peopleVolume);},[peopleVolume]);
+  useEffect(()=>{if(!tools.entries.length && mobileView==='tools')setMobileView('reader');},[tools.entries.length,mobileView]);
+  useEffect(()=>{if(!library && mobileView==='library')setMobileView('reader');},[library,mobileView]);
+  const stage = party.shared;
+  const stageName = stage ? localBible.getBook(stage.bookId,app.translationId)?.name ?? 'Scripture' : bookName;
+  const stageReference = stage ? `${stageName} ${stage.chapter}${stage.verse?`:${stage.verse}`:''}` : `${bookName} ${chapterNumber}`;
+  const samePassage = !stage || (stage.bookId===app.bookId && stage.chapter===chapterNumber);
+  const hostName = party.members.find(m=>m.host)?.name ?? 'the host';
+  const participant = party.active && !party.isHost;
+  const speechControls = <>
+    {speechState==='idle' && <button className="primary" onClick={app.speakChapter} disabled={!chapter}>{party.isHost?'Read to group':label.readAloud}</button>}
+    {speechState==='speaking' && <button className="primary" onClick={app.pauseSpeech}>{party.isHost?'Pause group reading':label.pause}</button>}
+    {speechState==='paused' && <button className="primary" onClick={app.resumeSpeech}>{party.isHost?'Resume group reading':label.resume}</button>}
+    {speechState!=='idle' && <button onClick={app.stopSpeech}>{label.stop}</button>}
+  </>;
+  const sound = <div className="sound-settings"><span className="workspace-eyebrow">Only on your device</span><h2>Find your balance.</h2><p role="status">{voiceState==='ready'?'Narration voice is ready on this device.':voiceState==='preparing'?'Preparing your narration voice in the background…':'Voice preparation failed. Check your connection or choose another voice in Settings.'}</p>
+    <label>People’s voices · {Math.round(peopleVolume*100)}%<input aria-label="People volume" type="range" min="0" max="1" step="0.05" value={peopleVolume} onChange={e=>setPeopleVolume(+e.target.value)} /></label>
+    <label>Bible narration · {Math.round(speechVolume*100)}%<input aria-label="Bible narration volume" type="range" min="0" max="1" step="0.05" value={speechVolume} onChange={e=>app.changeSpeechVolume(+e.target.value-speechVolume)} /></label>
+    <label>Reading speed · {speechRate.toFixed(1)}×<input aria-label="Reading speed" type="range" min={speechRateRange.min} max={speechRateRange.max} step={speechRateRange.step} value={speechRate} disabled={participant && party.following} onChange={e=>app.changeSpeechRate(+e.target.value-speechRate)} /></label>
+    <p>Group following tracks the host’s verse. Narration is generated on each device; voices may finish at different times.</p>
+    <button onClick={()=>{app.unlockSpeech();unlockRemoteAudio();party.arm();}}>Enable sound on this device</button>
+    <button onClick={()=>openTool('settings')}>Choose a narration voice</button>
+    <DeviceSettings party={party}/>
+  </div>;
+  const preferences = <Preferences embedded={view==='reader'} app={app} name={party.name} color={party.identity.color} avatar={party.avatar} reminder={reminder} onNameChange={party.setName} onAvatarChange={file=>{void party.setAvatar(file);}} onClose={()=>tools.close('settings')} />;
+  const group = <div className="group-content">
+    {!party.active ? <><span className="workspace-eyebrow">Read. Reflect. Together.</span><h2>A seat at the table.</h2><p>Share a passage, talk face to face, and follow the host’s reading.</p>
+      <div className="join-profile">{party.avatar && <img src={party.avatar} alt="Your profile"/>}<div><strong>{party.name}</strong><small>Your microphone and camera start off.</small></div><button onClick={()=>openTool('settings')}>Edit profile</button></div>
+      <p className="muted">Voice and video work best with up to 8 people. Larger groups keep chat and passage sharing.</p>
+      <label className="check-label"><input type="checkbox" checked={createFindable} onChange={e=>setCreateFindable(e.target.checked)}/>List this group publicly</label>
+      <p className="muted">{createFindable?'Your name, passage, and room code will be listed for other readers.':'Unlisted: share the code with the people you want to invite.'}</p>
+      <button className="primary" onClick={()=>{speech.unlock?.();unlockRemoteAudio();party.createParty({findable:createFindable});}}>Start a group</button>
+      <form className="join-form" onSubmit={e=>{e.preventDefault();speech.unlock?.();unlockRemoteAudio();party.joinParty(partyCode);}}><label>Have a room code?<input aria-label="Room code" value={partyCode} onChange={e=>setPartyCode(e.target.value)} placeholder="Enter code"/></label><button disabled={!partyCode.trim()}>Join group</button></form>
+      <h3>Open study groups</h3>{liveGroups.length?liveGroups.map(item=><button className="party-live-item" key={item.code} onClick={()=>{speech.unlock?.();unlockRemoteAudio();party.joinParty(item.code);}}><strong>{item.hostName}</strong><span>{item.members} people · Join group</span></button>):<p className="muted">No public groups are live right now.</p>}
+    </> : <><div className="group-summary"><span className="workspace-eyebrow">{party.isHost?'You are hosting':`Hosted by ${hostName}`}</span><h2>{stageReference}</h2><p>{partyStatusText(party.status,label)} · {party.members.length} people</p><button onClick={()=>{void navigator.clipboard.writeText(party.code).then(()=>setNotice('Room code copied.')).catch(()=>setNotice(`Room code: ${party.code}`));}}>Copy code · {party.code}</button></div>
+      <details className="people-list"><summary>People & host controls ({party.members.length})</summary>{party.members.map(member=><div className="member-row" key={member.id}><span className="member-avatar" style={{background:member.color}}>{member.avatar?<img src={member.avatar} alt=""/>:member.name.slice(0,1)}</span><span>{member.name}{member.id===party.identity.id?' (you)':''}<small>{member.host?'Host':member.mic?'Microphone on':'Microphone off'}</small></span>{party.isHost && member.id!==party.identity.id && <button onClick={()=>party.transferHost(member.id)}>Make host</button>}</div>)}<p className="muted">Passing the host role pauses group narration. The new host chooses when to resume.</p></details>
+      <div className="party-chat"><h3>Conversation</h3><div className="party-messages" role="log" aria-label="Group messages" aria-live="polite">{party.messages.map(msg=>msg.kind==='system'?<div className="party-msg system" key={msg.id}>{msg.event==='joined'?label.partyJoined(msg.name||''):msg.event==='left'?label.partyLeft(msg.name||''):msg.text}</div>:<div className="party-msg" key={msg.id}><strong>{msg.name}</strong><span>{msg.text}</span></div>)}</div><form onSubmit={e=>{e.preventDefault();if(partyChat.trim()){party.sendChat(partyChat);setPartyChat('');}}}><input aria-label="Message the group" placeholder="Share a thought…" maxLength={2000} value={partyChat} onChange={e=>setPartyChat(e.target.value)}/><button disabled={!partyChat.trim()}>Send</button></form></div>
+    </>}
+    {party.error && <p role="alert">Could not connect: {party.error}. Leave the room and try joining again.</p>}
+  </div>;
+  const dock = <footer className="session-dock" aria-label={party.active?'Meeting and reading controls':'Reading controls'}>
+    {party.active && <div className="device-controls"><button aria-label="Microphone" aria-pressed={party.micOn} disabled={party.capped&&!party.micOn} onClick={party.toggleMic}><MicIcon/><span>{party.micOn?'Mic on':'Mic off'}</span></button><button aria-label="Camera" aria-pressed={party.camOn} disabled={party.capped&&!party.camOn} onClick={party.toggleCam}><CamIcon/><span>{party.camOn?'Camera on':'Camera off'}</span></button></div>}
+    <div className="transport"><div className="transport-status"><span className="workspace-eyebrow">{participant?(party.following?`Following ${hostName}`:'Browsing independently'):party.active?'You control group reading':'Your quiet place'}</span><strong>{party.active?stageReference:`${bookName} ${chapterNumber}${speakingVerse?`:${speakingVerse}`:''}`}</strong></div>
+      {participant && party.following ? <><button onClick={party.toggleNarration} aria-pressed={party.narrationMuted}>{party.narrationMuted?'Unmute narration':'Mute narration'}</button>{(!party.following||!samePassage)&&<button className="primary" onClick={()=>{party.returnToHost();setMobileView('reader');}}>Return to host</button>}{party.needsArm&&<button onClick={()=>{speech.unlock?.();party.arm();}}>Enable narration</button>}</> : <>{speechControls}{participant&&<button onClick={party.returnToHost}>Return to host</button>}</>}
     </div>
-  );
-
-  const volumeControl = (
-    <div className="speed-control volume-control" title={label.volume}>
-      <button onClick={() => app.changeSpeechVolume(-speechVolumeRange.step)} disabled={speechVolume <= speechVolumeRange.min} aria-label={label.decreaseVolume} title={label.decreaseVolume}><VolumeLowIcon /></button>
-      <span aria-live="polite">{Math.round(speechVolume * 100)}%</span>
-      <button onClick={() => app.changeSpeechVolume(speechVolumeRange.step)} disabled={speechVolume >= speechVolumeRange.max} aria-label={label.increaseVolume} title={label.increaseVolume}><VolumeHighIcon /></button>
-    </div>
-  );
-
-  const speechControls = (
-    <>
-      {speechState === 'idle' && <button onClick={app.speakChapter} disabled={!chapter} aria-label={label.readAloud}>{label.readAloud}</button>}
-      {speechState === 'speaking' && <button onClick={app.pauseSpeech} aria-label={label.pause}>{label.pause}</button>}
-      {speechState === 'paused' && <button onClick={app.resumeSpeech} aria-label={label.resume}>{label.resume}</button>}
-      {speechState !== 'idle' && <button onClick={app.stopSpeech} aria-label={label.stop}>{label.stop}</button>}
-    </>
-  );
-
-  return (
-    <div className={party.active ? 'app-shell meeting' : 'app-shell'}>
-      <header className="topbar">
-        <div className="topbar-identity">
-          <button className="topbar-home" onClick={openHome} aria-label={label.home} title={label.home}>
-            <span className="brand-mark" role="img" aria-hidden="true"><BookBibleIcon /></span>
-            <span className="topbar-wordmark">The Word</span>
-          </button>
-          <h1 className="topbar-reference">{bookName} <span>{chapterNumber}</span></h1>
-        </div>
-        <div className="topbar-controls" ref={controlsRef}>
-          <div className="control-row">
-            {speechControls}
-            {/* The one settings surface, shared with the landing page. */}
-            <button className={`icon-button settings-toggle ${prefsOpen ? 'active' : ''}`} onClick={() => setPrefsOpen(true)} aria-label={label.settings} title={label.settings} aria-expanded={prefsOpen}>⚙</button>
-            <button className="icon-button" onClick={() => setSearchOpen((open) => !open)} aria-label={label.search} title={label.search}>⌕</button>
-            <button className={`icon-button ${bookmarksOpen ? 'active' : ''}`} onClick={() => setBookmarksOpen((open) => !open)} aria-label={label.bookmarks} title={label.bookmarks}>◈</button>
-            <button className={`icon-button party-toggle ${party.active ? 'active' : ''}`} onClick={() => setPartyOpen((open) => !open)} aria-label={label.readParty} title={label.readParty}>☍{party.active && <span className="party-count">{party.members.length}</span>}</button>
-            <button className="icon-button" onClick={app.toggleTheme} aria-label={label.toggleTheme} title={label.toggleTheme}>◐</button>
-          </div>
-        </div>
-      </header>
-      {party.active && (
-        <FaceRail
-          members={party.members}
-          selfId={party.identity.id}
-          selfAvatar={party.avatar}
-          localStream={party.localStream}
-          remoteStreams={party.remoteStreams}
-          micOn={party.micOn}
-          youSuffix={label.youSuffix}
-          mutedLabel={label.muted}
-          onPickPhoto={(file) => { void party.setAvatar(file); }}
-        />
-      )}
-      <main className="layout">
-        <aside className="sidebar">
-          <div className="control-group">
-            <span className="section-label">{label.translation}</span>
-            <SearchableSelect value={app.translationId} onChange={app.changeTranslation} label={label.translation} filterPlaceholder={label.filterPlaceholder} options={app.translationOptions} />
-          </div>
-          <div className="control-group">
-            <span className="section-label">{label.book}</span>
-            <SearchableSelect value={String(app.bookId)} onChange={(value) => app.changeBook(Number(value))} label={label.book} filterPlaceholder={label.filterPlaceholder} options={app.bookOptions} />
-          </div>
-          <div className="control-group">
-            <span className="section-label">{label.chapter}</span>
-            <SearchableSelect searchable={false} value={String(chapterNumber)} onChange={(value) => app.changeChapter(Number(value))} label={label.chapter} filterPlaceholder={label.filterPlaceholder} options={app.chapterOptions} />
-          </div>
-          <div className="sidebar-footer"><span>{label.footerFree}</span><span>{label.footerLocal}</span></div>
-        </aside>
-        <section className="reader-column">
-          <div className="chapter-nav">
-            <button onClick={() => app.moveChapter(-1)} disabled={chapterNumber === 1}>← {label.previous}</button>
-            <span>{bookName} {chapterNumber}</span>
-            <button onClick={() => app.moveChapter(1)} disabled={!book || chapterNumber === book.chapters}>{label.next} →</button>
-          </div>
-          {chapterLoading ? <div className="empty-state"><p>{label.loading}</p></div> : chapter ? (
-            <article className="reader" style={{ fontSize: `${app.fontSize}px` }}>
-              {chapter.verses.map((verse) => {
-                const selected = selectedVerses.has(verse.ref.verse);
-                const speaking = speakingVerse === verse.ref.verse;
-                const following = !speaking && followVerse === verse.ref.verse;
-                const focused = !speaking && !selected && app.focusedVerse === verse.ref.verse;
-                const refs = app.crossRefs[verse.ref.verse];
-                return (
-                  <span
-                    key={verse.ref.verse}
-                    role="button"
-                    tabIndex={0}
-                    ref={(el) => { verseRefs.current[verse.ref.verse] = el; }}
-                    className={speaking ? 'verse speaking' : following ? 'verse following' : focused ? 'verse focused' : selected ? 'verse selected' : 'verse'}
-                    onClick={() => {
-                      app.toggleVerse(verse.ref.verse);
-                      if (party.active && party.isHost) party.setFocusVerse(verse.ref.verse);
-                    }}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault();
-                        app.toggleVerse(verse.ref.verse);
-                        if (party.active && party.isHost) party.setFocusVerse(verse.ref.verse);
-                      }
-                    }}
-                  >
-                    <sup>{verse.ref.verse}</sup>
-                    <span>{verseRuns(verse.text, verse.redLetters).map((run, index) => (run.red ? <span className="words-of-jesus" key={index}>{run.text}</span> : <span key={index}>{run.text}</span>))}</span>
-                    {app.bookmarks.has(app.bookmarkKey(verse.ref.verse)) && <span className="bookmark" aria-label={label.bookmarks}>◆</span>}
-                    {refs?.length ? (
-                      <button
-                        type="button"
-                        className={xrefMenu?.verse === verse.ref.verse ? 'xref-mark open' : 'xref-mark'}
-                        aria-label={label.crossReferences}
-                        title={label.crossReferences}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          const rect = event.currentTarget.getBoundingClientRect();
-                          setXrefMenu({ verse: verse.ref.verse, x: rect.left, y: rect.bottom });
-                        }}
-                      >※</button>
-                    ) : null}
-                  </span>
-                );
-              })}
-            </article>
-          ) : <div className="empty-state"><h2>{label.chapterMissingTitle}</h2><p>{label.chapterMissingBody}</p></div>}
-          {selectedVerses.size > 0 && (
-            <div className="selection-bar">
-              <div><strong>{selectedReference}</strong><span>{selectedText}</span></div>
-              <button onClick={() => app.selectedVerseNumbers.forEach(app.toggleBookmark)}>{label.bookmark}</button>
-              <button onClick={app.copySelection}>{label.copy}</button>
-              <button onClick={app.speakSelection}>{label.readSelection}</button>
-              <button onClick={() => setImageJob({
-                reference: selectedReference,
-                text: selectedText,
-                translation: app.translations.find((item) => item.id === app.translationId)?.shortName ?? 'KJV',
-                filename: verseImageFilename(bookName, chapterNumber),
-                seed: selectedReference,
-              })}>{label.image}</button>
-              <button onClick={app.clearSelection}>{label.clearSelection}</button>
-            </div>
-          )}
-        </section>
-      </main>
-      {party.active && (
-        <div className="meeting-dock">
-          <div className="meeting-dock-id">
-            <span className="party-code-label">{label.partyCode}</span>
-            <strong className="party-code">{party.code}</strong>
-          </div>
-          <span className={`party-role ${party.isHost ? 'host' : ''}`}>{party.isHost ? label.youAreHost : label.followingHost}</span>
-          <button
-            className={`icon-button meeting-av ${party.micOn ? 'on' : ''}`}
-            onClick={party.toggleMic}
-            disabled={party.capped && !party.micOn}
-            aria-pressed={party.micOn}
-            aria-label={label.meetingMic}
-            title={label.meetingMic}
-          ><MicIcon /></button>
-          <button
-            className={`icon-button meeting-av ${party.camOn ? 'on' : ''}`}
-            onClick={party.toggleCam}
-            disabled={party.capped && !party.camOn}
-            aria-pressed={party.camOn}
-            aria-label={label.meetingCam}
-            title={label.meetingCam}
-          ><CamIcon /></button>
-          <button className={`icon-button ${partyOpen ? 'active' : ''}`} onClick={() => setPartyOpen((open) => !open)} aria-label={label.partyChat} title={label.partyChat}>💬</button>
-          <button className="icon-button" onClick={() => setPrefsOpen(true)} aria-label={label.preferences} title={label.preferences}>☺</button>
-          <button className="party-leave meeting-leave" onClick={party.leaveParty}>{label.leaveParty}</button>
-        </div>
-      )}
-      {party.mediaError === 'denied' && <div className="speech-error" role="alert">{label.mediaDenied}</div>}
-      {party.mediaError === 'photo' && <div className="speech-error" role="alert">{label.photoFailed}</div>}
-      {party.capped && party.active && <p className="meeting-cap muted">{label.meshCapped}</p>}
-      {party.active && party.isHost && !party.liveFloor && speechState === 'idle' && (
-        <p className="meeting-hint muted">{label.tapVerseToPlace}</p>
-      )}
-      {readingBarOpen && (
-        <div className="reading-bar">
-          <div className="reading-bar-status">
-            <strong>{bookName} {chapterNumber}{speakingVerse === null ? '' : `:${speakingVerse}`}</strong>
-            <span>{speechState === 'paused' ? label.paused : label.readingAloud}</span>
-          </div>
-          {speedControl}
-          {volumeControl}
-          {speechControls}
-        </div>
-      )}
-      {imageJob && (
-        <VerseImageEditor
-          job={imageJob}
-          fontStack={app.font.stack}
-          label={label}
-          onClose={() => setImageJob(null)}
-          onSaved={app.clearSelection}
-        />
-      )}
-      {speechError && <div className="speech-error" role="alert">{/valid JSON|Could not fetch/.test(speechError) ? `${label.noVoice} (${speechVoice})` : speechError}</div>}
-      {searchOpen && (
-        <div className="search-panel">
-          <div className="search-header"><h2>{label.searchTitle} · {app.translations.find((item) => item.id === app.translationId)?.shortName}</h2><button onClick={() => setSearchOpen(false)} aria-label={label.search}>×</button></div>
+    <div className="room-controls"><button onClick={()=>{if(view==='home')openReader();openTool('sound');}}><VolumeHighIcon/><span>Sound</span></button>{party.active&&<><button onClick={()=>{if(view==='home')openReader();openTool('group');}}><ReaderIcon name="people"/><span>Group · {party.members.length}</span></button><button className="leave-button" onClick={party.leaveParty}>Leave</button></>}</div>
+  </footer>;
+  return <><div hidden={view!=='home'} className={party.active?'home-in-session':''}>
+    <Landing app={app} onEnterReader={()=>{app.markProgress();openReader();}} onGroupStudy={()=>{openReader();openTool('group');}} onBookmarks={()=>{openReader();openLibrary('bookmarks');}} onPreferences={()=>tools.open('settings')} partyMembers={party.active?party.members.length:0} banner={<ReminderBanner reminder={reminder}/>} />
+    {view==='home'&&tools.entries.some(e=>e.id==='settings')&&preferences}
+    {party.active&&<div className="home-session"><button onClick={openReader}>Return to study · {stageReference}</button>{dock}</div>}
+  </div>
+  <div hidden={view!=='reader'} className={`study-workspace ${tools.entries.length?'has-tools':''} ${library?'has-library':''} ${tools.expanded?'wide-tools':''}`} data-mobile-view={mobileView}>
+    <header className="workspace-header"><button className="workspace-brand" onClick={openHome} aria-label={label.home}><BookBibleIcon/><span>The Word</span></button>
+      <div className="passage-picker"><button onClick={()=>openLibrary('books')}>{bookName} {chapterNumber} <span>⌄</span></button><span>{app.translations.find(t=>t.id===app.translationId)?.shortName}</span></div>
+      <nav aria-label="Reader tools"><button onClick={()=>openLibrary('search')}><ReaderIcon name="search"/><span>Search</span></button><button onClick={()=>openLibrary('bookmarks')}><ReaderIcon name="bookmark"/><span>Saved</span></button><button onClick={()=>openTool('group')}><ReaderIcon name="people"/><span>Group Study</span></button><button aria-label="Settings" onClick={()=>openTool('settings')}><ReaderIcon name="settings"/></button><button aria-label={label.toggleTheme} onClick={app.toggleTheme}><ReaderIcon name={app.theme==='dark'?'sun':'moon'}/></button></nav>
+    </header>
+    {party.active&&<section className={`session-strip ${peopleMode}`} aria-label="Study participants"><div className="session-heading"><span><i className="live-dot"/>Group Study <small>· {party.isHost?'You are hosting':`${hostName} is hosting`} · {partyStatusText(party.status,label)}</small></span><div><button onClick={()=>setPeopleMode(peopleMode==='discussion'?'compact':'discussion')} aria-pressed={peopleMode==='discussion'}>{peopleMode==='discussion'?'Reading layout':'Discussion layout'}</button><button onClick={()=>setPeopleMode(peopleMode==='collapsed'?'compact':'collapsed')}>{peopleMode==='collapsed'?'Show people':'Hide people'}</button></div></div>
+      <FaceRail members={party.members} selfId={party.identity.id} selfAvatar={party.avatar} localStream={party.localStream} remoteStreams={party.remoteStreams} micOn={party.micOn} youSuffix={label.youSuffix} mutedLabel={label.muted} onPickPhoto={file=>{void party.setAvatar(file);}}/>
+    </section>}
+    <nav className="mobile-workspace-nav" aria-label="Workspace views"><button aria-pressed={mobileView==='reader'} onClick={()=>setMobileView('reader')}>Read</button><button aria-pressed={mobileView==='library'} onClick={()=>openLibrary(library??'books')}>Library</button><button aria-pressed={mobileView==='tools'} onClick={()=>{if(!tools.entries.length)openTool('group');else setMobileView('tools');}}>Tools {tools.entries.length||''}</button></nav>
+    <main className="workspace-body">
+      <aside className="library-pane" aria-label="Scripture library" hidden={!library}><nav className="library-tabs" aria-label="Library sections"><button aria-pressed={library==='books'} onClick={()=>setLibrary('books')}>Books</button><button aria-pressed={library==='search'} onClick={()=>setLibrary('search')}>Search</button><button aria-pressed={library==='bookmarks'} onClick={()=>setLibrary('bookmarks')}>Saved</button><button onClick={()=>setLibrary(null)} aria-label="Close library">×</button></nav>
+        <div hidden={library!=='books'} className="book-navigation"><span className="workspace-eyebrow">Find your passage</span><h2>The Scriptures</h2><label>{label.translation}<SearchableSelect value={app.translationId} onChange={value=>{party.browseIndependently();app.changeTranslation(value);}} label={label.translation} filterPlaceholder={label.filterPlaceholder} options={app.translationOptions}/></label><label>{label.book}<SearchableSelect value={String(app.bookId)} onChange={value=>navigate(+value,1)} label={label.book} filterPlaceholder={label.filterPlaceholder} options={app.bookOptions}/></label><label>{label.chapter}<SearchableSelect searchable={false} value={String(chapterNumber)} onChange={value=>navigate(app.bookId,+value)} label={label.chapter} filterPlaceholder={label.filterPlaceholder} options={app.chapterOptions}/></label><p className="muted">{label.footerFree}<br/>{label.footerLocal}</p></div>
+        <div hidden={library!=='search'}><div className="search-panel">
+          <div className="search-header"><h2>{label.searchTitle} · {app.translations.find((item) => item.id === app.translationId)?.shortName}</h2><button onClick={() => setLibrary(null)} aria-label={label.search}>×</button></div>
           <input autoFocus placeholder={label.searchPlaceholder} value={app.query} onChange={(event) => { app.setQuery(event.target.value); if (event.target.value.trim()) app.setSelectedTopic(''); }} />
           {activeTopic && (
             <div className="topic-chip">
@@ -417,130 +267,41 @@ function App() {
             <div className="results">
               <div className="result-count">{app.searchLoading ? label.searching : label.results(app.searchResults.length)}</div>
               {app.searchResults.length ? app.searchResults.map((result) => (
-                <button className="result" key={`${result.translationId}:${result.verse.ref.bookId}:${result.verse.ref.chapter}:${result.verse.ref.verse}`} onClick={() => { app.goToVerse(result.verse.ref.bookId, result.verse.ref.chapter, result.verse.ref.verse); setSearchOpen(false); app.setQuery(''); }}>
+                <button className="result" key={`${result.translationId}:${result.verse.ref.bookId}:${result.verse.ref.chapter}:${result.verse.ref.verse}`} onClick={() => { navigate(result.verse.ref.bookId, result.verse.ref.chapter, result.verse.ref.verse); }}>
                   <strong>{localBible.getBook(result.verse.ref.bookId, app.translationId)?.name} {result.verse.ref.chapter}:{result.verse.ref.verse}</strong>
                   <span>{result.verse.text}</span>
                 </button>
               )) : !app.searchLoading && <p className="muted">{label.noMatches}</p>}
             </div>
           )}
-        </div>
-      )}
-      {xrefMenu && (
-        <CrossRefMenu
-          app={app}
-          verse={xrefMenu.verse}
-          refs={app.crossRefs[xrefMenu.verse] ?? []}
-          x={xrefMenu.x}
-          y={xrefMenu.y}
-          onClose={() => setXrefMenu(null)}
-          onSelect={(ref) => {
-            app.goToVerse(ref.bookId, ref.chapter, ref.verse);
-            setXrefMenu(null);
-          }}
-        />
-      )}
-      {bookmarksOpen && (
-        <div className="bookmarks-panel">
-          <div className="panel-header"><h2>{label.bookmarks}</h2><button onClick={() => setBookmarksOpen(false)} aria-label={label.closeBookmarks}>×</button></div>
+        </div></div><div hidden={library!=='bookmarks'}><div className="bookmarks-panel">
+          <div className="panel-header"><h2>{label.bookmarks}</h2><button onClick={() => setLibrary(null)} aria-label={label.closeBookmarks}>×</button></div>
           {app.bookmarkList.length ? app.bookmarkList.map((entry) => (
-            <button className="bookmark-item" key={`${entry.bookId}:${entry.chapter}:${entry.verse}`} onClick={() => { app.goToVerse(entry.bookId, entry.chapter, entry.verse); setBookmarksOpen(false); }}>
+            <button className="bookmark-item" key={`${entry.bookId}:${entry.chapter}:${entry.verse}`} onClick={() => { navigate(entry.bookId, entry.chapter, entry.verse); }}>
               <span className="bookmark-reference">{app.books.find((item) => item.id === entry.bookId)?.name} {entry.chapter}:{entry.verse}</span>
               <span className="bookmark-verse-text">{entry.bookId === app.bookId && entry.chapter === chapterNumber ? chapter?.verses.find((verse) => verse.ref.verse === entry.verse)?.text ?? '' : ''}</span>
             </button>
           )) : <p className="muted">{label.noBookmarks}</p>}
-        </div>
-      )}
-      {partyOpen && (
-        <div className="party-panel">
-          <div className="panel-header"><h2>{label.readParty}</h2><button onClick={() => setPartyOpen(false)} aria-label={label.closeParty}>×</button></div>
-          {!party.active ? (
-            <div className="party-setup">
-              <p className="muted">{label.partyIntro}</p>
-              <label className="party-findable">
-                <input type="checkbox" checked={createFindable} onChange={(event) => setCreateFindable(event.target.checked)} />
-                <span>
-                  <strong>{label.findableGroup}</strong>
-                  <small>{label.findableHint}</small>
-                </span>
-              </label>
-              <button className="party-primary" onClick={() => { speech.unlock?.(); unlockRemoteAudio(); party.createParty({ findable: createFindable }); }}>{label.startParty}</button>
-              <div className="party-live-list">
-                <span className="section-label">{label.liveGroups}</span>
-                {liveGroups.length ? liveGroups.map((item) => {
-                  const passage = localBible.getBook(item.bookId, app.translationId);
-                  const where = passage ? `${passage.name} ${item.chapter}${item.verse ? `:${item.verse}` : ''}` : '';
-                  return (
-                    <button
-                      type="button"
-                      className="party-live-item"
-                      key={item.code}
-                      onClick={() => { speech.unlock?.(); unlockRemoteAudio(); party.joinParty(item.code); }}
-                    >
-                      <strong>{item.hostName}</strong>
-                      <span>{label.peopleHere(item.members)}{where ? ` · ${where}` : ''}</span>
-                      <em>{label.joinThisGroup}</em>
-                    </button>
-                  );
-                }) : <p className="muted">{label.noLiveGroups}</p>}
-              </div>
-              <div className="party-or"><span>{label.orJoinParty}</span></div>
-              <form className="party-join" onSubmit={(event) => { event.preventDefault(); speech.unlock?.(); unlockRemoteAudio(); party.joinParty(partyCode); }}>
-                <input placeholder={label.partyCodePlaceholder} value={partyCode} onChange={(event) => setPartyCode(event.target.value)} />
-                <button type="submit" disabled={!partyCode.trim()}>{label.joinParty}</button>
-              </form>
-              {party.error && <p className="party-error">{label.partyConnectFailed(party.error)}</p>}
-            </div>
-          ) : (
-            <div className="party-live">
-              <div className="party-status">
-                <div><span className="party-code-label">{label.partyCode}</span><strong className="party-code">{party.code}</strong></div>
-                <span className={`party-role ${party.isHost ? 'host' : ''}`}>{party.isHost ? label.youAreHost : label.followingHost}</span>
-                {party.isHost && <span className="party-findable-tag">{party.findable ? label.groupFindable : label.groupUnlisted}</span>}
-              </div>
-              {party.status && <p className="muted party-conn">{partyStatusText(party.status, label)}</p>}
-              {party.isHost
-                ? <p className="muted">{label.hostHint}</p>
-                : (
-                  <div className="party-follow">
-                    <label><input type="checkbox" checked={party.following} onChange={(event) => party.setFollowing(event.target.checked)} /> {label.followHost}</label>
-                    {party.needsArm && <button className="party-arm" onClick={() => { speech.unlock?.(); party.arm(); }}>🔊 {label.tapToReadAlong}</button>}
-                  </div>
-                )}
-              <div className="party-members">
-                <span className="section-label">{label.inTheRoom(party.members.length)}</span>
-                {party.members.map((member) => (
-                  <div className="party-member" key={member.id}>
-                    {member.avatar
-                      ? <span className="party-dot photo" style={{ backgroundImage: `url("${member.avatar}")` }} />
-                      : <span className="party-dot" style={{ background: member.color }} />}
-                    <span>{member.name}{member.id === party.identity.id ? label.youSuffix : ''}</span>
-                    {member.host && <span className="party-host-tag">{label.hostTag}</span>}
-                  </div>
-                ))}
-              </div>
-              <div className="party-chat">
-                <span className="section-label">{label.partyChat}</span>
-                <div className="party-messages">
-                  {party.messages.map((msg) => (
-                    msg.kind === 'system'
-                      ? <div className="party-msg system" key={msg.id}>{msg.event === 'joined' ? label.partyJoined(msg.name || '') : msg.event === 'left' ? label.partyLeft(msg.name || '') : msg.text}</div>
-                      : <div className="party-msg" key={msg.id}><strong style={{ color: msg.color }}>{msg.name}</strong> {msg.text}</div>
-                  ))}
-                </div>
-                <form onSubmit={(event) => { event.preventDefault(); if (partyChat.trim()) { party.sendChat(partyChat); setPartyChat(''); } }}>
-                  <input placeholder={label.partyChatPlaceholder} value={partyChat} onChange={(event) => setPartyChat(event.target.value)} />
-                  <button type="submit" disabled={!partyChat.trim()}>{label.send}</button>
-                </form>
-              </div>
-              <button className="party-leave" onClick={party.leaveParty}>{label.leaveParty}</button>
-            </div>
-          )}
-        </div>
-      )}
-      {preferences}
-    </div>
-  );
+        </div></div>
+      </aside>
+      <section className="reader-column" aria-label="Scripture passage">
+        <div className="reader-heading"><span className="workspace-eyebrow">{app.translations.find(t=>t.id===app.translationId)?.name??'Holy Bible'}</span><h1>{bookName} <span>{chapterNumber}</span></h1><div className="chapter-nav"><button onClick={()=>navigate(app.bookId,chapterNumber-1)} disabled={chapterNumber===1}>← {label.previous}</button><span>Chapter {chapterNumber}{book?` of ${book.chapters}`:''}</span><button onClick={()=>navigate(app.bookId,chapterNumber+1)} disabled={!book||chapterNumber===book.chapters}>{label.next} →</button></div></div>
+        {party.active&&<div className="presentation-status">{party.isHost?<><button aria-pressed={party.presenting} onClick={()=>party.setPresenting(!party.presenting)}>{party.presenting?'Present mode on':'Present mode off'}</button><span>{party.presenting?'Your verse clicks are shared.':'Your selections are private.'}</span><button onClick={()=>{app.stopSpeech();party.showGroup(app.selectedVerseNumbers.length?app.selectedVerseNumbers:[currentVerse]);}}>Discuss this passage</button></>:<><span>{party.following?`Following ${hostName}`:'Browsing independently'}</span><button onClick={()=>{party.following?party.browseIndependently():party.returnToHost();}}>{party.following?'Browse independently':'Return to host'}</button></>}</div>}
+        {chapterLoading?<div className="empty-state" role="status">{label.loading}</div>:chapter?<article className="reader" style={{fontSize:`${app.fontSize}px`}}>{chapter.verses.map(verse=>{
+          const number=verse.ref.verse, selected=selectedVerses.has(number), speaking=speakingVerse===number, shared=party.highlights.includes(number), following=followVerse===number;
+          return <span key={number} ref={el=>{verseRefs.current[number]=el;}} className={['verse',selected?'selected':'',speaking?'speaking':'',shared?'shared-highlight':'',following?'following':'',app.focusedVerse===number?'focused':''].filter(Boolean).join(' ')}>
+            <span role="button" tabIndex={0} className="verse-select" onKeyDown={event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();app.toggleVerse(number);if(party.active&&party.isHost&&party.presenting)party.setFocusVerse(number);}}} aria-label={`Select ${bookName} ${chapterNumber}:${number}`} aria-pressed={selected} onClick={()=>{app.toggleVerse(number);if(party.active&&party.isHost&&party.presenting)party.setFocusVerse(number);}}><sup>{number}</sup><span>{verseRuns(verse.text,verse.redLetters).map((run,i)=><span key={i} className={run.red?'words-of-jesus':undefined}>{run.text}</span>)}</span>{app.bookmarks.has(app.bookmarkKey(number))&&<span className="bookmark" aria-label={label.bookmarks}>◆</span>}</span>
+            <button className="xref-mark" aria-label={`Explore ${bookName} ${chapterNumber}:${number}`} title="Explore this verse" onClick={()=>inspect(number,'references')}>※</button>{speaking&&<span className="sr-only">Currently reading</span>}{shared&&<span className="sr-only">Shared highlight</span>}
+          </span>;
+        })}</article>:<div className="empty-state"><h2>{label.chapterMissingTitle}</h2><p>{label.chapterMissingBody}</p></div>}
+        <div className="reader-end"><span>Continue in the Word</span><button onClick={()=>navigate(app.bookId,chapterNumber+1)} disabled={!book||chapterNumber===book.chapters}>{label.next} →</button></div>
+      </section>
+      <ToolDock tools={tools}>{ {group,settings:view==='reader'?preferences:null,sound,references:<PassageTools passage={passage} app={app} onNavigate={navigate} onRefresh={()=>setPassage(snapshot(app,currentVerse))} follow={followTool} onFollow={setFollowTool}/>,guide:<PassageTools guide passage={guidePassage} app={app} onNavigate={navigate} onRefresh={()=>setGuidePassage(snapshot(app,currentVerse))} follow={followGuide} onFollow={setFollowGuide}/>,image:imageJob?<VerseImageEditor key={imageJob.reference+imageJob.text} embedded job={imageJob} fontStack={app.font.stack} label={label} onClose={()=>tools.close('image')}/>:<p>Select a verse to create an image.</p>} }</ToolDock>
+    </main>
+    {(notice||speechError||party.mediaError||party.capped)&&<div className="workspace-notice" role="status"><span>{notice||speechError||(party.mediaError==='photo'?'That photo could not be loaded.':party.mediaError?'Microphone or camera unavailable. Check your browser permissions.':'This room is above the 8-person voice/video threshold. Chat and passage sharing remain available.')}</span>{notice&&<button onClick={()=>setNotice('')} aria-label="Dismiss message">×</button>}</div>}
+    {selectedVerses.size>0&&<div className="workspace-selection" aria-label="Selected verse actions"><strong>{selectedReference}</strong><div><button onClick={app.copySelection}>Copy</button><button onClick={()=>app.selectedVerseNumbers.forEach(app.toggleBookmark)}>Bookmark</button><button onClick={()=>inspect(currentVerse,'guide')}>Explore</button><button onClick={()=>{setImageJob({reference:selectedReference,text:selectedText,translation:app.translations.find(t=>t.id===app.translationId)?.shortName??'KJV',filename:verseImageFilename(bookName,chapterNumber),seed:selectedReference});openTool('image');}}>Image</button>{(!participant||!party.following)&&<button onClick={app.speakSelection}>{party.isHost?'Read to group':'Read selection'}</button>}{party.active&&party.isHost&&<button onClick={()=>party.showGroup(app.selectedVerseNumbers)}>Show group</button>}<button onClick={app.clearSelection} aria-label="Clear selection">×</button></div></div>}
+    {dock}
+  </div>
+  {welcome.open&&<Welcome party={party} onClose={welcome.close}/>}</>;
 }
-
 export default App;

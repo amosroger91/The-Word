@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { localBible, parseReference } from '@the-word/bible';
 import {
   DAILY_VERSE_API,
@@ -34,7 +34,9 @@ export function Landing({
   onBookmarks,
   onPreferences,
   partyMembers,
+  banner,
 }: {
+  banner?: ReactNode;
   app: WordApp;
   onEnterReader: () => void;
   onGroupStudy?: () => void;
@@ -151,6 +153,7 @@ export function Landing({
           <button className="icon-button" onClick={app.toggleTheme} aria-label={label.toggleTheme} title={label.toggleTheme}><ReaderIcon name={app.theme === 'dark' ? 'sun' : 'moon'} /></button>
         </div>
       </header>
+      {banner}
 
       <main className="landing-main">
         <div className="landing-welcome"><div><h1>{copy.title}</h1><p>{copy.intro}</p></div><span className="welcome-flourish" aria-hidden="true">✦</span></div>

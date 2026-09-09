@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { MicOffIcon } from './icons';
-import { registerRemotePlayer } from './media';
+import { registerRemotePlayer, getRemoteVolume } from './media';
 import type { PartyMember } from './readParty';
 
 // One AudioContext for the whole page. A browser caps how many a document may
@@ -97,7 +97,7 @@ function Tile({
     if (audio) {
       audio.srcObject = self ? null : stream;
       audio.muted = false;
-      audio.volume = 1;
+      audio.volume = getRemoteVolume();
       if (!self && stream) void audio.play().catch(() => {});
     }
     return () => {
@@ -178,11 +178,11 @@ export function FaceRail({
         const stream = self ? localStream : (remoteStreams[member.id] ?? null);
         const liveMic = self
           ? micOn
-          : Boolean(stream?.getAudioTracks().some((track) => track.readyState === 'live' && track.enabled));
+          : Boolean(member.mic ?? stream?.getAudioTracks().some((track) => track.readyState === 'live' && track.enabled));
         return (
           <Tile
             key={member.id}
-            name={member.name}
+            name={member.host ? `${member.name} · Host` : member.name}
             color={member.color}
             avatar={(self ? selfAvatar : member.avatar) || null}
             stream={stream}

@@ -24,10 +24,10 @@
 //  forming media connections.
 // ============================================================
 import { Peer, type DataConnection, type MediaConnection } from 'peerjs';
-import { getLocalStream, hasMedia } from './media';
+import { getLocalStream, hasMedia, getState } from './media';
 
 export interface PartyIdentity { id: string; name: string; color: string; avatar?: string | null; }
-export interface PartyMember { id: string; name: string; color: string; peerId: string; host?: boolean; av?: boolean; avatar?: string | null; }
+export interface PartyMember { id: string; name: string; color: string; peerId: string; host?: boolean; av?: boolean; mic?: boolean; cam?: boolean; avatar?: string | null; }
 export interface PartyChatMessage {
   id: string;
   kind: 'chat' | 'system';
@@ -47,6 +47,9 @@ export interface ReadingState {
   verse: number | null;
   action: 'idle' | 'playing' | 'paused' | 'live';
   ts: number;
+  highlights?: number[];
+  revision?: number;
+  translationId?: string;
 }
 
 export interface PartyHandlers {
@@ -79,6 +82,7 @@ export interface PartyRoom {
   sendChat(text: string): void;
   /** Host only: publish the shared reading state to everyone. No-op for clients. */
   setReadingState(state: ReadingState): void;
+  transferHost(memberId: string): void;
   updateIdentity(next: Partial<PartyIdentity>): void;
   /** Call after setMedia(): refresh streams across the mesh and announce A/V. */
   refreshMedia(): void;
@@ -95,6 +99,8 @@ export function joinParty({ code, identity, handlers = {} }: {
 
   let peer: Peer | null = null;
   let isHub = false;
+  let presenterId = '';
+  let revision = 0;
   let hubConn: DataConnection | null = null;         // client: the single connection to the hub
   const clientConns = new Map<string, DataConnection>(); // hub: remotePeerId -> connection
   let members: PartyMember[] = [];
@@ -111,7 +117,7 @@ export function joinParty({ code, identity, handlers = {} }: {
   const capped = () => members.length > MESH_CAP;
 
   function selfMember(): PartyMember {
-    return { id: me.id, name: me.name, color: me.color, avatar: me.avatar || null, peerId: myPeerId(), host: isHub, av: hasMedia() };
+    return { id: me.id, name: me.name, color: me.color, avatar: me.avatar || null, peerId: myPeerId(), host: me.id === presenterId, av: hasMedia(), mic: getState().audio, cam: getState().video };
   }
   function upsert(m: PartyMember) {
     const i = members.findIndex((x) => x.id === m.id);
@@ -119,7 +125,9 @@ export function joinParty({ code, identity, handlers = {} }: {
     else members.push(m);
   }
   function emitRoster() {
-    h.onRoster?.(members.slice(), { host: isHub, capped: capped() });
+    if (isHub) members = members.map(m => ({ ...m, host: m.id === presenterId }));
+    else presenterId = members.find(m => m.host)?.id || '';
+    h.onRoster?.(members.slice(), { host: presenterId === me.id, capped: capped() });
     scheduleReconcile();
   }
 
@@ -143,12 +151,31 @@ export function joinParty({ code, identity, handlers = {} }: {
     return { id: newId(), kind: 'system', text, ts: Date.now(), event, name };
   }
 
+  function publishReading(state: ReadingState) {
+    if (!state || !Number.isInteger(state.bookId) || !Number.isInteger(state.chapter)
+      || !['idle','playing','paused','live'].includes(state.action)) return;
+    readingState = { ...state, highlights: (state.highlights || []).filter(v => Number.isInteger(v) && v > 0).slice(0,200), revision: ++revision, ts: Date.now() };
+    broadcast({ t: 'reading', d: readingState });
+    h.onReading?.(readingState);
+  }
+  function transfer(memberId: string) {
+    if (!members.some(m => m.id === memberId)) return;
+    presenterId = memberId;
+    if (readingState) publishReading({ ...readingState, action: 'live' });
+    emitRoster(); broadcast({ t: 'roster', d: members.slice() });
+  }
+
   /* ---------------- hub: handle an incoming envelope ---------------- */
   function handleAtHub(env: Envelope, fromPeerId: string | null) {
     if (!env || !env.t) return;
-    if (env.t === 'hello') {
+    if (env.t === 'reading' || env.t === 'transfer') {
+      const sender = fromPeerId ? members.find(m => m.peerId === fromPeerId)?.id : me.id;
+      if (sender !== presenterId) return;
+      if (env.t === 'reading') publishReading(env.d as ReadingState);
+      else transfer(String(env.d));
+    } else if (env.t === 'hello') {
       const m = (env.d || {}) as Partial<PartyMember>;
-      upsert({ id: m.id!, name: m.name || 'Reader', color: m.color || '#888', avatar: m.avatar || null, peerId: fromPeerId || '', av: Boolean(m.av) });
+      upsert({ id: m.id!, name: m.name || 'Reader', color: m.color || '#888', avatar: m.avatar || null, peerId: fromPeerId || '', av: Boolean(m.av), mic: Boolean(m.mic), cam: Boolean(m.cam) });
       const conn = fromPeerId ? clientConns.get(fromPeerId) : null;
       if (conn) {
         try { conn.send({ t: 'welcome', d: { roster: members.slice(), chat: chatLog.slice(-CHAT_HISTORY), reading: readingState } }); } catch { /* dropped */ }
@@ -173,6 +200,8 @@ export function joinParty({ code, identity, handlers = {} }: {
         if (d.color != null) members[i].color = d.color;
         if ('avatar' in d) members[i].avatar = d.avatar || null;
         if (d.av != null) members[i].av = Boolean(d.av);
+        if (d.mic != null) members[i].mic = Boolean(d.mic);
+        if (d.cam != null) members[i].cam = Boolean(d.cam);
         emitRoster(); broadcast({ t: 'roster', d: members.slice() });
       }
     }
@@ -195,7 +224,9 @@ export function joinParty({ code, identity, handlers = {} }: {
     } else if (env.t === 'chat') {
       h.onChat?.(env.d as PartyChatMessage);
     } else if (env.t === 'reading') {
-      readingState = (env.d || null) as ReadingState | null;
+      const incoming = (env.d || null) as ReadingState | null;
+      if (incoming && incoming.revision != null && readingState?.revision != null && incoming.revision <= readingState.revision) return;
+      readingState = incoming;
       h.onReading?.(readingState);
     }
   }
@@ -257,7 +288,7 @@ export function joinParty({ code, identity, handlers = {} }: {
     hubConn = c;
     c.on('open', () => {
       status('connected');
-      try { c.send({ t: 'hello', d: { id: me.id, name: me.name, color: me.color, avatar: me.avatar || null, av: hasMedia() } }); } catch { /* dropped */ }
+      try { c.send({ t: 'hello', d: { id: me.id, name: me.name, color: me.color, avatar: me.avatar || null, av: hasMedia(), mic: getState().audio, cam: getState().video } }); } catch { /* dropped */ }
     });
     c.on('data', handleFromHub);
     c.on('close', () => { if (!leaving) reelect(); });
@@ -266,9 +297,13 @@ export function joinParty({ code, identity, handlers = {} }: {
 
   function startAsHub() {
     isHub = true;
+    presenterId = me.id;
+    revision = readingState?.revision || 0;
+    if (readingState) readingState = { ...readingState, action: 'live', revision: ++revision };
     members = [selfMember()];
     status('hosting');
     h.onSelf?.({ host: true });
+    if (readingState) h.onReading?.(readingState);
     emitRoster();
     // A re-elected hub keeps everyone in sync by re-announcing the reading state.
     if (readingState) broadcast({ t: 'reading', d: readingState });
@@ -280,6 +315,7 @@ export function joinParty({ code, identity, handlers = {} }: {
         const m = members.find((x) => x.peerId === c.peer);
         members = members.filter((x) => x.peerId !== c.peer);
         if (m) { const sm = systemMessage(`${m.name} left the party`, 'left', m.name); recordChat(sm); broadcast({ t: 'chat', d: sm }); }
+        if (m?.id === presenterId) transfer(me.id);
         pruneStaleMedia();
         emitRoster(); broadcast({ t: 'roster', d: members.slice() });
       });
@@ -333,7 +369,7 @@ export function joinParty({ code, identity, handlers = {} }: {
   connect();
 
   return {
-    get isHost() { return isHub; },
+    get isHost() { return presenterId === me.id; },
     get size() { return members.length; },
     get capped() { return capped(); },
     sendChat(text: string) {
@@ -347,23 +383,26 @@ export function joinParty({ code, identity, handlers = {} }: {
       }
     },
     setReadingState(state: ReadingState) {
-      if (!isHub) return; // host-authoritative: only the host publishes
-      readingState = state;
-      broadcast({ t: 'reading', d: state });
+      if (presenterId !== me.id) return;
+      toHub({ t: 'reading', d: state });
+    },
+    transferHost(memberId: string) {
+      if (presenterId !== me.id) return;
+      toHub({ t: 'transfer', d: memberId });
     },
     updateIdentity(next: Partial<PartyIdentity>) {
       me = { ...me, ...next };
       const i = members.findIndex((x) => x.id === me.id);
       if (i >= 0) { members[i].name = me.name; members[i].color = me.color; members[i].avatar = me.avatar || null; }
       if (isHub) { emitRoster(); broadcast({ t: 'roster', d: members.slice() }); }
-      else toHub({ t: 'meta', d: { name: me.name, color: me.color, avatar: me.avatar || null, av: hasMedia() } });
+      else toHub({ t: 'meta', d: { name: me.name, color: me.color, avatar: me.avatar || null, av: hasMedia(), mic: getState().audio, cam: getState().video } });
     },
     refreshMedia() {
       closeAllMedia();
       const i = members.findIndex((x) => x.id === me.id);
-      if (i >= 0) members[i].av = hasMedia();
+      if (i >= 0) { members[i].av = hasMedia(); members[i].mic = getState().audio; members[i].cam = getState().video; }
       if (isHub) { emitRoster(); broadcast({ t: 'roster', d: members.slice() }); }
-      else { toHub({ t: 'meta', d: { av: hasMedia() } }); scheduleReconcile(); }
+      else { toHub({ t: 'meta', d: { av: hasMedia(), mic: getState().audio, cam: getState().video } }); scheduleReconcile(); }
     },
     leave() {
       leaving = true;

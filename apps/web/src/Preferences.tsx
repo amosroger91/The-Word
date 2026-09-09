@@ -14,7 +14,9 @@ export function Preferences({
   onNameChange,
   onAvatarChange,
   onClose,
+  embedded = false,
 }: {
+  embedded?: boolean;
   app: WordApp;
   name: string;
   color: string;
@@ -39,7 +41,7 @@ export function Preferences({
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') onClose();
+      if (event.key === 'Escape' && panelRef.current?.contains(document.activeElement)) onClose();
     }
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
@@ -61,10 +63,10 @@ export function Preferences({
 
   return (
     <div
-      className="prefs-backdrop"
+      className={embedded ? 'prefs-embedded' : 'prefs-backdrop'}
       onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}
     >
-      <div className="prefs" role="dialog" aria-modal="true" aria-label={label.preferences} ref={panelRef} tabIndex={-1}>
+      <div className="prefs" role="dialog" aria-modal={embedded ? undefined : true} aria-label={label.preferences} ref={panelRef} tabIndex={-1}>
         <div className="prefs-header">
           <h2>{label.preferences}</h2>
           <button type="button" onClick={onClose} aria-label={label.closePreferences}>×</button>
@@ -208,7 +210,7 @@ export function Preferences({
               <div className="prefs-photo-actions">
                 <button type="button" onClick={() => fileRef.current?.click()}>{label.changePhoto}</button>
                 {avatar ? <button type="button" onClick={() => onAvatarChange(null)}>{label.removePhoto}</button> : null}
-                <p className="muted">{label.photoHint}</p>
+                <p className="muted">Stored in this browser, without a server account. Clearing this site’s cookies and site data removes your profile. Your name and photo are shared with people in a study you join; a public group also lists the host’s name.</p>
               </div>
               <input
                 ref={fileRef}

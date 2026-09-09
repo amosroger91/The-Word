@@ -3,7 +3,17 @@
 // and FaceRail.tsx renders remote streams.
 
 let localStream: MediaStream | null = null;
+let devices = { microphone: '', camera: '' };
+export function setDevices(next: typeof devices) { devices = next; }
+export function getDevices() { return { ...devices }; }
 let state = { audio: false, video: false };
+let remoteVolume = 1;
+export function setRemoteVolume(volume: number) {
+  remoteVolume = Math.max(0, Math.min(1, volume));
+  remotePlayers.forEach((player) => { player.volume = remoteVolume; });
+}
+export function getRemoteVolume() { return remoteVolume; }
+
 const remotePlayers = new Set<HTMLMediaElement>();
 
 export function getState() { return { ...state }; }
@@ -18,8 +28,8 @@ export async function setMedia({ audio, video }: { audio: boolean; video: boolea
     return null;
   }
   const fresh = await navigator.mediaDevices.getUserMedia({
-    audio: want.audio ? { echoCancellation: true, noiseSuppression: true, autoGainControl: true } : false,
-    video: want.video ? { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' } : false,
+    audio: want.audio ? { echoCancellation: true, noiseSuppression: true, autoGainControl: true, ...(devices.microphone ? { deviceId: { exact: devices.microphone } } : {}) } : false,
+    video: want.video ? { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user', ...(devices.camera ? { deviceId: { exact: devices.camera } } : {}) } : false,
   });
   stopLocal();
   localStream = fresh;
@@ -42,6 +52,7 @@ export function stopLocal() {
 // the autoplay gate, which is why the green ring can show with no sound.
 export function registerRemotePlayer(el: HTMLMediaElement) {
   remotePlayers.add(el);
+  el.volume = remoteVolume;
   return () => {
     remotePlayers.delete(el);
     el.srcObject = null;
@@ -51,7 +62,7 @@ export function registerRemotePlayer(el: HTMLMediaElement) {
 export function unlockRemoteAudio() {
   for (const el of remotePlayers) {
     el.muted = false;
-    el.volume = 1;
+    el.volume = remoteVolume;
     void el.play().catch(() => {});
   }
 }

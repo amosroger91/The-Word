@@ -28,7 +28,9 @@ export function VerseImageEditor({
   label,
   onClose,
   onSaved,
+  embedded = false,
 }: {
+  embedded?: boolean;
   job: VerseImageJob;
   fontStack: string;
   label: Strings;
@@ -107,7 +109,7 @@ export function VerseImageEditor({
   }
 
   return (
-    <div className="image-editor-backdrop" role="dialog" aria-label={label.createImage}>
+    <div className={embedded ? "image-editor-embedded" : "image-editor-backdrop"} role={embedded ? "region" : "dialog"} aria-label={label.createImage}>
       <div className="image-editor">
         <div className="image-editor-header">
           <h2>{label.createImage}</h2>

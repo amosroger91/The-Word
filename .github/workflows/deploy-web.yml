@@ -1,0 +1,57 @@
+name: Deploy web
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/web/**'
+      - 'packages/**'
+      - '.github/workflows/deploy-web.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: publish-web
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Restore installed web dependencies
+        id: dependencies
+        uses: actions/cache@v4
+        with:
+          path: apps/web/node_modules
+          key: web-modules-v1-${{ runner.os }}-${{ runner.arch }}-node22-${{ hashFiles('apps/web/package-lock.json') }}
+      - name: Install dependencies on cache miss
+        if: steps.dependencies.outputs.cache-hit != 'true'
+        run: npm --prefix apps/web ci
+      - run: npm --prefix apps/web run typecheck
+      - run: npm --prefix apps/web test
+      - name: Stamp source revision
+        run: node -e "require('fs').writeFileSync('apps/web/public/version.json', JSON.stringify({commit:process.env.GITHUB_SHA}))"
+      - name: Build static GitHub Pages site
+        env:
+          BASE_PATH: /The-Word/
+        run: npm --prefix apps/web run build
+      - uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: .pages-publish
+      - name: Publish built app
+        run: |
+          test -f apps/web/dist/index.html
+          rsync -a --delete --exclude=.git apps/web/dist/ .pages-publish/
+          touch .pages-publish/.nojekyll
+          cd .pages-publish
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "Deploy ${GITHUB_SHA}"
+          git push origin HEAD:gh-pages

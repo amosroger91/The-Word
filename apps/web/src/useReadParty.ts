@@ -7,7 +7,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { WordApp } from '@the-word/core';
 import { joinParty, type PartyChatMessage, type PartyMember, type PartyRoom, type ReadingState } from './readParty';
 import { compressAvatar, loadIdentity, saveIdentity } from './identity';
-import { getLocalStream, setMedia, stopLocal, unlockRemoteAudio } from './media';
+import { getLocalStream, setMedia, stopLocal, unlockRemoteAudio, setDevices } from './media';
 
 function randomCode(): string { return Math.random().toString(36).slice(2, 7); }
 
@@ -35,6 +35,13 @@ export function useReadParty(app: WordApp) {
   const [mediaError, setMediaError] = useState('');
   const [capped, setCapped] = useState(false);
   const [focusVerse, setFocusVerseState] = useState<number | null>(null);
+  const [shared, setShared] = useState<ReadingState | null>(null);
+  const [narrationMuted, setNarrationMuted] = useState(false);
+  const [presenting, setPresenting] = useState(false);
+  const appRef = useRef(app); appRef.current = app;
+  const sharedRef = useRef(shared); sharedRef.current = shared;
+  const hadHost = useRef(false);
+  const roleChanged = useRef(false);
   const [findable, setFindable] = useState(false);
 
   const identityRef = useRef(loadIdentity());
@@ -49,6 +56,7 @@ export function useReadParty(app: WordApp) {
   const startParty = useCallback((joinCode: string, opts?: { armed?: boolean; findable?: boolean }) => {
     const clean = joinCode.trim().toLowerCase();
     if (!clean) return;
+    appRef.current.stopSpeech(); setShared(null); setPresenting(false); setNarrationMuted(false);
     setError(''); setMessages([]); setMembers([]); setRemoteReading(null);
     setArmed(Boolean(opts?.armed)); setFollowing(true); lastSentRef.current = '';
     spokenVerseRef.current = null;
@@ -62,7 +70,7 @@ export function useReadParty(app: WordApp) {
         onSelf: ({ host }) => setIsHost(host),
         onRoster: (list, meta) => { setMembers(list); setIsHost(meta.host); setCapped(meta.capped); },
         onChat: (msg) => setMessages((prev) => [...prev.slice(-199), msg]),
-        onReading: (state) => setRemoteReading(state),
+        onReading: (state) => { setRemoteReading(state); setShared(state); },
         onError: (c) => setError(c),
         onRemoteStream: (id, stream) => setRemoteStreams((prev) => ({ ...prev, [id]: stream })),
         onRemoteEnd: (id) => setRemoteStreams((prev) => {
@@ -76,10 +84,12 @@ export function useReadParty(app: WordApp) {
     setRoom(r);
   }, []);
 
-  const createParty = useCallback((opts?: { findable?: boolean }) => startParty(randomCode(), { findable: opts?.findable }), [startParty]);
+  const createParty = useCallback((opts?: { findable?: boolean }) => startParty(randomCode(), { armed: true, findable: opts?.findable }), [startParty]);
 
   const leaveParty = useCallback(() => {
+    appRef.current.stopSpeech();
     room?.leave();
+    setShared(null); setPresenting(false);
     stopLocal();
     setLocalStream(null); setMicOn(false); setCamOn(false); setRemoteStreams({});
     setRoom(null); setIsHost(false); setMembers([]); setMessages([]);
@@ -125,46 +135,80 @@ export function useReadParty(app: WordApp) {
     void applyMedia(micOn, !camOn);
   }, [applyMedia, capped, micOn, camOn]);
 
-  const setFocusVerse = useCallback((verse: number) => {
-    setFocusVerseState(verse);
-  }, []);
-
-  const liveFloor = micOn || camOn || Object.keys(remoteStreams).length > 0;
+  const showGroup = useCallback((verses: number[]) => {
+    if (!room || !isHost) return;
+    const current = appRef.current;
+    current.stopSpeech();
+    setFocusVerseState(verses[0] ?? null);
+    const state: ReadingState = { bookId: current.bookId, chapter: current.chapterNumber,
+      translationId: current.translationId, verse: verses[0] ?? null,
+      highlights: [...verses].sort((a,b)=>a-b), action: 'live', ts: Date.now() };
+    setShared(state); room.setReadingState(state);
+  }, [room, isHost]);
+  const setFocusVerse = useCallback((verse: number) => showGroup([verse]), [showGroup]);
+  const liveFloor = shared?.action === 'live';
 
   useEffect(() => () => { room?.leave(); }, [room]);
 
-  // HOST: reflect this device's passage + playback + current verse into the
-  // shared reading state, so participants follow along verse by verse.
+  // Leadership changes stop old narration before the new host deliberately starts.
+  useEffect(() => {
+    if (hadHost.current !== isHost) {
+      roleChanged.current = true;
+      appRef.current.stopSpeech(); spokenVerseRef.current = null; lastSentRef.current = '';
+      setPresenting(false);
+    }
+    hadHost.current = isHost;
+  }, [isHost]);
+
+  // Idle navigation is private. Only explicit presentation or playback changes
+  // the group's passage; selection and research cannot move other readers.
   useEffect(() => {
     if (!room || !isHost) return;
-    const spoken = actionFor(app.speechState);
-    const action: ReadingState['action'] = spoken !== 'idle' ? spoken : (focusVerse != null || liveFloor ? 'live' : 'idle');
-    const verse = app.speakingVerse ?? (action === 'idle' ? null : focusVerse);
-    const state: ReadingState = { bookId: app.bookId, chapter: app.chapterNumber, verse, action, ts: Date.now() };
-    const key = `${state.bookId}:${state.chapter}:${state.verse}:${state.action}`;
+    if(roleChanged.current) { roleChanged.current=false; if(app.speechState !== 'idle') return; }
+    const old = sharedRef.current;
+    const playing = app.speechState !== 'idle';
+    const state: ReadingState = playing ? {
+      bookId: app.bookId, chapter: app.chapterNumber, translationId: app.translationId,
+      verse: app.speakingVerse, action: actionFor(app.speechState),
+      highlights: old?.bookId === app.bookId && old.chapter === app.chapterNumber ? old.highlights : [], ts: Date.now(),
+    } : old ? { ...old, action: 'live', ts: Date.now() } : {
+      bookId: app.bookId, chapter: app.chapterNumber, translationId: app.translationId,
+      verse: null, highlights: [], action: 'live', ts: Date.now(),
+    };
+    const key = JSON.stringify([state.bookId,state.chapter,state.verse,state.action,state.highlights,state.translationId]);
     if (key === lastSentRef.current) return;
     lastSentRef.current = key;
-    room.setReadingState(state);
-  }, [room, isHost, app.bookId, app.chapterNumber, app.speechState, app.speakingVerse, focusVerse, liveFloor]);
+    setShared(state); room.setReadingState(state);
+  }, [room,isHost,app.bookId,app.chapterNumber,app.translationId,app.speechState,app.speakingVerse]);
 
-  // HOST heartbeat: while reading (Piper or live), re-broadcast the current
-  // position every few seconds so anyone who joined mid-verse stays in sync.
   useEffect(() => {
     if (!room || !isHost) return;
-    if (app.speechState === 'idle' && focusVerse == null && !liveFloor) return;
     const timer = setInterval(() => {
-      const spoken = actionFor(app.speechState);
-      const action: ReadingState['action'] = spoken !== 'idle' ? spoken : (focusVerse != null || liveFloor ? 'live' : 'idle');
-      room.setReadingState({
-        bookId: app.bookId,
-        chapter: app.chapterNumber,
-        verse: app.speakingVerse ?? focusVerse,
-        action,
-        ts: Date.now(),
-      });
+      if (sharedRef.current) room.setReadingState({ ...sharedRef.current, ts: Date.now() });
     }, 3000);
     return () => clearInterval(timer);
-  }, [room, isHost, app.bookId, app.chapterNumber, app.speechState, app.speakingVerse, focusVerse, liveFloor]);
+  }, [room,isHost]);
+
+  const browseIndependently = useCallback(() => {
+    appRef.current.stopSpeech();
+    if (!isHost) setFollowing(false);
+    setPresenting(false);
+    spokenVerseRef.current = null;
+  }, [isHost]);
+  const returnToHost = useCallback(() => {
+    const current = sharedRef.current;
+    if (!current) return;
+    setFollowing(true); spokenVerseRef.current = null;
+    appRef.current.goToVerse(current.bookId,current.chapter,current.verse || 1);
+  }, []);
+  const toggleNarration = useCallback(() => {
+    setNarrationMuted(value => !value);
+    appRef.current.stopSpeech(); spokenVerseRef.current = null;
+  }, []);
+  const transferHost = useCallback((id: string) => {
+    appRef.current.stopSpeech();
+    room?.transferHost(id);
+  }, [room]);
 
   // If join-click unlock wasn't enough, drop armed so the fallback button appears.
   useEffect(() => {
@@ -184,6 +228,7 @@ export function useReadParty(app: WordApp) {
   // host's passage AND current verse, reading each verse with the local TTS.
   useEffect(() => {
     if (!room || isHost || !remoteReading || !following) return;
+    if (status !== 'connected') { appRef.current.stopSpeech(); spokenVerseRef.current = null; return; }
     const rs = remoteReading;
     // 1. Follow the host to the passage first; re-runs once the new chapter loads.
     if (app.bookId !== rs.bookId || app.chapterNumber !== rs.chapter) {
@@ -209,6 +254,7 @@ export function useReadParty(app: WordApp) {
       return;
     }
     // 3. action === 'playing': speak the host's current verse (audio needs arming).
+    if (narrationMuted) { if (app.speechState !== 'idle') app.stopSpeech(); spokenVerseRef.current = null; return; }
     if (!armed || app.chapterLoading || !app.chapter || rs.verse == null) return;
     if (rs.verse !== spokenVerseRef.current) {
       // Host moved to a new verse — jump our local reading to it.
@@ -217,14 +263,16 @@ export function useReadParty(app: WordApp) {
     } else if (app.speechState === 'paused') {
       app.resumeSpeech();
     }
-  }, [room, isHost, following, armed, remoteReading, app.bookId, app.chapterNumber, app.chapterLoading, app.chapter, app.speechState]);
+  }, [room, isHost, following, armed, narrationMuted, status, remoteReading, app.bookId, app.chapterNumber, app.chapterLoading, app.chapter, app.speechState]);
 
   // A participant who is following and hasn't armed audio, while the host is playing.
-  const needsArm = Boolean(room) && !isHost && following && !armed && remoteReading?.action === 'playing';
+  const needsArm = Boolean(room) && !isHost && following && !narrationMuted && !armed && remoteReading?.action === 'playing';
   // The verse the host is currently on, for visual "here's where the host is"
   // highlighting even before (or without) local audio.
   const hostVerse = (Boolean(room) && !isHost && following && remoteReading && remoteReading.action !== 'idle') ? (remoteReading.verse ?? null) : null;
-  const stageVerse = isHost ? (app.speakingVerse ?? focusVerse) : hostVerse;
+  const stageVisible = shared?.bookId === app.bookId && shared.chapter === app.chapterNumber;
+  const stageVerse = stageVisible && (isHost || following) ? shared?.verse ?? null : null;
+  const highlights = stageVisible ? shared?.highlights ?? [] : [];
 
   // Name and photo live in this browser only — renaming/uploading applies
   // live to the roster in an open room, and sticks for the next visit.
@@ -250,6 +298,9 @@ export function useReadParty(app: WordApp) {
   }, [room]);
 
   return {
+    chooseDevices: async (microphone:string,camera:string) => {setDevices({microphone,camera});if(micOn||camOn)await applyMedia(micOn,camOn);},
+    shared, highlights, presenting, setPresenting, showGroup, browseIndependently, returnToHost,
+    narrationMuted, toggleNarration, transferHost,
     active: Boolean(room),
     code,
     isHost,

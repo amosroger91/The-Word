@@ -5,7 +5,11 @@ Deploy: `bash scripts/deploy-pages.sh` (builds `apps/web`, force-pushes `dist/` 
 
 ## Requested, not yet started
 
-_(none)_
+- Guided lessons, circles (family / couple / friends / solo), badges, and portable
+  accounts. Framework design in [`docs/study-plans-framework.md`](docs/study-plans-framework.md)
+  — data shapes and delivery order, no plan content. Four decisions are still open
+  at the end of that doc; the family-on-one-device question is the one that changes
+  the account model, so settle it before Phase 3.
 
 ## Recently shipped (this session, pending deploy)
 
