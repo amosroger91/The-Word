@@ -20,6 +20,14 @@ async function fields(target) {
 }
 
 await page.goto(APP_URL, { waitUntil: 'networkidle' });
+
+// First run puts the welcome card over everything.
+const skip = page.locator('.welcome-card button', { hasText: 'Skip for now' });
+if (await skip.count()) {
+  await skip.click();
+  await page.waitForSelector('.welcome-backdrop', { state: 'detached' });
+}
+
 await page.locator('.landing button[aria-label="Preferences"]').first().click();
 await page.waitForSelector('.prefs');
 const fromLanding = await fields(page);
@@ -32,7 +40,7 @@ await page.waitForSelector('.prefs', { state: 'detached' });
 await page.goto(`${APP_URL}#read`, { waitUntil: 'networkidle' });
 await page.waitForSelector('.verse');
 if (await page.locator('.control-settings').count()) throw new Error('FAIL: the reader still has its own settings row');
-await page.locator('.settings-toggle').click();
+await page.locator('nav[aria-label="Reader tools"] button[aria-label="Settings"]').click();
 await page.waitForSelector('.prefs');
 const fromReader = await fields(page);
 console.log(JSON.stringify({ fromReader }));
@@ -69,8 +77,8 @@ await page.keyboard.press('Escape');
 await page.waitForSelector('.prefs', { state: 'detached' });
 await page.setViewportSize({ width: 400, height: 840 });
 await page.waitForTimeout(300);
-if (!(await page.locator('.settings-toggle').isVisible())) throw new Error('FAIL: no settings button at phone width');
-await page.locator('.settings-toggle').click();
+if (!(await page.locator('nav[aria-label="Reader tools"] button[aria-label="Settings"]').isVisible())) throw new Error('FAIL: no settings button at phone width');
+await page.locator('nav[aria-label="Reader tools"] button[aria-label="Settings"]').click();
 await page.waitForSelector('.prefs');
 console.log(JSON.stringify({ mobileFields: (await fields(page)).length }));
 await page.screenshot({ path: shot('settings-mobile.png') });

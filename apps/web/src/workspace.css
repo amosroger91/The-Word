@@ -306,7 +306,7 @@
 :root[data-theme='dark'] .verse-note { background: #201f1c; border-color: #38352e; }
 .verse-note-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .verse-note-header button { border: 0; background: transparent; color: inherit; font-size: 24px; line-height: 1; padding: 0 4px; }
-.verse-note textarea { width: 100%; min-height: 108px; resize: vertical; border: 1px solid var(--line, #c9c1b3); border-radius: 10px; background: transparent; color: inherit; padding: 10px; }
+.verse-note textarea { font: inherit; width: 100%; min-height: 108px; resize: vertical; border: 1px solid var(--line, #c9c1b3); border-radius: 10px; background: transparent; color: inherit; padding: 10px; }
 .verse-note-share { display: flex; align-items: center; gap: 8px; text-transform: none; letter-spacing: normal; font-size: 15px; font-weight: 400; color: inherit; }
 .verse-note-share input { width: 18px; height: 18px; flex: 0 0 auto; padding: 0; }
 .verse-note .muted { margin: 0; font-size: 12px; }
