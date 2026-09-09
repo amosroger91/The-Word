@@ -3,6 +3,19 @@ import { MicOffIcon } from './icons';
 import { registerRemotePlayer } from './media';
 import type { PartyMember } from './readParty';
 
+// One AudioContext for the whole page. A browser caps how many a document may
+// hold (Chrome around six) and each one costs an audio render thread, so a full
+// room must not open one per tile — that is what made the voices stutter.
+let shared: AudioContext | null = null;
+function talkingContext() {
+  const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (!AudioCtx) return null;
+  shared ??= new AudioCtx();
+  // Created before any gesture on some browsers; a mic/join click resumes it.
+  if (shared.state === 'suspended') void shared.resume();
+  return shared;
+}
+
 function useTalking(stream: MediaStream | null, liveMic: boolean) {
   const [talking, setTalking] = useState(false);
 
@@ -11,9 +24,8 @@ function useTalking(stream: MediaStream | null, liveMic: boolean) {
       setTalking(false);
       return;
     }
-    const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!AudioCtx) return;
-    const ctx = new AudioCtx();
+    const ctx = talkingContext();
+    if (!ctx) return;
     const source = ctx.createMediaStreamSource(stream);
     const analyser = ctx.createAnalyser();
     analyser.fftSize = 512;
@@ -22,22 +34,27 @@ function useTalking(stream: MediaStream | null, liveMic: boolean) {
     const bins = new Uint8Array(analyser.frequencyBinCount);
     let raf = 0;
     let lastVoice = 0;
+    let lastSample = 0;
     const tick = () => {
+      raf = requestAnimationFrame(tick);
+      const now = performance.now();
+      // A talking ring does not need every frame, and one FFT per tile per frame
+      // is real main-thread work once a few people are in the room.
+      if (now - lastSample < 50) return;
+      lastSample = now;
       analyser.getByteFrequencyData(bins);
       const end = Math.min(48, bins.length);
       let sum = 0;
       for (let i = 2; i < end; i += 1) sum += bins[i];
       const level = sum / Math.max(1, end - 2) / 255;
-      const now = performance.now();
       if (level > 0.14) lastVoice = now;
       setTalking(now - lastVoice < 280);
-      raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => {
       cancelAnimationFrame(raf);
+      // Only this stream's node goes; the context is shared and stays open.
       source.disconnect();
-      void ctx.close();
     };
   }, [stream, liveMic]);
 
@@ -99,7 +116,10 @@ function Tile({
 
   return (
     <div className={className} role="listitem">
-      {stream ? <video ref={videoRef} autoPlay playsInline muted={self} /> : null}
+      {/* Picture only. Sound for a remote peer comes from the dedicated <audio>
+          below; leaving this unmuted played every remote voice through two
+          elements at once, which drift apart into a jumbled, echoing double. */}
+      {stream ? <video ref={videoRef} autoPlay playsInline muted /> : null}
       {!self ? <audio ref={audioRef} autoPlay playsInline className="meeting-audio" /> : null}
       {!hasVideo && (
         avatar
