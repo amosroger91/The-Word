@@ -73,13 +73,21 @@ const again = await page.evaluate(async () => {
   return (await reminder.getNotifications()).length;
 });
 await page.locator('.prefs-reminder button', { hasText: 'test' }).click();
-await page.waitForTimeout(800);
+// The panel reports what actually became of it: a notification the browser
+// accepts but the system swallows never lands in the registration's own list.
+await page.waitForSelector('.prefs-field:has(.prefs-toggle) [role="status"], .prefs-field:has(.prefs-toggle) [role="alert"]', { timeout: 8000 });
+const verdict = await page.evaluate(() => {
+  const el = document.querySelector('.prefs-field:has(.prefs-toggle) [role="status"], .prefs-field:has(.prefs-toggle) [role="alert"]');
+  return { role: el?.getAttribute('role'), text: el?.textContent?.trim().slice(0, 60) };
+});
 const tags = await page.evaluate(async () => {
   const registrations = await navigator.serviceWorker.getRegistrations();
   const reminder = registrations.find((registration) => registration.scope.endsWith('/reminder/'));
   return (await reminder.getNotifications()).map((n) => n.tag);
 });
-console.log(JSON.stringify({ afterSecondCheck: again, tags }));
+console.log(JSON.stringify({ afterSecondCheck: again, tags, verdict }));
+if (verdict.role !== 'status') throw new Error(`FAIL: test notification reported "${verdict.text}" where the browser does show them`);
+if (!tags.some((tag) => tag.startsWith('word-reminder-test-'))) throw new Error('FAIL: the test notification is not in the browser list');
 
 // Turning it off must leave nothing queued behind.
 await toggle.uncheck();

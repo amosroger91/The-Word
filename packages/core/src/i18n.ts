@@ -142,6 +142,9 @@ export interface Strings {
   reminderBlocked: string;
   reminderUnsupported: string;
   reminderTest: string;
+  reminderTestSent: string;
+  reminderTestBlocked: string;
+  reminderTestFailed: string;
   reminderTitle: string;
   reminderBody: string;
 }
@@ -295,6 +298,9 @@ export const strings: Record<Language, Strings> = {
     reminderBlocked: 'Notifications are blocked for this site. Allow them in your browser settings to turn the reminder on.',
     reminderUnsupported: 'This browser cannot show reminders.',
     reminderTest: 'Send a test notification',
+    reminderTestSent: 'Sent — it should be on your desktop now.',
+    reminderTestBlocked: 'Your browser sent it, but your system did not show it. Turn notifications on for your browser in your system settings (on Windows: Settings › System › Notifications), and check that do not disturb is off.',
+    reminderTestFailed: 'Your browser would not show the notification.',
     reminderTitle: 'Time in the Word',
     reminderBody: "Today's verse is waiting for you.",
   },
@@ -440,6 +446,9 @@ export const strings: Record<Language, Strings> = {
     reminderBlocked: 'Las notificaciones están bloqueadas para este sitio. Permítelas en la configuración del navegador para activar el recordatorio.',
     reminderUnsupported: 'Este navegador no puede mostrar recordatorios.',
     reminderTest: 'Enviar una notificación de prueba',
+    reminderTestSent: 'Enviada: ya debería estar en tu escritorio.',
+    reminderTestBlocked: 'El navegador la envió, pero el sistema no la mostró. Activa las notificaciones del navegador en los ajustes del sistema (en Windows: Configuración › Sistema › Notificaciones) y comprueba que el modo no molestar esté desactivado.',
+    reminderTestFailed: 'El navegador no quiso mostrar la notificación.',
     reminderTitle: 'Un momento con la Palabra',
     reminderBody: 'El versículo de hoy te espera.',
   },
@@ -585,6 +594,9 @@ export const strings: Record<Language, Strings> = {
     reminderBlocked: 'Les notifications sont bloquées pour ce site. Autorisez-les dans les réglages du navigateur pour activer le rappel.',
     reminderUnsupported: 'Ce navigateur ne peut pas afficher de rappels.',
     reminderTest: 'Envoyer une notification de test',
+    reminderTestSent: 'Envoyée — elle devrait être sur votre bureau.',
+    reminderTestBlocked: "Le navigateur l'a envoyée, mais le système ne l'a pas affichée. Activez les notifications du navigateur dans les réglages système (sous Windows : Paramètres › Système › Notifications) et vérifiez que le mode ne pas déranger est désactivé.",
+    reminderTestFailed: "Le navigateur a refusé d'afficher la notification.",
     reminderTitle: 'Un temps dans la Parole',
     reminderBody: "Le verset du jour vous attend.",
   },
@@ -730,6 +742,9 @@ export const strings: Record<Language, Strings> = {
     reminderBlocked: '本站的通知已被阻止。请在浏览器设置中允许通知，才能开启提醒。',
     reminderUnsupported: '此浏览器无法显示提醒。',
     reminderTest: '发送测试通知',
+    reminderTestSent: '已发送——它现在应该出现在你的桌面上。',
+    reminderTestBlocked: '浏览器已发送，但系统没有显示。请在系统设置中为浏览器开启通知（Windows：设置 › 系统 › 通知），并确认勿扰模式已关闭。',
+    reminderTestFailed: '浏览器拒绝显示该通知。',
     reminderTitle: '与圣言同在的时刻',
     reminderBody: '今日经文正等着你。',
   },
@@ -875,6 +890,9 @@ export const strings: Record<Language, Strings> = {
     reminderBlocked: 'Thông báo đang bị chặn cho trang này. Hãy cho phép trong cài đặt trình duyệt để bật lời nhắc.',
     reminderUnsupported: 'Trình duyệt này không hiển thị được lời nhắc.',
     reminderTest: 'Gửi thông báo thử',
+    reminderTestSent: 'Đã gửi — nó sẽ hiện trên màn hình của bạn ngay bây giờ.',
+    reminderTestBlocked: 'Trình duyệt đã gửi, nhưng hệ thống không hiển thị. Hãy bật thông báo cho trình duyệt trong cài đặt hệ thống (trên Windows: Cài đặt › Hệ thống › Thông báo) và kiểm tra chế độ không làm phiền đã tắt.',
+    reminderTestFailed: 'Trình duyệt đã từ chối hiển thị thông báo.',
     reminderTitle: 'Giờ ở trong Lời Chúa',
     reminderBody: 'Câu Kinh Thánh hôm nay đang chờ bạn.',
   },

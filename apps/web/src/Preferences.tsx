@@ -174,6 +174,11 @@ export function Preferences({
             )}
             <p className="muted">{reminderHint}</p>
             {reminder.settings.enabled && !reminder.exact && <p className="muted">{label.reminderApprox}</p>}
+            {/* Whether the toast actually reaches the desktop is the operating
+                system's call, so say what the browser did and leave the rest. */}
+            {reminder.testState === 'sent' && <p className="muted" role="status">{label.reminderTestSent}</p>}
+            {reminder.testState === 'blocked' && <p className="muted" role="alert">{label.reminderTestBlocked}</p>}
+            {reminder.testState === 'failed' && <p className="muted" role="alert">{label.reminderTestFailed}</p>}
           </div>
 
           <label className="prefs-field">

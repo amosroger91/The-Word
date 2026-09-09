@@ -213,10 +213,28 @@ async function arm(settings: ReminderSettings, text: ReminderText) {
   active?.postMessage({ type: 'check' });
 }
 
+export type ReminderTestState = 'idle' | 'sending' | 'sent' | 'blocked' | 'failed';
+
+// A notification the browser accepted but the system then swallowed never turns
+// up in the registration's own list. That is the signature of notifications being
+// switched off for the browser at the OS level (Windows Settings › System ›
+// Notifications, or a do-not-disturb mode): showNotification resolves, and
+// nothing reaches the desktop. Poll briefly, because appearing is not instant.
+async function reachedTheDesktop(registration: ServiceWorkerRegistration, tag: string) {
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    const shown = await registration.getNotifications({ tag });
+    if (shown.length) return true;
+  }
+  return false;
+}
+
 export interface DailyReminder {
   settings: ReminderSettings;
   permission: ReminderPermission;
   supported: boolean;
+  /** What became of the last test notification the reader asked for. */
+  testState: ReminderTestState;
   /** True when this browser fires the reminder with nothing of ours running. */
   exact: boolean;
   nextAt: Date | null;
@@ -229,6 +247,7 @@ export function useDailyReminder(text: ReminderText): DailyReminder {
   const supported = isSupported();
   const [settings, setSettings] = useState(readSettings);
   const [permission, setPermission] = useState<ReminderPermission>(() => (supported ? Notification.permission : 'unsupported'));
+  const [testState, setTestState] = useState<ReminderTestState>('idle');
   // The reminder is armed from an effect, but the notification wording follows the
   // interface language; a ref keeps the latest text without re-arming on identity.
   const textRef = useRef(text);
@@ -295,17 +314,34 @@ export function useDailyReminder(text: ReminderText): DailyReminder {
 
   const sendTest = useCallback(() => {
     if (!supported || Notification.permission !== 'granted') return;
-    void reminderWorker().then((registration) => registration.showNotification(textRef.current.title, {
-      body: textRef.current.body,
-      tag: `${PREFIX}-test`,
-      data: { url: appUrl() },
-    }));
+    setTestState('sending');
+    // A fresh tag every time. Reusing one replaces the existing notification
+    // instead of posting a new one, and a replacement does not raise a second
+    // toast — so pressing twice looked like nothing happened at all.
+    const tag = `${PREFIX}-test-${Date.now()}`;
+    void (async () => {
+      try {
+        const registration = await reminderWorker();
+        await registration.showNotification(textRef.current.title, {
+          body: textRef.current.body,
+          tag,
+          data: { url: appUrl() },
+          // Keep it on screen rather than letting it slide straight into the
+          // notification centre, which is the whole point of a test.
+          requireInteraction: true,
+        });
+        setTestState(await reachedTheDesktop(registration, tag) ? 'sent' : 'blocked');
+      } catch {
+        setTestState('failed');
+      }
+    })();
   }, [supported]);
 
   return {
     settings,
     permission,
     supported,
+    testState,
     exact: supported && timestampTrigger() !== null,
     nextAt: on ? nextReminderAt(time) : null,
     setEnabled,
