@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#f7f4ee" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <!-- Relative so it resolves under a GitHub Pages subpath as well as at the
+         root. Installing the app is what lets the browser deliver the daily
+         reading reminder while the page is closed. -->
+    <link rel="manifest" href="manifest.webmanifest" />
     <title>The Word</title>
     <!-- Restores cross-origin isolation on static hosts (GitHub Pages) that cannot
          send COOP/COEP headers, so Piper read-aloud's threaded WASM can run.

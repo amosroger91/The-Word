@@ -1,0 +1,13 @@
+{
+  "name": "The Word",
+  "short_name": "The Word",
+  "description": "Read the Bible, listen to it, and study it together — free, and local to your device.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f7f4ee",
+  "theme_color": "#f7f4ee",
+  "icons": [
+    { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

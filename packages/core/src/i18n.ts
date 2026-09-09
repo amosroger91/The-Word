@@ -133,6 +133,17 @@ export interface Strings {
   overlay: string;
   textColor: string;
   textSize: string;
+  dailyReminder: string;
+  dailyReminderHint: string;
+  reminderEnable: string;
+  reminderTime: string;
+  reminderNext: (when: string) => string;
+  reminderApprox: string;
+  reminderBlocked: string;
+  reminderUnsupported: string;
+  reminderTest: string;
+  reminderTitle: string;
+  reminderBody: string;
 }
 
 function verseList(verses: number[]) {
@@ -275,6 +286,17 @@ export const strings: Record<Language, Strings> = {
     overlay: 'Overlay',
     textColor: 'Text color',
     textSize: 'Text size',
+    dailyReminder: 'Daily reminder',
+    dailyReminderHint: 'A notification at the same time every day, even when this page is closed.',
+    reminderEnable: 'Remind me to read every day',
+    reminderTime: 'Reminder time',
+    reminderNext: (when: string) => `Next reminder ${when}.`,
+    reminderApprox: 'This browser wakes up on its own schedule, so the reminder can arrive a little late — or when you next open The Word.',
+    reminderBlocked: 'Notifications are blocked for this site. Allow them in your browser settings to turn the reminder on.',
+    reminderUnsupported: 'This browser cannot show reminders.',
+    reminderTest: 'Send a test notification',
+    reminderTitle: 'Time in the Word',
+    reminderBody: "Today's verse is waiting for you.",
   },
   es: {
     languageName: 'Español',
@@ -409,6 +431,17 @@ export const strings: Record<Language, Strings> = {
     overlay: 'Superposición',
     textColor: 'Color del texto',
     textSize: 'Tamaño del texto',
+    dailyReminder: 'Recordatorio diario',
+    dailyReminderHint: 'Una notificación a la misma hora cada día, aunque esta página esté cerrada.',
+    reminderEnable: 'Recuérdame leer cada día',
+    reminderTime: 'Hora del recordatorio',
+    reminderNext: (when: string) => `Próximo recordatorio ${when}.`,
+    reminderApprox: 'Este navegador despierta cuando lo decide, así que el recordatorio puede llegar un poco tarde, o cuando vuelvas a abrir La Palabra.',
+    reminderBlocked: 'Las notificaciones están bloqueadas para este sitio. Permítelas en la configuración del navegador para activar el recordatorio.',
+    reminderUnsupported: 'Este navegador no puede mostrar recordatorios.',
+    reminderTest: 'Enviar una notificación de prueba',
+    reminderTitle: 'Un momento con la Palabra',
+    reminderBody: 'El versículo de hoy te espera.',
   },
   fr: {
     languageName: 'Français',
@@ -543,6 +576,17 @@ export const strings: Record<Language, Strings> = {
     overlay: 'Voile',
     textColor: 'Couleur du texte',
     textSize: 'Taille du texte',
+    dailyReminder: 'Rappel quotidien',
+    dailyReminderHint: 'Une notification à la même heure chaque jour, même quand cette page est fermée.',
+    reminderEnable: 'Me rappeler de lire chaque jour',
+    reminderTime: 'Heure du rappel',
+    reminderNext: (when: string) => `Prochain rappel ${when}.`,
+    reminderApprox: "Ce navigateur se réveille quand il le décide : le rappel peut arriver avec un peu de retard, ou à votre prochaine ouverture de La Parole.",
+    reminderBlocked: 'Les notifications sont bloquées pour ce site. Autorisez-les dans les réglages du navigateur pour activer le rappel.',
+    reminderUnsupported: 'Ce navigateur ne peut pas afficher de rappels.',
+    reminderTest: 'Envoyer une notification de test',
+    reminderTitle: 'Un temps dans la Parole',
+    reminderBody: "Le verset du jour vous attend.",
   },
   zh: {
     languageName: '中文',
@@ -677,6 +721,17 @@ export const strings: Record<Language, Strings> = {
     overlay: '遮罩',
     textColor: '文字颜色',
     textSize: '文字大小',
+    dailyReminder: '每日提醒',
+    dailyReminderHint: '每天同一时间发送通知，即使此页面已关闭。',
+    reminderEnable: '每天提醒我读经',
+    reminderTime: '提醒时间',
+    reminderNext: (when: string) => `下次提醒：${when}。`,
+    reminderApprox: '此浏览器按自己的节奏唤醒，提醒可能稍有延迟，或在你下次打开《圣言》时送达。',
+    reminderBlocked: '本站的通知已被阻止。请在浏览器设置中允许通知，才能开启提醒。',
+    reminderUnsupported: '此浏览器无法显示提醒。',
+    reminderTest: '发送测试通知',
+    reminderTitle: '与圣言同在的时刻',
+    reminderBody: '今日经文正等着你。',
   },
   vi: {
     languageName: 'Tiếng Việt',
@@ -811,6 +866,17 @@ export const strings: Record<Language, Strings> = {
     overlay: 'Lớp phủ',
     textColor: 'Màu chữ',
     textSize: 'Cỡ chữ',
+    dailyReminder: 'Nhắc nhở hằng ngày',
+    dailyReminderHint: 'Một thông báo vào cùng giờ mỗi ngày, ngay cả khi trang này đã đóng.',
+    reminderEnable: 'Nhắc tôi đọc mỗi ngày',
+    reminderTime: 'Giờ nhắc',
+    reminderNext: (when: string) => `Lần nhắc kế tiếp ${when}.`,
+    reminderApprox: 'Trình duyệt này tự chọn lúc thức dậy, nên lời nhắc có thể đến hơi trễ, hoặc khi bạn mở Lời Chúa lần sau.',
+    reminderBlocked: 'Thông báo đang bị chặn cho trang này. Hãy cho phép trong cài đặt trình duyệt để bật lời nhắc.',
+    reminderUnsupported: 'Trình duyệt này không hiển thị được lời nhắc.',
+    reminderTest: 'Gửi thông báo thử',
+    reminderTitle: 'Giờ ở trong Lời Chúa',
+    reminderBody: 'Câu Kinh Thánh hôm nay đang chờ bạn.',
   },
 };
 

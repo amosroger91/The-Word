@@ -16,6 +16,7 @@ Web, Android, and iOS share one reader brain in `packages/core`. The web client 
 - Read-aloud with speed and volume controls (five UI languages)
 - Web read-aloud uses local Piper WASM. Android/iOS use the device speech engine
 - Web Group Study: a P2P room so several devices follow one host's passage and read it aloud locally, with optional live microphone and camera around the verse (WebRTC mesh, capped at 8)
+- Daily reading reminder: an optional browser notification at a time you choose (7:00 by default), scheduled by the browser so it arrives with the page closed. No server and no account — see `apps/web/src/dailyReminder.ts` for the three delivery paths and what each browser can promise
 
 KJV is sourced from the aruljohn/Bible-kjv repository. ASV is sourced from Scrollmapper’s public Bible database. WEB is sourced from eBible.org’s public-domain WEB Protestant USFM release. Copyrighted translations such as ESV are not bundled.
 

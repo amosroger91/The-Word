@@ -15,6 +15,7 @@ data/*.db-*
 .DS_Store
 Thumbs.db
 apps/web/e2e-landing/
+apps/web/e2e-reminder/
 packages/bible/data/cross-references.zip
 packages/bible/data/cross-references-src/
 

@@ -494,11 +494,15 @@ select, input { border: 1px solid #c9c1b3; border-radius: 8px; background: trans
 .prefs-stepper button:hover { border-color: var(--accent); }
 .prefs-sample { flex: 1; margin: 0; padding: 8px 12px; border: 1px dashed var(--line); border-radius: 10px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .prefs-toggle { display: flex; align-items: center; gap: 10px; min-height: 44px; }
+/* A sentence to read, not a field heading: undo the uppercase label styling. */
+.prefs-toggle span { color: inherit; text-transform: none; letter-spacing: normal; font-size: 15px; font-weight: 400; }
 .prefs-toggle input[type='checkbox'] { width: 20px; height: 20px; flex: 0 0 auto; padding: 0; accent-color: var(--accent); }
 .prefs-toggle input:disabled + span { opacity: 0.55; }
 .prefs-reminder { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .prefs-reminder input[type='time'] { width: auto; min-height: 44px; }
-.prefs-reminder button { border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: inherit; padding: 8px 14px; min-height: 44px; }
+/* The panel sits outside .landing, where --line/--surface are defined, so this
+   falls back to the same border the app's other controls draw. */
+.prefs-reminder button { border: 1px solid var(--line, #c9c1b3); border-radius: 10px; background: var(--surface, transparent); color: inherit; padding: 8px 14px; min-height: 44px; }
 .prefs-reminder button:hover { border-color: var(--accent); }
 .prefs-field .muted { margin: 0; font-size: 12px; }
 

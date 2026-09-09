@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { readingFonts, type Language, type WordApp } from '@the-word/core';
 import { SearchableSelect } from './SearchableSelect';
+import type { DailyReminder } from './dailyReminder';
 
 // Everything a reader sets once and forgets: how Scripture looks, how it sounds,
 // and who they are to the rest of a Group Study.
@@ -9,6 +10,7 @@ export function Preferences({
   name,
   color,
   avatar,
+  reminder,
   onNameChange,
   onAvatarChange,
   onClose,
@@ -17,6 +19,7 @@ export function Preferences({
   name: string;
   color: string;
   avatar: string | null;
+  reminder: DailyReminder;
   onNameChange: (name: string) => void;
   onAvatarChange: (file: File | null) => void;
   onClose: () => void;
@@ -40,6 +43,16 @@ export function Preferences({
   const voiceLabel = (voice: { id: string; name: string; isDefault?: boolean }) => (
     voice.isDefault ? label.defaultVoice : voice.name
   );
+
+  // "Tuesday 7:00 AM" — the day makes it plain when the chosen time has already
+  // passed today, and the clock format follows the reader's own language.
+  const nextReminder = reminder.nextAt
+    ? new Intl.DateTimeFormat(app.language, { weekday: 'long', hour: 'numeric', minute: '2-digit' }).format(reminder.nextAt)
+    : null;
+  const reminderHint = !reminder.supported ? label.reminderUnsupported
+    : reminder.permission === 'denied' ? label.reminderBlocked
+    : nextReminder ? label.reminderNext(nextReminder)
+    : label.dailyReminderHint;
 
   return (
     <div
@@ -130,6 +143,32 @@ export function Preferences({
               aria-label={label.volume}
               onChange={(event) => app.changeSpeechVolume(Number(event.target.value) - app.speechVolume)}
             />
+          </div>
+
+          <div className="prefs-field">
+            <span className="section-label">{label.dailyReminder}</span>
+            <label className="prefs-toggle">
+              <input
+                type="checkbox"
+                checked={reminder.settings.enabled}
+                disabled={!reminder.supported || reminder.permission === 'denied'}
+                onChange={(event) => reminder.setEnabled(event.target.checked)}
+              />
+              <span>{label.reminderEnable}</span>
+            </label>
+            {reminder.settings.enabled && (
+              <div className="prefs-reminder">
+                <input
+                  type="time"
+                  value={reminder.settings.time}
+                  aria-label={label.reminderTime}
+                  onChange={(event) => reminder.setTime(event.target.value)}
+                />
+                <button type="button" onClick={reminder.sendTest}>{label.reminderTest}</button>
+              </div>
+            )}
+            <p className="muted">{reminderHint}</p>
+            {reminder.settings.enabled && !reminder.exact && <p className="muted">{label.reminderApprox}</p>}
           </div>
 
           <label className="prefs-field">
