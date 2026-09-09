@@ -147,6 +147,19 @@ export interface Strings {
   reminderTestSent: string;
   reminderTestBlocked: string;
   reminderTestFailed: string;
+  readers: string;
+  readersHint: string;
+  readerName: string;
+  addReader: string;
+  removeReader: string;
+  readerPin: string;
+  readerPinFor: string;
+  readerSetPin: string;
+  readerPinSet: string;
+  readerPinClear: string;
+  readerPinHint: string;
+  readerPinWrong: string;
+  readerUnlock: string;
   noteFor: string;
   closeNote: string;
   notePlaceholder: string;
@@ -381,6 +394,19 @@ export const strings: Record<Language, Strings> = {
     reminderTestSent: 'Sent — it should be on your desktop now.',
     reminderTestBlocked: 'Your browser sent it, but your system did not show it. Turn notifications on for your browser in your system settings (on Windows: Settings › System › Notifications), and check that do not disturb is off.',
     reminderTestFailed: 'Your browser would not show the notification.',
+    readers: 'Who is reading',
+    readersHint: 'Everyone on this device earns their own badges and progress. One account, one backup.',
+    readerName: 'Name',
+    addReader: 'Add reader',
+    removeReader: 'Remove {name}',
+    readerPin: 'PIN set',
+    readerPinFor: 'PIN for {name}',
+    readerSetPin: 'PIN for {name}',
+    readerPinSet: 'Set PIN',
+    readerPinClear: 'Clear PIN',
+    readerPinHint: 'A PIN keeps notes and answers away from someone else picking up this device. It will not stop someone determined.',
+    readerPinWrong: 'That PIN does not match.',
+    readerUnlock: 'Unlock',
     noteFor: 'Note',
     closeNote: 'Close note',
     notePlaceholder: 'What do you want to remember about this verse?',
@@ -607,6 +633,19 @@ export const strings: Record<Language, Strings> = {
     reminderTestSent: 'Enviada: ya debería estar en tu escritorio.',
     reminderTestBlocked: 'El navegador la envió, pero el sistema no la mostró. Activa las notificaciones del navegador en los ajustes del sistema (en Windows: Configuración › Sistema › Notificaciones) y comprueba que el modo no molestar esté desactivado.',
     reminderTestFailed: 'El navegador no quiso mostrar la notificación.',
+    readers: 'Quién está leyendo',
+    readersHint: 'Cada persona de este dispositivo gana sus propias insignias y su progreso. Una cuenta, una copia de seguridad.',
+    readerName: 'Nombre',
+    addReader: 'Añadir lector',
+    removeReader: 'Quitar a {name}',
+    readerPin: 'PIN activo',
+    readerPinFor: 'PIN de {name}',
+    readerSetPin: 'PIN de {name}',
+    readerPinSet: 'Guardar el PIN',
+    readerPinClear: 'Quitar el PIN',
+    readerPinHint: 'Un PIN mantiene tus notas y respuestas lejos de quien tome este dispositivo. No detendrá a alguien decidido.',
+    readerPinWrong: 'Ese PIN no coincide.',
+    readerUnlock: 'Desbloquear',
     noteFor: 'Nota',
     closeNote: 'Cerrar la nota',
     notePlaceholder: '¿Qué quieres recordar de este versículo?',
@@ -833,6 +872,19 @@ export const strings: Record<Language, Strings> = {
     reminderTestSent: 'Envoyée — elle devrait être sur votre bureau.',
     reminderTestBlocked: "Le navigateur l'a envoyée, mais le système ne l'a pas affichée. Activez les notifications du navigateur dans les réglages système (sous Windows : Paramètres › Système › Notifications) et vérifiez que le mode ne pas déranger est désactivé.",
     reminderTestFailed: "Le navigateur a refusé d'afficher la notification.",
+    readers: 'Qui lit',
+    readersHint: 'Chaque personne de cet appareil gagne ses propres badges et sa progression. Un compte, une sauvegarde.',
+    readerName: 'Nom',
+    addReader: 'Ajouter un lecteur',
+    removeReader: 'Retirer {name}',
+    readerPin: 'Code défini',
+    readerPinFor: 'Code de {name}',
+    readerSetPin: 'Code de {name}',
+    readerPinSet: 'Définir le code',
+    readerPinClear: 'Effacer le code',
+    readerPinHint: 'Un code éloigne vos notes et réponses de qui prend cet appareil. Il n’arrêtera pas quelqu’un de déterminé.',
+    readerPinWrong: 'Ce code ne correspond pas.',
+    readerUnlock: 'Déverrouiller',
     noteFor: 'Note',
     closeNote: 'Fermer la note',
     notePlaceholder: 'Que voulez-vous retenir de ce verset ?',
@@ -1059,6 +1111,19 @@ export const strings: Record<Language, Strings> = {
     reminderTestSent: '已发送——它现在应该出现在你的桌面上。',
     reminderTestBlocked: '浏览器已发送，但系统没有显示。请在系统设置中为浏览器开启通知（Windows：设置 › 系统 › 通知），并确认勿扰模式已关闭。',
     reminderTestFailed: '浏览器拒绝显示该通知。',
+    readers: '谁在读',
+    readersHint: '此设备上的每个人都有自己的徽章和进度。一个账户，一份备份。',
+    readerName: '名字',
+    addReader: '添加读者',
+    removeReader: '移除 {name}',
+    readerPin: '已设密码',
+    readerPinFor: '{name} 的密码',
+    readerSetPin: '{name} 的密码',
+    readerPinSet: '设置密码',
+    readerPinClear: '清除密码',
+    readerPinHint: '密码可以让别人拿起设备时看不到你的笔记和答案，但挡不住有心之人。',
+    readerPinWrong: '密码不正确。',
+    readerUnlock: '解锁',
     noteFor: '笔记',
     closeNote: '关闭笔记',
     notePlaceholder: '关于这节经文，你想记住什么？',
@@ -1285,6 +1350,19 @@ export const strings: Record<Language, Strings> = {
     reminderTestSent: 'Đã gửi — nó sẽ hiện trên màn hình của bạn ngay bây giờ.',
     reminderTestBlocked: 'Trình duyệt đã gửi, nhưng hệ thống không hiển thị. Hãy bật thông báo cho trình duyệt trong cài đặt hệ thống (trên Windows: Cài đặt › Hệ thống › Thông báo) và kiểm tra chế độ không làm phiền đã tắt.',
     reminderTestFailed: 'Trình duyệt đã từ chối hiển thị thông báo.',
+    readers: 'Ai đang đọc',
+    readersHint: 'Mỗi người trên thiết bị này có huy hiệu và tiến độ riêng. Một tài khoản, một bản sao lưu.',
+    readerName: 'Tên',
+    addReader: 'Thêm người đọc',
+    removeReader: 'Bỏ {name}',
+    readerPin: 'Đã đặt mã',
+    readerPinFor: 'Mã của {name}',
+    readerSetPin: 'Mã của {name}',
+    readerPinSet: 'Đặt mã',
+    readerPinClear: 'Xoá mã',
+    readerPinHint: 'Mã PIN giữ ghi chú và câu trả lời khỏi người cầm máy lên. Nó không chặn được người quyết tâm.',
+    readerPinWrong: 'Mã không khớp.',
+    readerUnlock: 'Mở khoá',
     noteFor: 'Ghi chú',
     closeNote: 'Đóng ghi chú',
     notePlaceholder: 'Bạn muốn nhớ điều gì về câu này?',

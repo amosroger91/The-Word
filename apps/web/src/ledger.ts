@@ -12,18 +12,22 @@ export type AnswerValue =
   | { type: 'checklist'; itemIds: string[] }
   | null;
 
+/** Which person on this device wrote the event. Absent on anything written
+ *  before readers existed, which reads as the household. */
+export type ReaderId = string;
+
 export type LedgerEvent =
-  | { id: EventId; kind: 'read'; at: string; bookId: number; chapter: number; verses?: number[] }
-  | { id: EventId; kind: 'answer'; at: string; planId: string; sessionId: string; questionId: string;
+  | { id: EventId; kind: 'read'; at: string; readerId?: ReaderId; bookId: number; chapter: number; verses?: number[] }
+  | { id: EventId; kind: 'answer'; at: string; readerId?: ReaderId; planId: string; sessionId: string; questionId: string;
       value: AnswerValue; circleId?: string; share: 'private' | 'circle' }
-  | { id: EventId; kind: 'session'; at: string; planId: string; sessionId: string; circleId?: string }
-  | { id: EventId; kind: 'plan'; at: string; planId: string; sessionId?: string; circleId?: string }
+  | { id: EventId; kind: 'session'; at: string; readerId?: ReaderId; planId: string; sessionId: string; circleId?: string }
+  | { id: EventId; kind: 'plan'; at: string; readerId?: ReaderId; planId: string; sessionId?: string; circleId?: string }
   // A note the reader wrote against one verse. Edits append; an empty `text` is
   // the tombstone, so a deletion survives a merge instead of losing to the
   // older event that still carries the words.
-  | { id: EventId; kind: 'note'; at: string; bookId: number; chapter: number; verse: number;
+  | { id: EventId; kind: 'note'; at: string; readerId?: ReaderId; bookId: number; chapter: number; verse: number;
       text: string; share: 'private' | 'friends' }
-  | { id: EventId; kind: 'share'; at: string; bookId: number; chapter: number; verse: number;
+  | { id: EventId; kind: 'share'; at: string; readerId?: ReaderId; bookId: number; chapter: number; verse: number;
       via: 'link' | 'image' | 'feed' };
 
 export type ReadEvent = Extract<LedgerEvent, { kind: 'read' }>;
@@ -148,6 +152,14 @@ export function appendEvent(events: LedgerEvent[], gunPub: string, draft: DraftE
   const event = { ...draft, id: eventId(gunPub, nextCounter(events, gunPub)) } as LedgerEvent;
   return { events: mergeLedgers(events, [event]), event };
 }
+
+/** One person's slice of a shared device. The household reader also owns every
+ *  event written before readers existed. */
+export function eventsForReader(events: LedgerEvent[], readerId: string): LedgerEvent[] {
+  return events.filter((event) => (event.readerId ?? HOUSEHOLD_READER) === readerId);
+}
+
+export const HOUSEHOLD_READER = 'household';
 
 export function eventsForActor(events: LedgerEvent[], gunPub: string): LedgerEvent[] {
   return events.filter((event) => parseEventId(event.id)?.gunPub === gunPub);

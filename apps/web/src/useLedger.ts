@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { currentStreak, dayKey, storageKeys } from '@the-word/core';
 import { loadAccount } from './nostrAccount';
+import { activeReader, loadReaders, saveReaders, type ReaderState } from './readers';
 import {
   alreadyReadToday,
   appendEvent,
   eventsForActor,
+  eventsForReader,
   loadEvents,
   mergeLedgers,
   noteFor,
@@ -35,13 +37,24 @@ function writeCache(hash: string, earned: EarnedBadge[]) {
 
 export function useLedger() {
   const gunPub = useRef(loadAccount().gun.pub);
+  const [readerState, setReaderState] = useState<ReaderState>(loadReaders);
+  const readerId = useRef(readerState.activeId);
+  readerId.current = readerState.activeId;
+  const [allEvents, setAllEvents] = useState<LedgerEvent[]>([]);
   const [events, setEvents] = useState<LedgerEvent[]>([]);
   const [earned, setEarned] = useState<EarnedBadge[]>([]);
   const [justEarned, setJustEarned] = useState<EarnedBadge[]>([]);
   const [ready, setReady] = useState(false);
 
-  const refresh = useCallback((next: LedgerEvent[]) => {
-    const mine = eventsForActor(next, gunPub.current);
+  // The reader is a parameter, not just a ref read: switching reader has to
+  // re-derive with the *new* id, and a ref set during render still holds the old
+  // one at the moment the switch handler runs.
+  const refresh = useCallback((next: LedgerEvent[], forReader = readerId.current) => {
+    const device = eventsForActor(next, gunPub.current);
+    setAllEvents(device);
+    // Badges and progress are per person, so everything downstream sees only
+    // that reader's slice.
+    const mine = eventsForReader(device, forReader);
     setEvents(mine);
     const hash = hashLedger(mine);
     const cached = readCache(hash);
@@ -63,12 +76,13 @@ export function useLedger() {
 
   const recordChapterRead = useCallback(async (bookId: number, chapter: number, verses?: number[]) => {
     const all = await loadEvents();
-    const mine = eventsForActor(all, gunPub.current);
+    const mine = eventsForReader(eventsForActor(all, gunPub.current), readerId.current);
     if (alreadyReadToday(mine, bookId, chapter)) return [];
     const before = evaluate(mine, BADGES);
     const { event } = appendEvent(mine, gunPub.current, {
       kind: 'read',
       at: new Date().toISOString(),
+      readerId: readerId.current,
       bookId,
       chapter,
       verses,
@@ -93,10 +107,13 @@ export function useLedger() {
     share: 'private' | 'friends',
   ): Promise<NoteEvent> => {
     const all = await loadEvents();
+    // Counter still runs across the whole device: event ids must stay unique
+    // per key, not per reader.
     const mine = eventsForActor(all, gunPub.current);
     const { event } = appendEvent(mine, gunPub.current, {
       kind: 'note',
       at: new Date().toISOString(),
+      readerId: readerId.current,
       bookId,
       chapter,
       verse,
@@ -154,6 +171,17 @@ export function useLedger() {
     chapters,
     streak,
     canon,
+    readers: readerState.readers,
+    activeReader: activeReader(readerState),
+    switchReader: (id: string) => {
+      const next = { ...readerState, activeId: id };
+      readerId.current = id;
+      setReaderState(next); saveReaders(next); refresh(allEvents, id);
+    },
+    updateReaders: (next: ReaderState) => {
+      readerId.current = next.activeId;
+      setReaderState(next); saveReaders(next); refresh(allEvents, next.activeId);
+    },
     notes: noteList(events),
     noteAt: (bookId: number, chapter: number, verse: number) => noteFor(events, bookId, chapter, verse),
     saveNote,

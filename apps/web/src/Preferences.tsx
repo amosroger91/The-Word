@@ -3,6 +3,8 @@ import { readingFonts, type Language, type WordApp } from '@the-word/core';
 import { SearchableSelect } from './SearchableSelect';
 import { AccountSettings } from './AccountSettings';
 import type { DailyReminder } from './dailyReminder';
+import { ReaderSwitcher } from './ReaderSwitcher';
+import type { Reader, ReaderState } from './readers';
 
 // Everything a reader sets once and forgets: how Scripture looks, how it sounds,
 // and who they are to the rest of a Group Study.
@@ -12,6 +14,9 @@ export function Preferences({
   color,
   avatar,
   reminder,
+  readers,
+  activeReader,
+  onReadersChange,
   restorePrefill,
   onNameChange,
   onAvatarChange,
@@ -24,6 +29,9 @@ export function Preferences({
   color: string;
   avatar: string | null;
   reminder: DailyReminder;
+  readers: ReaderState;
+  activeReader: Reader;
+  onReadersChange: (next: ReaderState) => void;
   restorePrefill?: string;
   onNameChange: (name: string) => void;
   onAvatarChange: (file: File | null) => void;
@@ -154,6 +162,8 @@ export function Preferences({
               onChange={(event) => app.changeSpeechVolume(Number(event.target.value) - app.speechVolume)}
             />
           </div>
+
+          <ReaderSwitcher state={readers} active={activeReader} label={label} onChange={onReadersChange} />
 
           <div className="prefs-field">
             <span className="section-label">{label.dailyReminder}</span>

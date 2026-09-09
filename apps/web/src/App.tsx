@@ -241,7 +241,7 @@ function App() {
     <button onClick={()=>openTool('settings')}>Choose a narration voice</button>
     <DeviceSettings party={party}/>
   </div>;
-  const preferences = <Preferences embedded={view==='reader'} app={app} name={party.name} color={party.identity.color} avatar={party.avatar} reminder={reminder} restorePrefill={restorePrefill} onNameChange={party.setName} onAvatarChange={file=>{void party.setAvatar(file);}} onClose={()=>tools.close('settings')} />;
+  const preferences = <Preferences embedded={view==='reader'} app={app} name={party.name} color={party.identity.color} avatar={party.avatar} reminder={reminder} readers={{readers:ledger.readers,activeId:ledger.activeReader.id}} activeReader={ledger.activeReader} onReadersChange={ledger.updateReaders} restorePrefill={restorePrefill} onNameChange={party.setName} onAvatarChange={file=>{void party.setAvatar(file);}} onClose={()=>tools.close('settings')} />;
   const group = <div className="group-content">
     {!party.active ? <><span className="workspace-eyebrow">Read. Reflect. Together.</span><h2>A seat at the table.</h2><p>Share a passage, talk face to face, and follow the host’s reading.</p>
       <div className="join-profile">{party.avatar && <img src={party.avatar} alt="Your profile"/>}<div><strong>{party.name}</strong><small>Your microphone and camera start off.</small></div><button onClick={()=>openTool('settings')}>Edit profile</button></div>
