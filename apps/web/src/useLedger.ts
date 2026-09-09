@@ -7,12 +7,15 @@ import {
   eventsForActor,
   loadEvents,
   mergeLedgers,
+  noteFor,
+  noteList,
   readDayKeys,
   saveEvents,
   uniqueChapters,
   type LedgerEvent,
+  type NoteEvent,
 } from './ledger';
-import { BADGES, evaluate, hashLedger, type EarnedBadge } from './badges';
+import { BADGES, bibleProgress, evaluate, hashLedger, type EarnedBadge } from './badges';
 
 const DWELL_MS = 12_000;
 
@@ -79,8 +82,41 @@ export function useLedger() {
     return fresh;
   }, [refresh]);
 
+  // Writing a note never earns a badge, so this stays simpler than the read path:
+  // append, persist, refresh. Returns the event so the caller can decide whether
+  // it also belongs on the timeline.
+  const saveNote = useCallback(async (
+    bookId: number,
+    chapter: number,
+    verse: number,
+    text: string,
+    share: 'private' | 'friends',
+  ): Promise<NoteEvent> => {
+    const all = await loadEvents();
+    const mine = eventsForActor(all, gunPub.current);
+    const { event } = appendEvent(mine, gunPub.current, {
+      kind: 'note',
+      at: new Date().toISOString(),
+      bookId,
+      chapter,
+      verse,
+      text: text.trim(),
+      share,
+    });
+    const merged = mergeLedgers(all, [event]);
+    await saveEvents(merged);
+    refresh(merged);
+    return event as NoteEvent;
+  }, [refresh]);
+
+  /** Clearing a note is an empty one — the tombstone from ledger.ts. */
+  const removeNote = useCallback((bookId: number, chapter: number, verse: number) => (
+    saveNote(bookId, chapter, verse, '', 'private')
+  ), [saveNote]);
+
   const chapters = uniqueChapters(events).length;
   const streak = currentStreak(readDayKeys(events), dayKey());
+  const canon = bibleProgress(events);
 
   return {
     ready,
@@ -91,6 +127,11 @@ export function useLedger() {
     recordChapterRead,
     chapters,
     streak,
+    canon,
+    notes: noteList(events),
+    noteAt: (bookId: number, chapter: number, verse: number) => noteFor(events, bookId, chapter, verse),
+    saveNote,
+    removeNote,
   };
 }
 

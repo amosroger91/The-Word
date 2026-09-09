@@ -122,6 +122,23 @@
 .badge-card small { color: var(--ws-muted); font-size: 12px; line-height: 1.45; }
 .badge-card.locked { opacity: 0.62; }
 .badge-meter { font-size: 11px; color: var(--ws-accent); letter-spacing: 0.02em; }
+.read-bar { display: grid; gap: 6px; margin: 0 0 12px; }
+.read-bar.large { margin-bottom: 16px; }
+.read-bar-copy { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; }
+.read-bar-copy strong { font-weight: 600; }
+.read-bar-copy span { color: var(--ws-muted); }
+.read-bar-track { height: 10px; border-radius: 999px; background: var(--ws-soft); overflow: hidden; }
+.read-bar.large .read-bar-track { height: 14px; }
+.read-bar-track i { display: block; height: 100%; background: var(--ws-accent); border-radius: inherit; }
+.read-bar-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 8px; }
+.book-badge-group { margin-top: 12px; }
+.book-badge-group > small { display: block; color: var(--ws-muted); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 8px; }
+.book-badge-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 6px; }
+.book-chip { display: grid; gap: 2px; padding: 8px 6px; border: 1px solid var(--ws-line); border-radius: 8px; background: var(--ws-surface); text-align: center; }
+.book-chip strong { font-size: 11px; }
+.book-chip small { font-size: 10px; color: var(--ws-muted); }
+.book-chip.earned { border-color: var(--ws-accent); color: var(--ws-accent); }
+.book-chip.earned small { color: var(--ws-accent); }
 .study-hub .study-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 16px; }
 .study-hub .study-tabs button[aria-pressed='true'] { background: var(--ws-accent); color: var(--ws-surface); border-color: var(--ws-accent); }
 .plan-card,.circle-card,.feed-card { display: grid; gap: 4px; width: 100%; text-align: left; padding: 12px; margin: 8px 0; border: 1px solid var(--ws-line); border-radius: 12px; background: var(--ws-surface); }
@@ -282,3 +299,20 @@
 .study-workspace .reader .verse.shared-highlight { background:var(--ws-highlight); }
 .study-workspace .reader .verse.speaking { background:var(--ws-highlight); border-left:3px solid var(--ws-accent); }
 .study-workspace .reader .verse.following { box-shadow:inset 0 -2px 0 var(--ws-accent); }
+
+/* Verse notes: the composer above the selection bar, plus the ✎ marker and the
+   note text shown under a reference in Saved. */
+.verse-note { position: fixed; z-index: 32; left: 50%; bottom: 96px; transform: translateX(-50%); width: min(520px, calc(100vw - 24px)); display: grid; gap: 10px; padding: 14px 16px; border: 1px solid var(--line, #c9c1b3); border-radius: 14px; background: var(--surface, #fffdf8); box-shadow: 0 18px 44px -18px #0007; }
+:root[data-theme='dark'] .verse-note { background: #201f1c; border-color: #38352e; }
+.verse-note-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.verse-note-header button { border: 0; background: transparent; color: inherit; font-size: 24px; line-height: 1; padding: 0 4px; }
+.verse-note textarea { width: 100%; min-height: 108px; resize: vertical; border: 1px solid var(--line, #c9c1b3); border-radius: 10px; background: transparent; color: inherit; padding: 10px; }
+.verse-note-share { display: flex; align-items: center; gap: 8px; text-transform: none; letter-spacing: normal; font-size: 15px; font-weight: 400; color: inherit; }
+.verse-note-share input { width: 18px; height: 18px; flex: 0 0 auto; padding: 0; }
+.verse-note .muted { margin: 0; font-size: 12px; }
+.verse-note-actions { display: flex; gap: 8px; }
+.verse-note-actions button { min-height: 40px; padding: 8px 14px; border: 1px solid var(--line, #c9c1b3); border-radius: 10px; background: transparent; color: inherit; }
+.verse-note-actions button:disabled { opacity: 0.45; }
+.verse-note-mark { color: #6a8a2f; font-size: .6em; margin-left: 5px; vertical-align: top; }
+:root[data-theme='dark'] .verse-note-mark { color: #a9c46f; }
+.bookmark-note { display: block; font-size: 13px; line-height: 1.45; opacity: .85; margin-top: 4px; white-space: pre-wrap; }

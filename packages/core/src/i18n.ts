@@ -145,6 +145,18 @@ export interface Strings {
   reminderTestSent: string;
   reminderTestBlocked: string;
   reminderTestFailed: string;
+  noteFor: string;
+  closeNote: string;
+  notePlaceholder: string;
+  shareWithFriends: string;
+  notePrivateHint: string;
+  noteSharedHint: string;
+  saveNote: string;
+  deleteNote: string;
+  addNote: string;
+  editNote: string;
+  yourNotes: string;
+  noNotes: string;
   reminderTitle: string;
   reminderBody: string;
   account: string;
@@ -179,6 +191,10 @@ export interface Strings {
   badgeProgress: (have: number, need: number) => string;
   earnedBadges: string;
   lockedBadges: string;
+  wholeBible: string;
+  bookBadges: string;
+  chaptersFraction: (have: number, need: number) => string;
+  biblePercent: (percent: number) => string;
   study: string;
   plans: string;
   planHint: string;
@@ -361,6 +377,18 @@ export const strings: Record<Language, Strings> = {
     reminderTestSent: 'Sent — it should be on your desktop now.',
     reminderTestBlocked: 'Your browser sent it, but your system did not show it. Turn notifications on for your browser in your system settings (on Windows: Settings › System › Notifications), and check that do not disturb is off.',
     reminderTestFailed: 'Your browser would not show the notification.',
+    noteFor: 'Note',
+    closeNote: 'Close note',
+    notePlaceholder: 'What do you want to remember about this verse?',
+    shareWithFriends: 'Share with friends',
+    notePrivateHint: 'Kept on your devices. Nobody else sees it.',
+    noteSharedHint: 'This note appears in your friends’ timeline.',
+    saveNote: 'Save note',
+    deleteNote: 'Delete note',
+    addNote: 'Note',
+    editNote: 'Edit note',
+    yourNotes: 'Your notes',
+    noNotes: 'No notes yet. Select a verse and press Note.',
     reminderTitle: 'Time in the Word',
     reminderBody: "Today's verse is waiting for you.",
     account: 'Account',
@@ -395,6 +423,10 @@ export const strings: Record<Language, Strings> = {
     badgeProgress: (have, need) => `${have} of ${need}`,
     earnedBadges: 'Earned',
     lockedBadges: 'Still ahead',
+    wholeBible: 'The whole Bible',
+    bookBadges: 'Each book',
+    chaptersFraction: (have, need) => `${have} of ${need} chapters`,
+    biblePercent: (percent) => `${percent}% of the Bible`,
     study: 'Plans & circles',
     plans: 'Plans',
     planHint: 'Guided hours in Scripture. Answers stay on this device, and sync when a relay is configured.',
@@ -569,6 +601,18 @@ export const strings: Record<Language, Strings> = {
     reminderTestSent: 'Enviada: ya debería estar en tu escritorio.',
     reminderTestBlocked: 'El navegador la envió, pero el sistema no la mostró. Activa las notificaciones del navegador en los ajustes del sistema (en Windows: Configuración › Sistema › Notificaciones) y comprueba que el modo no molestar esté desactivado.',
     reminderTestFailed: 'El navegador no quiso mostrar la notificación.',
+    noteFor: 'Nota',
+    closeNote: 'Cerrar la nota',
+    notePlaceholder: '¿Qué quieres recordar de este versículo?',
+    shareWithFriends: 'Compartir con amigos',
+    notePrivateHint: 'Se guarda en tus dispositivos. Nadie más la ve.',
+    noteSharedHint: 'Esta nota aparece en la cronología de tus amigos.',
+    saveNote: 'Guardar la nota',
+    deleteNote: 'Eliminar la nota',
+    addNote: 'Nota',
+    editNote: 'Editar la nota',
+    yourNotes: 'Tus notas',
+    noNotes: 'Aún no hay notas. Elige un versículo y pulsa Nota.',
     reminderTitle: 'Un momento con la Palabra',
     reminderBody: 'El versículo de hoy te espera.',
     account: 'Cuenta',
@@ -603,6 +647,10 @@ export const strings: Record<Language, Strings> = {
     badgeProgress: (have, need) => `${have} de ${need}`,
     earnedBadges: 'Conseguidas',
     lockedBadges: 'Por delante',
+    wholeBible: 'Toda la Biblia',
+    bookBadges: 'Cada libro',
+    chaptersFraction: (have, need) => `${have} de ${need} capítulos`,
+    biblePercent: (percent) => `${percent}% de la Biblia`,
     study: 'Planes y círculos',
     plans: 'Planes',
     planHint: 'Horas guiadas en las Escrituras. Las respuestas quedan en este dispositivo y se sincronizan si hay un relé.',
@@ -777,6 +825,18 @@ export const strings: Record<Language, Strings> = {
     reminderTestSent: 'Envoyée — elle devrait être sur votre bureau.',
     reminderTestBlocked: "Le navigateur l'a envoyée, mais le système ne l'a pas affichée. Activez les notifications du navigateur dans les réglages système (sous Windows : Paramètres › Système › Notifications) et vérifiez que le mode ne pas déranger est désactivé.",
     reminderTestFailed: "Le navigateur a refusé d'afficher la notification.",
+    noteFor: 'Note',
+    closeNote: 'Fermer la note',
+    notePlaceholder: 'Que voulez-vous retenir de ce verset ?',
+    shareWithFriends: 'Partager avec mes amis',
+    notePrivateHint: 'Conservée sur vos appareils. Personne d’autre ne la voit.',
+    noteSharedHint: 'Cette note apparaît dans le fil de vos amis.',
+    saveNote: 'Enregistrer la note',
+    deleteNote: 'Supprimer la note',
+    addNote: 'Note',
+    editNote: 'Modifier la note',
+    yourNotes: 'Vos notes',
+    noNotes: 'Aucune note. Choisissez un verset et appuyez sur Note.',
     reminderTitle: 'Un temps dans la Parole',
     reminderBody: "Le verset du jour vous attend.",
     account: 'Compte',
@@ -811,6 +871,10 @@ export const strings: Record<Language, Strings> = {
     badgeProgress: (have, need) => `${have} sur ${need}`,
     earnedBadges: 'Obtenus',
     lockedBadges: 'À venir',
+    wholeBible: 'Toute la Bible',
+    bookBadges: 'Chaque livre',
+    chaptersFraction: (have, need) => `${have} sur ${need} chapitres`,
+    biblePercent: (percent) => `${percent}% de la Bible`,
     study: 'Plans et cercles',
     plans: 'Plans',
     planHint: 'Des heures guidées dans les Écritures. Les réponses restent sur cet appareil et se synchronisent si un relais est configuré.',
@@ -985,6 +1049,18 @@ export const strings: Record<Language, Strings> = {
     reminderTestSent: '已发送——它现在应该出现在你的桌面上。',
     reminderTestBlocked: '浏览器已发送，但系统没有显示。请在系统设置中为浏览器开启通知（Windows：设置 › 系统 › 通知），并确认勿扰模式已关闭。',
     reminderTestFailed: '浏览器拒绝显示该通知。',
+    noteFor: '笔记',
+    closeNote: '关闭笔记',
+    notePlaceholder: '关于这节经文，你想记住什么？',
+    shareWithFriends: '与好友分享',
+    notePrivateHint: '仅保存在你的设备上，别人看不到。',
+    noteSharedHint: '这条笔记会出现在好友的动态里。',
+    saveNote: '保存笔记',
+    deleteNote: '删除笔记',
+    addNote: '笔记',
+    editNote: '编辑笔记',
+    yourNotes: '你的笔记',
+    noNotes: '还没有笔记。选择一节经文并点击“笔记”。',
     reminderTitle: '与圣言同在的时刻',
     reminderBody: '今日经文正等着你。',
     account: '账户',
@@ -1019,6 +1095,10 @@ export const strings: Record<Language, Strings> = {
     badgeProgress: (have, need) => `${have} / ${need}`,
     earnedBadges: '已获得',
     lockedBadges: '未获得',
+    wholeBible: '整本圣经',
+    bookBadges: '每一卷书',
+    chaptersFraction: (have, need) => `${have} / ${need} 章`,
+    biblePercent: (percent) => `圣经的 ${percent}%`,
     study: '计划与圈子',
     plans: '计划',
     planHint: '有引导的读经时光。回答保存在本机，配置中继后才会同步。',
@@ -1193,6 +1273,18 @@ export const strings: Record<Language, Strings> = {
     reminderTestSent: 'Đã gửi — nó sẽ hiện trên màn hình của bạn ngay bây giờ.',
     reminderTestBlocked: 'Trình duyệt đã gửi, nhưng hệ thống không hiển thị. Hãy bật thông báo cho trình duyệt trong cài đặt hệ thống (trên Windows: Cài đặt › Hệ thống › Thông báo) và kiểm tra chế độ không làm phiền đã tắt.',
     reminderTestFailed: 'Trình duyệt đã từ chối hiển thị thông báo.',
+    noteFor: 'Ghi chú',
+    closeNote: 'Đóng ghi chú',
+    notePlaceholder: 'Bạn muốn nhớ điều gì về câu này?',
+    shareWithFriends: 'Chia sẻ với bạn bè',
+    notePrivateHint: 'Chỉ lưu trên thiết bị của bạn. Không ai khác thấy.',
+    noteSharedHint: 'Ghi chú này hiện trên dòng thời gian của bạn bè.',
+    saveNote: 'Lưu ghi chú',
+    deleteNote: 'Xoá ghi chú',
+    addNote: 'Ghi chú',
+    editNote: 'Sửa ghi chú',
+    yourNotes: 'Ghi chú của bạn',
+    noNotes: 'Chưa có ghi chú. Chọn một câu và nhấn Ghi chú.',
     reminderTitle: 'Giờ ở trong Lời Chúa',
     reminderBody: 'Câu Kinh Thánh hôm nay đang chờ bạn.',
     account: 'Tài khoản',
@@ -1227,6 +1319,10 @@ export const strings: Record<Language, Strings> = {
     badgeProgress: (have, need) => `${have} / ${need}`,
     earnedBadges: 'Đã nhận',
     lockedBadges: 'Phía trước',
+    wholeBible: 'Cả Kinh Thánh',
+    bookBadges: 'Từng sách',
+    chaptersFraction: (have, need) => `${have} / ${need} đoạn`,
+    biblePercent: (percent) => `${percent}% Kinh Thánh`,
     study: 'Kế hoạch & vòng tròn',
     plans: 'Kế hoạch',
     planHint: 'Giờ đọc có hướng dẫn. Câu trả lời ở lại trên thiết bị này, và đồng bộ khi có relay.',

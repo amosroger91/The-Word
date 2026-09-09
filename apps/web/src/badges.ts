@@ -23,6 +23,7 @@ export interface BadgeDefinition {
     | { kind: 'chaptersRead'; count: number }
     | { kind: 'streakDays'; days: number }
     | { kind: 'bookComplete'; bookId: number | 'any' }
+    | { kind: 'testamentComplete'; testament: 'old' | 'new' | 'all' }
     | { kind: 'sessionsComplete'; count: number }
     | { kind: 'planComplete'; planId: string | 'any'; count?: number }
     | { kind: 'questionsAnswered'; count: number }
@@ -41,8 +42,61 @@ export interface BadgeProgress {
   done: boolean;
 }
 
+export interface CanonProgress {
+  have: number;
+  need: number;
+  percent: number;
+}
+
 const books = BOOKS_DATA;
 const bookById = new Map(books.map((book) => [book.id, book]));
+const BOOK_ICON = 'M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 0-3 3V4Zm3 4h8M8 12h8';
+const SCROLL_ICON = 'M6 4h9a3 3 0 0 1 3 3v13H8a2 2 0 0 0-2 2V4Zm3 4h7M9 12h7M9 16h5';
+
+function percent(have: number, need: number): number {
+  if (!need || !have) return 0;
+  return Math.round((have / need) * 1000) / 10;
+}
+
+function booksFor(testament: 'old' | 'new' | 'all') {
+  return testament === 'all' ? books : books.filter((book) => book.testament === testament);
+}
+
+function chaptersIn(events: LedgerEvent[], testament: 'old' | 'new' | 'all'): { have: number; need: number } {
+  const set = booksFor(testament);
+  const ids = new Set(set.map((book) => book.id));
+  const need = set.reduce((sum, book) => sum + book.chapters, 0);
+  const have = uniqueChapters(events).filter((row) => ids.has(row.bookId)).length;
+  return { have, need };
+}
+
+export function bibleProgress(events: LedgerEvent[]): { all: CanonProgress; old: CanonProgress; new: CanonProgress } {
+  const all = chaptersIn(events, 'all');
+  const old = chaptersIn(events, 'old');
+  const nt = chaptersIn(events, 'new');
+  return {
+    all: { ...all, percent: percent(all.have, all.need) },
+    old: { ...old, percent: percent(old.have, old.need) },
+    new: { ...nt, percent: percent(nt.have, nt.need) },
+  };
+}
+
+function bookBadges(): BadgeDefinition[] {
+  return books.map((book) => ({
+    id: `book-${book.id}`,
+    tier: book.chapters >= 40 ? 'gold' : book.chapters >= 10 ? 'silver' : 'bronze',
+    title: { en: book.name },
+    description: {
+      en: `Read every chapter of ${book.name}.`,
+      es: `Lee todos los capítulos de ${book.name}.`,
+      fr: `Lire tous les chapitres de ${book.name}.`,
+      zh: `读完《${book.name}》的每一章。`,
+      vi: `Đọc hết mọi đoạn của ${book.name}.`,
+    },
+    icon: BOOK_ICON,
+    criteria: { kind: 'bookComplete' as const, bookId: book.id },
+  }));
+}
 
 export const BADGES: BadgeDefinition[] = [
   {
@@ -126,23 +180,52 @@ export const BADGES: BadgeDefinition[] = [
       zh: '读完任何一卷书的每一章。',
       vi: 'Đọc xong mọi đoạn của một sách.',
     },
-    icon: 'M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 0-3 3V4Zm3 4h8M8 12h8',
+    icon: BOOK_ICON,
     criteria: { kind: 'bookComplete', bookId: 'any' },
   },
   {
-    id: 'gospel-john',
+    id: 'old-testament',
     tier: 'gold',
-    title: { en: 'The Gospel of John', es: 'El Evangelio de Juan', fr: 'L’Évangile de Jean', zh: '约翰福音', vi: 'Tin Mừng Giăng' },
+    title: { en: 'The Old Testament', es: 'El Antiguo Testamento', fr: 'L’Ancien Testament', zh: '旧约', vi: 'Cựu Ước' },
     description: {
-      en: 'Read all twenty-one chapters of John.',
-      es: 'Lee los veintiún capítulos de Juan.',
-      fr: 'Lire les vingt-et-un chapitres de Jean.',
-      zh: '读完约翰福音全部二十一章。',
-      vi: 'Đọc cả hai mươi mốt đoạn của Giăng.',
+      en: 'Read every chapter of the Old Testament.',
+      es: 'Lee todos los capítulos del Antiguo Testamento.',
+      fr: 'Lire tous les chapitres de l’Ancien Testament.',
+      zh: '读完旧约的每一章。',
+      vi: 'Đọc hết mọi đoạn của Cựu Ước.',
+    },
+    icon: SCROLL_ICON,
+    criteria: { kind: 'testamentComplete', testament: 'old' },
+  },
+  {
+    id: 'new-testament',
+    tier: 'gold',
+    title: { en: 'The New Testament', es: 'El Nuevo Testamento', fr: 'Le Nouveau Testament', zh: '新约', vi: 'Tân Ước' },
+    description: {
+      en: 'Read every chapter of the New Testament.',
+      es: 'Lee todos los capítulos del Nuevo Testamento.',
+      fr: 'Lire tous les chapitres du Nouveau Testament.',
+      zh: '读完新约的每一章。',
+      vi: 'Đọc hết mọi đoạn của Tân Ước.',
     },
     icon: 'M12 3c4 3 7 4 8 4v10c-2-1-5 0-8 2-3-2-6-3-8-2V7c1 0 4-1 8-4Z',
-    criteria: { kind: 'bookComplete', bookId: 43 },
+    criteria: { kind: 'testamentComplete', testament: 'new' },
   },
+  {
+    id: 'whole-bible',
+    tier: 'gold',
+    title: { en: 'The whole Bible', es: 'Toda la Biblia', fr: 'Toute la Bible', zh: '整本圣经', vi: 'Cả Kinh Thánh' },
+    description: {
+      en: 'Read every chapter of Scripture.',
+      es: 'Lee todos los capítulos de las Escrituras.',
+      fr: 'Lire tous les chapitres des Écritures.',
+      zh: '读完圣经的每一章。',
+      vi: 'Đọc hết mọi đoạn Kinh Thánh.',
+    },
+    icon: 'M4 5h7c2 0 3 1 3 3v13H7a3 3 0 0 0-3 3V5Zm9 0h7v18a3 3 0 0 0-3-3h-4V5Z',
+    criteria: { kind: 'testamentComplete', testament: 'all' },
+  },
+  ...bookBadges(),
 ];
 
 function sessionsComplete(events: LedgerEvent[]) {
@@ -201,6 +284,10 @@ export function progressToward(definition: BadgeDefinition, events: LedgerEvent[
     }
     const have = chaptersOfBook(events, criteria.bookId).size;
     const need = bookById.get(criteria.bookId)?.chapters ?? 0;
+    return { have, need, done: have >= need };
+  }
+  if (criteria.kind === 'testamentComplete') {
+    const { have, need } = chaptersIn(events, criteria.testament);
     return { have, need, done: have >= need };
   }
   if (criteria.kind === 'sessionsComplete') {

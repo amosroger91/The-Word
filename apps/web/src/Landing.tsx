@@ -47,7 +47,7 @@ export function Landing({
   onPreferences?: () => void;
   onProgress?: () => void;
   onStudy?: () => void;
-  progress?: { chapters: number; streak: number };
+  progress?: { chapters: number; streak: number; percent: number; have: number; need: number };
   // Live Group Study roster, so the landing shows who is connected.
   partyMembers?: number;
 }) {
@@ -254,10 +254,11 @@ export function Landing({
                 <span className="action-icon"><ReaderIcon name="award" /></span>
                 <span className="action-copy">
                   <strong>{label.progress}</strong>
-                  <small>{progress?.chapters ? label.chaptersReadCount(progress.chapters) : label.noBadgesYet}</small>
+                  <small>{progress?.need ? `${label.biblePercent(progress.percent)} · ${label.chaptersReadCount(progress.chapters)}` : label.noBadgesYet}</small>
                 </span>
-                {progress?.streak ? <span className="landing-count">{progress.streak}</span> : null}
+                {progress?.need ? <span className="landing-count">{Math.round(progress.percent)}%</span> : progress?.streak ? <span className="landing-count">{progress.streak}</span> : null}
                 <span aria-hidden="true">↗</span>
+                {progress?.need ? <span className="landing-read-bar" aria-hidden="true"><i style={{ width: `${Math.min(100, progress.percent)}%` }} /></span> : null}
               </button>
             )}
             {onStudy && (

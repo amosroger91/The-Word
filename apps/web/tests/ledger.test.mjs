@@ -35,7 +35,8 @@ const badgesUrl = transpile(path.join(here, '../src/badges.ts'), 'badges.mjs', (
   .replaceAll('"./ledger"', "'./ledger.mjs'"));
 
 const { appendEvent, mergeLedgers, uniqueChapters, alreadyReadToday, latestAnswers, eventId } = await import(ledgerUrl);
-const { evaluate, BADGES, progressToward, hashLedger } = await import(badgesUrl);
+const { evaluate, BADGES, progressToward, hashLedger, bibleProgress } = await import(badgesUrl);
+const { BOOKS_DATA } = await import(pathToFileURL(path.join(compiledDir, 'schema.mjs')).href);
 const { dayKey } = await import(pathToFileURL(path.join(compiledDir, 'day.mjs')).href);
 
 const ACTOR = 'gunpub';
@@ -105,10 +106,43 @@ test('a skipped day breaks the streak; finishing John earns the gospel badge', (
     john.push(read(`2026-01-${String(chapter).padStart(2, '0')}T12:00:00.000Z`, 43, chapter, chapter));
   }
   const earned = evaluate(john, BADGES);
-  const gospel = earned.find((badge) => badge.id === 'gospel-john');
+  const gospel = earned.find((badge) => badge.id === 'book-43');
   const whole = earned.find((badge) => badge.id === 'any-book');
   assert.equal(gospel.earnedAt, '2026-01-21T12:00:00.000Z');
   assert.equal(whole.earnedAt, '2026-01-21T12:00:00.000Z');
+});
+
+test('bible, testament, and book badges follow unique chapters', () => {
+  const philemon = [read('2026-02-01T12:00:00.000Z', 57, 1, 1)];
+  const afterPhilemon = evaluate(philemon, BADGES);
+  assert.ok(afterPhilemon.some((badge) => badge.id === 'book-57'));
+  assert.equal(bibleProgress(philemon).all.have, 1);
+  assert.equal(bibleProgress(philemon).all.need, BOOKS_DATA.reduce((sum, book) => sum + book.chapters, 0));
+
+  const nt = [];
+  let n = 0;
+  for (const book of BOOKS_DATA.filter((item) => item.testament === 'new')) {
+    for (let chapter = 1; chapter <= book.chapters; chapter++) {
+      n += 1;
+      nt.push(read('2026-03-01T12:00:00.000Z', book.id, chapter, n));
+    }
+  }
+  assert.equal(progressToward(BADGES.find((badge) => badge.id === 'new-testament'), nt).done, true);
+  assert.equal(progressToward(BADGES.find((badge) => badge.id === 'old-testament'), nt).done, false);
+  assert.equal(progressToward(BADGES.find((badge) => badge.id === 'whole-bible'), nt).done, false);
+  assert.equal(bibleProgress(nt).new.percent, 100);
+
+  const all = [...nt];
+  for (const book of BOOKS_DATA.filter((item) => item.testament === 'old')) {
+    for (let chapter = 1; chapter <= book.chapters; chapter++) {
+      n += 1;
+      all.push(read('2026-04-01T12:00:00.000Z', book.id, chapter, n));
+    }
+  }
+  assert.equal(progressToward(BADGES.find((badge) => badge.id === 'old-testament'), all).done, true);
+  assert.equal(progressToward(BADGES.find((badge) => badge.id === 'whole-bible'), all).done, true);
+  assert.equal(bibleProgress(all).all.percent, 100);
+  assert.equal(BADGES.filter((badge) => badge.id.startsWith('book-')).length, 66);
 });
 
 test('ledger hash changes when an event is added', () => {

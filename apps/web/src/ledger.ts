@@ -17,9 +17,15 @@ export type LedgerEvent =
   | { id: EventId; kind: 'answer'; at: string; planId: string; sessionId: string; questionId: string;
       value: AnswerValue; circleId?: string; share: 'private' | 'circle' }
   | { id: EventId; kind: 'session'; at: string; planId: string; sessionId: string; circleId?: string }
-  | { id: EventId; kind: 'plan'; at: string; planId: string; sessionId?: string; circleId?: string };
+  | { id: EventId; kind: 'plan'; at: string; planId: string; sessionId?: string; circleId?: string }
+  // A note the reader wrote against one verse. Edits append; an empty `text` is
+  // the tombstone, so a deletion survives a merge instead of losing to the
+  // older event that still carries the words.
+  | { id: EventId; kind: 'note'; at: string; bookId: number; chapter: number; verse: number;
+      text: string; share: 'private' | 'friends' };
 
 export type ReadEvent = Extract<LedgerEvent, { kind: 'read' }>;
+export type NoteEvent = Extract<LedgerEvent, { kind: 'note' }>;
 export type AnswerEvent = Extract<LedgerEvent, { kind: 'answer' }>;
 export type SessionEvent = Extract<LedgerEvent, { kind: 'session' }>;
 export type PlanEvent = Extract<LedgerEvent, { kind: 'plan' }>;
@@ -102,6 +108,31 @@ export function latestAnswers(events: LedgerEvent[]): Map<string, AnswerEvent> {
     if (!prev || prev.at < event.at || (prev.at === event.at && prev.id < event.id)) latest.set(key, event);
   }
   return latest;
+}
+
+export function noteKey(bookId: number, chapter: number, verse: number): string {
+  return `${bookId}:${chapter}:${verse}`;
+}
+
+/** The surviving note per verse: newest wins, and a tombstone wins as removal. */
+export function latestNotes(events: LedgerEvent[]): Map<string, NoteEvent> {
+  const latest = new Map<string, NoteEvent>();
+  for (const event of events) {
+    if (event.kind !== 'note') continue;
+    const key = noteKey(event.bookId, event.chapter, event.verse);
+    const prev = latest.get(key);
+    if (!prev || prev.at < event.at || (prev.at === event.at && prev.id < event.id)) latest.set(key, event);
+  }
+  for (const [key, event] of latest) if (!event.text.trim()) latest.delete(key);
+  return latest;
+}
+
+export function noteFor(events: LedgerEvent[], bookId: number, chapter: number, verse: number): NoteEvent | null {
+  return latestNotes(events).get(noteKey(bookId, chapter, verse)) ?? null;
+}
+
+export function noteList(events: LedgerEvent[]): NoteEvent[] {
+  return [...latestNotes(events).values()].sort((a, b) => (a.at < b.at ? 1 : -1));
 }
 
 export function appendEvent(events: LedgerEvent[], gunPub: string, draft: DraftEvent): { events: LedgerEvent[]; event: LedgerEvent } {
