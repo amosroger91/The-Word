@@ -5,6 +5,20 @@ Deploy: `bash scripts/deploy-pages.sh` (builds `apps/web`, force-pushes `dist/` 
 
 ## Requested, not yet started
 
+- **Study breakdown, phases 2–3: the WASM model.** Phase 1 shipped and is
+  deliberately generation-free — see `packages/bible/src/breakdown/`. The model
+  work is not started: manifest and versioning, a background shard download with
+  resume and checksums into Cache Storage, an ONNX runtime in a worker, readiness
+  and progress UI, then constrained JSON formatting of the evidence packet. The
+  gate it must pass already exists (`breakdown/sources.ts`): a claim survives only
+  if it names a known source and every quote occurs in the cited text, so the
+  model can be wired in as a formatter without loosening anything. Phase 5's test
+  list (offline before download, interrupted download, invalid model output,
+  no network during inference) still stands.
+- Lexicon, morphology, and entity dictionaries for the breakdown's original-language
+  section. Needs a public-domain or clearly licensed source chosen first; the
+  section is absent rather than empty until then.
+
 - Run the survivor relay on a real VPS (`services/relay`) and pin its URL plus
   issuer public key in Settings. Until then, plans, badges, and circles work
   on-device; shared feed and apart-sync wait on that server. The four open
