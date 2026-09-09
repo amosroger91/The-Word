@@ -147,6 +147,14 @@ export interface Strings {
   reminderTestSent: string;
   reminderTestBlocked: string;
   reminderTestFailed: string;
+  breakdownQuestions: string;
+  breakdownGeneratedNote: string;
+  breakdownModelReady: string;
+  breakdownModelPreparing: string;
+  breakdownModelDownloading: string;
+  breakdownModelOff: string;
+  breakdownModelUnavailable: string;
+  breakdownEnableModel: string;
   breakItDown: string;
   breakdownPickVerse: string;
   breakdownWorking: string;
@@ -428,6 +436,14 @@ export const strings: Record<Language, Strings> = {
     reminderTestSent: 'Sent — it should be on your desktop now.',
     reminderTestBlocked: 'Your browser sent it, but your system did not show it. Turn notifications on for your browser in your system settings (on Windows: Settings › System › Notifications), and check that do not disturb is off.',
     reminderTestFailed: 'Your browser would not show the notification.',
+    breakdownQuestions: 'Questions to sit with',
+    breakdownGeneratedNote: 'Questions written by a small model running on this device, from the verse above and nothing else. It is asked only for questions — never for statements about what the passage means — and anything it could not support was withheld.',
+    breakdownModelReady: 'Ready.',
+    breakdownModelPreparing: 'Preparing study tools…',
+    breakdownModelDownloading: 'Downloading study tools — {percent}% of {size}. Reading is unaffected.',
+    breakdownModelOff: 'Plain-English wording is off. Everything above works without it.',
+    breakdownModelUnavailable: 'Plain-English wording is unavailable offline. Everything above still works.',
+    breakdownEnableModel: 'Turn on plain-English wording',
     breakItDown: 'Break this down',
     breakdownPickVerse: 'Choose a verse to break down.',
     breakdownWorking: 'Reading the sources…',
@@ -701,6 +717,14 @@ export const strings: Record<Language, Strings> = {
     reminderTestSent: 'Enviada: ya debería estar en tu escritorio.',
     reminderTestBlocked: 'El navegador la envió, pero el sistema no la mostró. Activa las notificaciones del navegador en los ajustes del sistema (en Windows: Configuración › Sistema › Notificaciones) y comprueba que el modo no molestar esté desactivado.',
     reminderTestFailed: 'El navegador no quiso mostrar la notificación.',
+    breakdownQuestions: 'Preguntas para meditar',
+    breakdownGeneratedNote: 'Preguntas escritas por un modelo pequeño que se ejecuta en este dispositivo, a partir del versículo anterior y nada más. Solo se le piden preguntas, nunca afirmaciones sobre lo que significa el pasaje, y se omitió todo lo que no pudo respaldar.',
+    breakdownModelReady: 'Listo.',
+    breakdownModelPreparing: 'Preparando las herramientas de estudio…',
+    breakdownModelDownloading: 'Descargando herramientas de estudio: {percent}% de {size}. La lectura no se ve afectada.',
+    breakdownModelOff: 'La redacción sencilla está desactivada. Todo lo anterior funciona sin ella.',
+    breakdownModelUnavailable: 'La redacción sencilla no está disponible sin conexión. Todo lo anterior sigue funcionando.',
+    breakdownEnableModel: 'Activar la redacción sencilla',
     breakItDown: 'Analizar este versículo',
     breakdownPickVerse: 'Elige un versículo para analizar.',
     breakdownWorking: 'Leyendo las fuentes…',
@@ -974,6 +998,14 @@ export const strings: Record<Language, Strings> = {
     reminderTestSent: 'Envoyée — elle devrait être sur votre bureau.',
     reminderTestBlocked: "Le navigateur l'a envoyée, mais le système ne l'a pas affichée. Activez les notifications du navigateur dans les réglages système (sous Windows : Paramètres › Système › Notifications) et vérifiez que le mode ne pas déranger est désactivé.",
     reminderTestFailed: "Le navigateur a refusé d'afficher la notification.",
+    breakdownQuestions: 'Questions à méditer',
+    breakdownGeneratedNote: 'Questions rédigées par un petit modèle exécuté sur cet appareil, à partir du verset ci-dessus et de rien d’autre. On ne lui demande que des questions, jamais des affirmations sur le sens du passage, et tout ce qu’il ne pouvait pas étayer a été écarté.',
+    breakdownModelReady: 'Prêt.',
+    breakdownModelPreparing: 'Préparation des outils d’étude…',
+    breakdownModelDownloading: 'Téléchargement des outils d’étude — {percent}% de {size}. La lecture n’est pas affectée.',
+    breakdownModelOff: 'La formulation simple est désactivée. Tout ce qui précède fonctionne sans elle.',
+    breakdownModelUnavailable: 'La formulation simple est indisponible hors ligne. Tout ce qui précède fonctionne toujours.',
+    breakdownEnableModel: 'Activer la formulation simple',
     breakItDown: 'Décomposer ce verset',
     breakdownPickVerse: 'Choisissez un verset à décomposer.',
     breakdownWorking: 'Lecture des sources…',
@@ -1247,6 +1279,14 @@ export const strings: Record<Language, Strings> = {
     reminderTestSent: '已发送——它现在应该出现在你的桌面上。',
     reminderTestBlocked: '浏览器已发送，但系统没有显示。请在系统设置中为浏览器开启通知（Windows：设置 › 系统 › 通知），并确认勿扰模式已关闭。',
     reminderTestFailed: '浏览器拒绝显示该通知。',
+    breakdownQuestions: '可以默想的问题',
+    breakdownGeneratedNote: '由本机运行的小模型根据上面的经文写出的问题，仅此而已。只让它提问，绝不让它断言经文的含义；凡是无法佐证的内容都已略去。',
+    breakdownModelReady: '已就绪。',
+    breakdownModelPreparing: '正在准备学习工具…',
+    breakdownModelDownloading: '正在下载学习工具 — 已完成 {percent}%，共 {size}。不影响阅读。',
+    breakdownModelOff: '白话措辞已关闭。以上内容不依赖它。',
+    breakdownModelUnavailable: '离线时无法使用白话措辞。以上内容仍然可用。',
+    breakdownEnableModel: '开启白话措辞',
     breakItDown: '拆解这节经文',
     breakdownPickVerse: '请选择要拆解的经文。',
     breakdownWorking: '正在读取来源…',
@@ -1520,6 +1560,14 @@ export const strings: Record<Language, Strings> = {
     reminderTestSent: 'Đã gửi — nó sẽ hiện trên màn hình của bạn ngay bây giờ.',
     reminderTestBlocked: 'Trình duyệt đã gửi, nhưng hệ thống không hiển thị. Hãy bật thông báo cho trình duyệt trong cài đặt hệ thống (trên Windows: Cài đặt › Hệ thống › Thông báo) và kiểm tra chế độ không làm phiền đã tắt.',
     reminderTestFailed: 'Trình duyệt đã từ chối hiển thị thông báo.',
+    breakdownQuestions: 'Câu hỏi để suy ngẫm',
+    breakdownGeneratedNote: 'Câu hỏi do một mô hình nhỏ chạy trên thiết bị này viết ra, chỉ dựa vào câu ở trên. Nó chỉ được yêu cầu đặt câu hỏi, không bao giờ khẳng định ý nghĩa đoạn văn, và những gì không chứng minh được đều bị lược bỏ.',
+    breakdownModelReady: 'Sẵn sàng.',
+    breakdownModelPreparing: 'Đang chuẩn bị công cụ học…',
+    breakdownModelDownloading: 'Đang tải công cụ học — {percent}% của {size}. Việc đọc không bị ảnh hưởng.',
+    breakdownModelOff: 'Diễn đạt dễ hiểu đang tắt. Mọi thứ ở trên vẫn hoạt động.',
+    breakdownModelUnavailable: 'Không dùng được diễn đạt dễ hiểu khi ngoại tuyến. Mọi thứ ở trên vẫn hoạt động.',
+    breakdownEnableModel: 'Bật diễn đạt dễ hiểu',
     breakItDown: 'Phân tích câu này',
     breakdownPickVerse: 'Hãy chọn một câu để phân tích.',
     breakdownWorking: 'Đang đọc nguồn…',

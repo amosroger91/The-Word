@@ -12,5 +12,6 @@ function run(file) {
 }
 
 await run('copy-piper-assets.mjs');
+await run('copy-ort-assets.mjs');
 await run('fetch-daily.mjs');
 await run('validate-plans.mjs');

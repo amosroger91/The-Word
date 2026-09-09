@@ -14,6 +14,7 @@ import { Preferences } from './Preferences';
 import { VerseImageEditor, type VerseImageJob } from './VerseImageEditor';
 import { VerseNote } from './VerseNote';
 import { Breakdown } from './Breakdown';
+import { prepareModel } from './breakdown/client';
 import { BackupPrompt } from './BackupPrompt';
 import { needsBackup, type BackupTrigger } from './backupState';
 import { unlockRemoteAudio, setRemoteVolume } from './media';
@@ -93,6 +94,9 @@ function App() {
   const lastVerse = chapter?.verses.length ? chapter.verses[chapter.verses.length - 1].ref.verse : null;
 
   useEffect(() => { if (restorePrefill) tools.open('settings'); }, [restorePrefill]);
+  // The optional breakdown formatter fetches itself once the page is quiet.
+  // Scripture is already on screen by then and never waits for it.
+  useEffect(() => { prepareModel(); }, []);
   useEffect(() => { document.documentElement.dataset.theme = app.theme; }, [app.theme]);
   useEffect(() => { document.documentElement.lang = language; }, [language]);
   useEffect(() => { document.documentElement.style.setProperty('--app-font', app.font.stack); }, [app.font]);

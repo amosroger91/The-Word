@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { buildBreakdown, localBible, type VerseBreakdown, type VerseReference } from '@the-word/bible';
 import type { WordApp } from '@the-word/core';
+import { enableModel, generateSummary, modelStatus, onModelStatus, type GeneratedSummary } from './breakdown/client';
+import { formatBytes, type ModelStatus } from './breakdown/model';
 
 // The breakdown drawer. Every line on screen traces to bundled Scripture, and
 // each one says which kind of statement it is — the verse itself, an
@@ -20,6 +22,20 @@ export function Breakdown({
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [compare, setCompare] = useState(false);
+  const [model, setModel] = useState<ModelStatus>(modelStatus);
+  const [phrased, setPhrased] = useState<GeneratedSummary | null>(null);
+
+  useEffect(() => onModelStatus(setModel), []);
+
+  // Phrasing runs only once the deterministic breakdown exists, and only when
+  // the model is already loaded. The panel is complete without it.
+  useEffect(() => {
+    setPhrased(null);
+    if (!data || model.phase !== 'ready') return;
+    let cancelled = false;
+    void generateSummary(data).then((result) => { if (!cancelled) setPhrased(result); });
+    return () => { cancelled = true; };
+  }, [data?.referenceLabel, model.phase]);
 
   useEffect(() => {
     if (!target) { setData(null); return; }
@@ -113,14 +129,47 @@ export function Breakdown({
       </section>
 
       <section className="breakdown-section">
+        <h3>{label.breakdownQuestions}</h3>
+        {model.phase === 'ready' && phrased?.questions.length ? (
+          <>
+            <ul className="breakdown-questions">
+              {phrased.questions.map((question) => <li key={question}>{question}</li>)}
+            </ul>
+            <p className="breakdown-source">{label.breakdownGeneratedNote}</p>
+          </>
+        ) : (
+          <p className="muted" role="status">{modelLine(model, label)}</p>
+        )}
+        {model.phase === 'off' ? (
+          <button type="button" onClick={() => enableModel(true)}>{label.breakdownEnableModel}</button>
+        ) : null}
+      </section>
+
+      <section className="breakdown-section">
         <h3>{label.breakdownSourceNotes}</h3>
         <p className="breakdown-source">{label.breakdownOnlySources}</p>
-        {data.sourceWarnings.length ? (
+        {data.sourceWarnings.length || phrased?.rejected.length ? (
           <ul className="breakdown-warnings">
             {data.sourceWarnings.map((warning) => <li key={warning}>{warning}</li>)}
+            {phrased?.rejected.map((warning) => <li key={warning}>{warning}</li>)}
           </ul>
         ) : null}
       </section>
     </div>
   );
+}
+
+// One line describing where the optional formatter has got to. It is a status,
+// never a blocker: everything above it renders regardless.
+function modelLine(model: ModelStatus, label: WordApp['label']): string {
+  switch (model.phase) {
+    case 'ready': return label.breakdownModelReady;
+    case 'checking': return label.breakdownModelPreparing;
+    case 'downloading': return model.total
+      ? label.breakdownModelDownloading.replace('{percent}', String(Math.round(model.progress * 100))).replace('{size}', formatBytes(model.total))
+      : label.breakdownModelPreparing;
+    case 'off': return label.breakdownModelOff;
+    case 'unavailable': return label.breakdownModelUnavailable;
+    default: return label.breakdownModelOff;
+  }
 }
