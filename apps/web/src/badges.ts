@@ -7,6 +7,7 @@ import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils.js';
 import {
   chaptersOfBook,
   readDayKeys,
+  shareCount,
   uniqueChapters,
   type LedgerEvent,
 } from './ledger';
@@ -27,7 +28,8 @@ export interface BadgeDefinition {
     | { kind: 'sessionsComplete'; count: number }
     | { kind: 'planComplete'; planId: string | 'any'; count?: number }
     | { kind: 'questionsAnswered'; count: number }
-    | { kind: 'circleSessions'; count: number };
+    | { kind: 'circleSessions'; count: number }
+    | { kind: 'verseShares'; via: 'link' | 'image' | 'feed' | 'any'; count: number };
 }
 
 export interface EarnedBadge {
@@ -337,6 +339,76 @@ export const BADGES: BadgeDefinition[] = [
     icon: 'M4 16l3-8h10l3 8H4Zm3 0v3M17 16v3M8 12h8',
     criteria: { kind: 'bookComplete', bookId: 44 },
   },
+  {
+    id: 'share-link-1',
+    tier: 'bronze',
+    title: { en: 'Town crier', es: 'Pregonero', fr: 'Crieur public', zh: '报信人', vi: 'Người rao tin' },
+    description: {
+      en: 'Share a direct link to a verse.',
+      es: 'Comparte un enlace directo a un versículo.',
+      fr: 'Partager un lien direct vers un verset.',
+      zh: '分享一节经文的直接链接。',
+      vi: 'Chia sẻ liên kết thẳng tới một câu.',
+    },
+    icon: 'M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1',
+    criteria: { kind: 'verseShares', via: 'link', count: 1 },
+  },
+  {
+    id: 'share-link-7',
+    tier: 'silver',
+    title: { en: 'Going viral', es: 'Se está corriendo', fr: 'Ça circule', zh: '传开了', vi: 'Lan truyền' },
+    description: {
+      en: 'Share seven verse links. The Word gets around.',
+      es: 'Comparte siete enlaces de versículos. La Palabra corre.',
+      fr: 'Partager sept liens de versets. La Parole circule.',
+      zh: '分享七个经文链接。圣言会自己走。',
+      vi: 'Chia sẻ bảy liên kết câu. Lời tự đi.',
+    },
+    icon: 'M4 12h4l2-6 4 12 2-6h4',
+    criteria: { kind: 'verseShares', via: 'link', count: 7 },
+  },
+  {
+    id: 'share-image-1',
+    tier: 'bronze',
+    title: { en: 'Postcard', es: 'Postal', fr: 'Carte postale', zh: '明信片', vi: 'Bưu thiếp' },
+    description: {
+      en: 'Save a verse image to send along.',
+      es: 'Guarda una imagen de un versículo para enviarla.',
+      fr: 'Enregistrer une image de verset à envoyer.',
+      zh: '保存一张经文图片好发出去。',
+      vi: 'Lưu một ảnh câu để gửi đi.',
+    },
+    icon: 'M4 6h16v12H4V6Zm3 3 3 4 2-2 4 5',
+    criteria: { kind: 'verseShares', via: 'image', count: 1 },
+  },
+  {
+    id: 'share-image-5',
+    tier: 'silver',
+    title: { en: 'Gallery', es: 'Galería', fr: 'Galerie', zh: '画廊', vi: 'Phòng tranh' },
+    description: {
+      en: 'Make five verse images. The fridge is out of magnets.',
+      es: 'Haz cinco imágenes de versículos. Ya no caben imanes en la nevera.',
+      fr: 'Créer cinq images de versets. Le frigo n’a plus d’aimants.',
+      zh: '做五张经文图。冰箱上贴不下了。',
+      vi: 'Làm năm ảnh câu. Tủ lạnh hết chỗ nam châm.',
+    },
+    icon: 'M3 7h7v7H3V7Zm11 0h7v4h-7V7ZM3 16h7v4H3v-4Zm11 6h7v7h-7v-7Z',
+    criteria: { kind: 'verseShares', via: 'image', count: 5 },
+  },
+  {
+    id: 'share-any-3',
+    tier: 'bronze',
+    title: { en: 'Word of mouth', es: 'De boca en boca', fr: 'De bouche à oreille', zh: '口耳相传', vi: 'Truyền miệng' },
+    description: {
+      en: 'Share a verse three times — link, image, or the feed.',
+      es: 'Comparte un versículo tres veces: enlace, imagen o el muro.',
+      fr: 'Partager un verset trois fois — lien, image ou le fil.',
+      zh: '分享经文三次：链接、图片或动态。',
+      vi: 'Chia sẻ một câu ba lần — liên kết, ảnh, hoặc bảng tin.',
+    },
+    icon: 'M5 8h9l4 4v8H5V8Zm4 4h6M9 16h4',
+    criteria: { kind: 'verseShares', via: 'any', count: 3 },
+  },
   ...bookBadges(),
 ];
 
@@ -413,6 +485,10 @@ export function progressToward(definition: BadgeDefinition, events: LedgerEvent[
   }
   if (criteria.kind === 'questionsAnswered') {
     const have = questionsAnswered(events);
+    return { have, need: criteria.count, done: have >= criteria.count };
+  }
+  if (criteria.kind === 'verseShares') {
+    const have = shareCount(events, criteria.via);
     return { have, need: criteria.count, done: have >= criteria.count };
   }
   const have = circleSessions(events);

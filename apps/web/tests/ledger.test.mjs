@@ -23,6 +23,13 @@ function transpile(file, destName, rewrite = (text) => text) {
 
 transpile(path.join(root, 'packages/core/src/day.ts'), 'day.mjs');
 transpile(path.join(root, 'packages/bible/src/schema.ts'), 'schema.mjs');
+transpile(path.join(root, 'packages/bible/src/parseRef.ts'), 'parseRef.mjs', (text) => text
+  .replaceAll("'./schema'", "'./schema.mjs'")
+  .replaceAll('"./schema"', "'./schema.mjs'"));
+fs.writeFileSync(path.join(compiledDir, 'bible.mjs'), "export * from './schema.mjs';\nexport * from './parseRef.mjs';\n");
+const verseLinkUrl = transpile(path.join(here, '../src/verseLink.ts'), 'verseLink.mjs', (text) => text
+  .replaceAll("'@the-word/bible'", "'./bible.mjs'")
+  .replaceAll('"@the-word/bible"', "'./bible.mjs'"));
 const ledgerUrl = transpile(path.join(here, '../src/ledger.ts'), 'ledger.mjs', (text) => text
   .replaceAll("'@the-word/core'", "'./day.mjs'")
   .replaceAll('"@the-word/core"', "'./day.mjs'"));
@@ -34,8 +41,9 @@ const badgesUrl = transpile(path.join(here, '../src/badges.ts'), 'badges.mjs', (
   .replaceAll("'./ledger'", "'./ledger.mjs'")
   .replaceAll('"./ledger"', "'./ledger.mjs'"));
 
-const { appendEvent, mergeLedgers, uniqueChapters, alreadyReadToday, latestAnswers, eventId } = await import(ledgerUrl);
+const { appendEvent, mergeLedgers, uniqueChapters, alreadyReadToday, latestAnswers, eventId, shareCount } = await import(ledgerUrl);
 const { evaluate, BADGES, progressToward, hashLedger, bibleProgress } = await import(badgesUrl);
+const { parseVerseHash, encodeVerseRef, readerViewFromHash } = await import(verseLinkUrl);
 const { BOOKS_DATA } = await import(pathToFileURL(path.join(compiledDir, 'schema.mjs')).href);
 const { dayKey } = await import(pathToFileURL(path.join(compiledDir, 'day.mjs')).href);
 
@@ -154,6 +162,32 @@ test('funny book badges fire with the matching finished book', () => {
 
   const obadiah = [read('2026-05-02T12:00:00.000Z', 31, 1, 1)];
   assert.ok(evaluate(obadiah, BADGES).some((badge) => badge.id === 'fun-blink'));
+});
+
+test('verse hashes round-trip and deep links open the reader', () => {
+  assert.equal(encodeVerseRef(43, 3, 16), 'John.3.16');
+  assert.deepEqual(parseVerseHash('#John.3.16'), { bookId: 43, chapter: 3, verse: 16 });
+  assert.deepEqual(parseVerseHash('#1Jn.4.8'), { bookId: 62, chapter: 4, verse: 8 });
+  assert.deepEqual(parseVerseHash('#Gen-1-1'), { bookId: 1, chapter: 1, verse: 1 });
+  assert.equal(parseVerseHash('#read'), null);
+  assert.equal(parseVerseHash('#restore=ncryptsec1abc'), null);
+  assert.equal(readerViewFromHash('#John.3.16'), 'reader');
+  assert.equal(readerViewFromHash('#read'), 'reader');
+  assert.equal(readerViewFromHash(''), 'home');
+});
+
+test('sharing a link or image earns the matching badges', () => {
+  function share(via, n) {
+    return { id: eventId(ACTOR, n), kind: 'share', at: '2026-06-01T12:00:00.000Z', bookId: 43, chapter: 3, verse: 16, via };
+  }
+  const one = [share('link', 1)];
+  assert.ok(evaluate(one, BADGES).some((badge) => badge.id === 'share-link-1'));
+  assert.equal(evaluate(one, BADGES).some((badge) => badge.id === 'share-image-1'), false);
+  const images = [1, 2, 3, 4, 5].map((n) => share('image', n));
+  assert.ok(evaluate(images, BADGES).some((badge) => badge.id === 'share-image-5'));
+  assert.equal(shareCount(images, 'image'), 5);
+  const mixed = [share('link', 1), share('image', 2), share('feed', 3)];
+  assert.ok(evaluate(mixed, BADGES).some((badge) => badge.id === 'share-any-3'));
 });
 
 test('ledger hash changes when an event is added', () => {

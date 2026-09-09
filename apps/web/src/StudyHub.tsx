@@ -12,11 +12,13 @@ export function StudyHub({
   study,
   onOpenPassage,
   onReadTogether,
+  onSharedVerse,
 }: {
   app: WordApp;
   study: ReturnType<typeof useStudy>;
   onOpenPassage: (bookId: number, chapter: number, verse?: number) => void;
   onReadTogether: () => void;
+  onSharedVerse?: (bookId: number, chapter: number, verse: number) => void;
 }) {
   const { label, language } = app;
   const [tab, setTab] = useState<Tab>('plans');
@@ -95,7 +97,7 @@ export function StudyHub({
           <label>{label.shareVerse}
             <input value={shareNote} onChange={(event) => setShareNote(event.target.value)} placeholder={label.messagePlaceholder} />
           </label>
-          <button type="button" onClick={() => { void study.shareVerse(app.bookId, app.chapterNumber, app.focusedVerse ?? 1, shareNote); setShareNote(''); }}>{label.shareVerse}</button>
+          <button type="button" onClick={() => { const verse = app.focusedVerse ?? 1; void study.shareVerse(app.bookId, app.chapterNumber, verse, shareNote); onSharedVerse?.(app.bookId, app.chapterNumber, verse); setShareNote(''); }}>{label.shareVerse}</button>
           {study.feed.length ? study.feed.map((item) => (
             <article key={item.id} className="feed-card">
               <strong>{item.name}</strong>

@@ -42,6 +42,8 @@ export interface Strings {
   next: string;
   bookmark: string;
   copy: string;
+  shareLink: string;
+  linkCopied: string;
   image: string;
   exporting: string;
   clearSelection: string;
@@ -274,6 +276,8 @@ export const strings: Record<Language, Strings> = {
     next: 'Next',
     bookmark: 'Bookmark',
     copy: 'Copy',
+    shareLink: 'Share link',
+    linkCopied: 'Link copied.',
     image: 'Image',
     exporting: 'Exporting…',
     clearSelection: 'Unhighlight selected',
@@ -498,6 +502,8 @@ export const strings: Record<Language, Strings> = {
     next: 'Siguiente',
     bookmark: 'Marcador',
     copy: 'Copiar',
+    shareLink: 'Compartir enlace',
+    linkCopied: 'Enlace copiado.',
     image: 'Imagen',
     exporting: 'Exportando…',
     clearSelection: 'Quitar selección',
@@ -722,6 +728,8 @@ export const strings: Record<Language, Strings> = {
     next: 'Suivant',
     bookmark: 'Signet',
     copy: 'Copier',
+    shareLink: 'Partager le lien',
+    linkCopied: 'Lien copié.',
     image: 'Image',
     exporting: 'Exportation…',
     clearSelection: 'Désélectionner',
@@ -946,6 +954,8 @@ export const strings: Record<Language, Strings> = {
     next: '下一章',
     bookmark: '加书签',
     copy: '复制',
+    shareLink: '分享链接',
+    linkCopied: '链接已复制。',
     image: '图片',
     exporting: '正在导出…',
     clearSelection: '取消选择',
@@ -1170,6 +1180,8 @@ export const strings: Record<Language, Strings> = {
     next: 'Tiếp',
     bookmark: 'Dấu trang',
     copy: 'Sao chép',
+    shareLink: 'Chia sẻ liên kết',
+    linkCopied: 'Đã sao chép liên kết.',
     image: 'Hình ảnh',
     exporting: 'Đang xuất…',
     clearSelection: 'Bỏ chọn',

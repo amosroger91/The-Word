@@ -22,13 +22,16 @@ export type LedgerEvent =
   // the tombstone, so a deletion survives a merge instead of losing to the
   // older event that still carries the words.
   | { id: EventId; kind: 'note'; at: string; bookId: number; chapter: number; verse: number;
-      text: string; share: 'private' | 'friends' };
+      text: string; share: 'private' | 'friends' }
+  | { id: EventId; kind: 'share'; at: string; bookId: number; chapter: number; verse: number;
+      via: 'link' | 'image' | 'feed' };
 
 export type ReadEvent = Extract<LedgerEvent, { kind: 'read' }>;
 export type NoteEvent = Extract<LedgerEvent, { kind: 'note' }>;
 export type AnswerEvent = Extract<LedgerEvent, { kind: 'answer' }>;
 export type SessionEvent = Extract<LedgerEvent, { kind: 'session' }>;
 export type PlanEvent = Extract<LedgerEvent, { kind: 'plan' }>;
+export type ShareEvent = Extract<LedgerEvent, { kind: 'share' }>;
 export type DraftEvent = LedgerEvent extends infer Event ? Event extends LedgerEvent ? Omit<Event, 'id'> : never : never;
 
 const DB_NAME = 'word-ledger';
@@ -91,6 +94,12 @@ export function alreadyReadToday(events: LedgerEvent[], bookId: number, chapter:
   return readsOf(events).some((event) => (
     event.bookId === bookId && event.chapter === chapter && dayKey(new Date(event.at)) === today
   ));
+}
+
+export function shareCount(events: LedgerEvent[], via: 'link' | 'image' | 'feed' | 'any' = 'any'): number {
+  return events.filter((event) => (
+    event.kind === 'share' && (via === 'any' || event.via === via)
+  )).length;
 }
 
 export function chaptersOfBook(events: LedgerEvent[], bookId: number): Set<number> {

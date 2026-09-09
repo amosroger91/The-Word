@@ -15,6 +15,7 @@ import { BookBibleIcon } from './icons';
 import { ReaderIcon } from './ReaderIcon';
 import { useSavedDailyVerse } from './savedDailyVerse';
 import { downloadVerseImage } from './verseImageExport';
+import { verseHash } from './verseLink';
 
 // Shown only when the feed fails and nothing was ever saved. The text comes
 // from the bundled translation, so the card still works with no network.
@@ -35,6 +36,7 @@ export function Landing({
   onPreferences,
   onProgress,
   onStudy,
+  onShareImage,
   progress,
   partyMembers,
   banner,
@@ -47,6 +49,7 @@ export function Landing({
   onPreferences?: () => void;
   onProgress?: () => void;
   onStudy?: () => void;
+  onShareImage?: (bookId: number, chapter: number, verse: number) => void;
   progress?: { chapters: number; streak: number; percent: number; have: number; need: number };
   // Live Group Study roster, so the landing shows who is connected.
   partyMembers?: number;
@@ -102,6 +105,7 @@ export function Landing({
     // at the top rather than jumping to the day's verse and back.
     else if (speak === 'chapter') app.speakChapterAt(parsed.bookId, parsed.chapter);
     else app.goToVerse(parsed.bookId, parsed.chapter, parsed.verse);
+    window.location.hash = verseHash(parsed.bookId, parsed.chapter, parsed.verse);
     onEnterReader();
   }, [app, onEnterReader, parsed]);
 
@@ -126,10 +130,11 @@ export function Landing({
         artUrl,
         verseImageFilename(bookName || 'verse', parsed?.chapter ?? 1),
       );
+      if (parsed) onShareImage?.(parsed.bookId, parsed.chapter, parsed.verse);
     } finally {
       setExporting(false);
     }
-  }, [app.font.stack, artOverlay, artUrl, bookName, displayReference, displayText, exporting, parsed, translationName]);
+  }, [app.font.stack, artOverlay, artUrl, bookName, displayReference, displayText, exporting, onShareImage, parsed, translationName]);
 
   return (
     <div className="landing">

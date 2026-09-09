@@ -114,6 +114,32 @@ export function useLedger() {
     saveNote(bookId, chapter, verse, '', 'private')
   ), [saveNote]);
 
+  const recordShare = useCallback(async (
+    via: 'link' | 'image' | 'feed',
+    bookId: number,
+    chapter: number,
+    verse: number,
+  ) => {
+    const all = await loadEvents();
+    const mine = eventsForActor(all, gunPub.current);
+    const before = evaluate(mine, BADGES);
+    const { event } = appendEvent(mine, gunPub.current, {
+      kind: 'share',
+      at: new Date().toISOString(),
+      bookId,
+      chapter,
+      verse,
+      via,
+    });
+    const merged = mergeLedgers(all, [event]);
+    await saveEvents(merged);
+    const after = refresh(merged);
+    const known = new Set(before.map((badge) => badge.id));
+    const fresh = after.filter((badge) => !known.has(badge.id));
+    if (fresh.length) setJustEarned(fresh);
+    return fresh;
+  }, [refresh]);
+
   const chapters = uniqueChapters(events).length;
   const streak = currentStreak(readDayKeys(events), dayKey());
   const canon = bibleProgress(events);
@@ -132,6 +158,7 @@ export function useLedger() {
     noteAt: (bookId: number, chapter: number, verse: number) => noteFor(events, bookId, chapter, verse),
     saveNote,
     removeNote,
+    recordShare,
   };
 }
 
