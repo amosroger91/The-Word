@@ -6,17 +6,20 @@ const outDir = new URL('../e2e-reminder/', import.meta.url);
 mkdirSync(outDir, { recursive: true });
 const shot = (name) => fileURLToPath(new URL(name, outDir));
 
+// Defaults to the dev server; point APP_URL at the deployed site to check it live.
+const APP_URL = (process.env.APP_URL || 'http://localhost:5173/').split('#')[0].replace(/\/?$/, '/');
+const ORIGIN = new URL(APP_URL).origin;
 const errors = [];
 // Headed: headless Chromium reports Notification.permission as 'denied' whatever
 // the context is granted, which would disable the control under test.
 const browser = await chromium.launch({ headless: false });
 const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
-await context.grantPermissions(['notifications'], { origin: 'http://localhost:5173' });
+await context.grantPermissions(['notifications'], { origin: ORIGIN });
 const page = await context.newPage();
 page.on('pageerror', (e) => errors.push(e.message));
 page.on('console', (msg) => { if (msg.type() === 'error') errors.push('console: ' + msg.text()); });
 
-await page.goto('http://localhost:5173/', { waitUntil: 'networkidle' });
+await page.goto(APP_URL, { waitUntil: 'networkidle' });
 
 // The reminder lives in Preferences, reachable from the landing page.
 await page.locator('.landing button[aria-label="Preferences"]').first().click();
