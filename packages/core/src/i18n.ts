@@ -147,6 +147,15 @@ export interface Strings {
   reminderTestSent: string;
   reminderTestBlocked: string;
   reminderTestFailed: string;
+  backUpNow: string;
+  backupWhyBadge: string;
+  backupWhyCircle: string;
+  backupNoReset: string;
+  backupLater: string;
+  backupPlain: string;
+  backupPlainHint: string;
+  backupDownload: string;
+  backupDone: string;
   readers: string;
   readersHint: string;
   readerName: string;
@@ -394,6 +403,15 @@ export const strings: Record<Language, Strings> = {
     reminderTestSent: 'Sent — it should be on your desktop now.',
     reminderTestBlocked: 'Your browser sent it, but your system did not show it. Turn notifications on for your browser in your system settings (on Windows: Settings › System › Notifications), and check that do not disturb is off.',
     reminderTestFailed: 'Your browser would not show the notification.',
+    backUpNow: 'Save your account now',
+    backupWhyBadge: 'You have earned something. Save your account so it is not lost with this browser.',
+    backupWhyCircle: 'You have joined a circle. Save your account so it is not lost with this browser.',
+    backupNoReset: 'There is no password reset. Nobody — including us — can recover this key for you.',
+    backupLater: 'Not yet',
+    backupPlain: 'Save without a password',
+    backupPlainHint: 'A file without a password is your account: anyone who opens it is you. Keep it in a password manager. Forgetting a password loses the backup just as surely as losing the key.',
+    backupDownload: 'Download backup',
+    backupDone: 'Saved. Keep the file somewhere you will still have it next year.',
     readers: 'Who is reading',
     readersHint: 'Everyone on this device earns their own badges and progress. One account, one backup.',
     readerName: 'Name',
@@ -633,6 +651,15 @@ export const strings: Record<Language, Strings> = {
     reminderTestSent: 'Enviada: ya debería estar en tu escritorio.',
     reminderTestBlocked: 'El navegador la envió, pero el sistema no la mostró. Activa las notificaciones del navegador en los ajustes del sistema (en Windows: Configuración › Sistema › Notificaciones) y comprueba que el modo no molestar esté desactivado.',
     reminderTestFailed: 'El navegador no quiso mostrar la notificación.',
+    backUpNow: 'Guarda tu cuenta ahora',
+    backupWhyBadge: 'Has ganado algo. Guarda tu cuenta para no perderla con este navegador.',
+    backupWhyCircle: 'Te has unido a un círculo. Guarda tu cuenta para no perderla con este navegador.',
+    backupNoReset: 'No hay forma de restablecer la contraseña. Nadie, ni siquiera nosotros, puede recuperar esta clave.',
+    backupLater: 'Todavía no',
+    backupPlain: 'Guardar sin contraseña',
+    backupPlainHint: 'Un archivo sin contraseña es tu cuenta: quien lo abra eres tú. Guárdalo en un gestor de contraseñas. Olvidar una contraseña pierde la copia igual que perder la clave.',
+    backupDownload: 'Descargar la copia',
+    backupDone: 'Guardada. Deja el archivo donde sigas teniéndolo el año que viene.',
     readers: 'Quién está leyendo',
     readersHint: 'Cada persona de este dispositivo gana sus propias insignias y su progreso. Una cuenta, una copia de seguridad.',
     readerName: 'Nombre',
@@ -872,6 +899,15 @@ export const strings: Record<Language, Strings> = {
     reminderTestSent: 'Envoyée — elle devrait être sur votre bureau.',
     reminderTestBlocked: "Le navigateur l'a envoyée, mais le système ne l'a pas affichée. Activez les notifications du navigateur dans les réglages système (sous Windows : Paramètres › Système › Notifications) et vérifiez que le mode ne pas déranger est désactivé.",
     reminderTestFailed: "Le navigateur a refusé d'afficher la notification.",
+    backUpNow: 'Sauvegardez votre compte',
+    backupWhyBadge: 'Vous avez gagné quelque chose. Sauvegardez votre compte pour ne pas le perdre avec ce navigateur.',
+    backupWhyCircle: 'Vous avez rejoint un cercle. Sauvegardez votre compte pour ne pas le perdre avec ce navigateur.',
+    backupNoReset: 'Il n’y a pas de réinitialisation. Personne, nous compris, ne peut récupérer cette clé.',
+    backupLater: 'Pas maintenant',
+    backupPlain: 'Enregistrer sans mot de passe',
+    backupPlainHint: 'Un fichier sans mot de passe est votre compte : quiconque l’ouvre est vous. Gardez-le dans un gestionnaire de mots de passe. Oublier un mot de passe perd la sauvegarde aussi sûrement que perdre la clé.',
+    backupDownload: 'Télécharger la sauvegarde',
+    backupDone: 'Enregistrée. Gardez le fichier là où vous l’aurez encore l’an prochain.',
     readers: 'Qui lit',
     readersHint: 'Chaque personne de cet appareil gagne ses propres badges et sa progression. Un compte, une sauvegarde.',
     readerName: 'Nom',
@@ -1111,6 +1147,15 @@ export const strings: Record<Language, Strings> = {
     reminderTestSent: '已发送——它现在应该出现在你的桌面上。',
     reminderTestBlocked: '浏览器已发送，但系统没有显示。请在系统设置中为浏览器开启通知（Windows：设置 › 系统 › 通知），并确认勿扰模式已关闭。',
     reminderTestFailed: '浏览器拒绝显示该通知。',
+    backUpNow: '现在保存你的账户',
+    backupWhyBadge: '你已经有所收获。保存账户，别让它随这个浏览器一起消失。',
+    backupWhyCircle: '你加入了一个小组。保存账户，别让它随这个浏览器一起消失。',
+    backupNoReset: '没有密码重置。没有人能帮你找回这把密钥，我们也不能。',
+    backupLater: '暂时不用',
+    backupPlain: '不设密码保存',
+    backupPlainHint: '没有密码的文件就是你的账户：打开它的人就是你。请放进密码管理器。忘记密码和丢失密钥一样，备份同样没了。',
+    backupDownload: '下载备份',
+    backupDone: '已保存。把文件放在明年还找得到的地方。',
     readers: '谁在读',
     readersHint: '此设备上的每个人都有自己的徽章和进度。一个账户，一份备份。',
     readerName: '名字',
@@ -1350,6 +1395,15 @@ export const strings: Record<Language, Strings> = {
     reminderTestSent: 'Đã gửi — nó sẽ hiện trên màn hình của bạn ngay bây giờ.',
     reminderTestBlocked: 'Trình duyệt đã gửi, nhưng hệ thống không hiển thị. Hãy bật thông báo cho trình duyệt trong cài đặt hệ thống (trên Windows: Cài đặt › Hệ thống › Thông báo) và kiểm tra chế độ không làm phiền đã tắt.',
     reminderTestFailed: 'Trình duyệt đã từ chối hiển thị thông báo.',
+    backUpNow: 'Lưu tài khoản của bạn ngay',
+    backupWhyBadge: 'Bạn đã đạt được điều gì đó. Hãy lưu tài khoản để không mất cùng trình duyệt này.',
+    backupWhyCircle: 'Bạn đã tham gia một nhóm. Hãy lưu tài khoản để không mất cùng trình duyệt này.',
+    backupNoReset: 'Không có cách đặt lại mật khẩu. Không ai, kể cả chúng tôi, khôi phục được khoá này.',
+    backupLater: 'Chưa cần',
+    backupPlain: 'Lưu không cần mật khẩu',
+    backupPlainHint: 'Tệp không mật khẩu chính là tài khoản của bạn: ai mở nó là bạn. Hãy giữ trong trình quản lý mật khẩu. Quên mật khẩu thì mất bản sao lưu y như mất khoá.',
+    backupDownload: 'Tải bản sao lưu',
+    backupDone: 'Đã lưu. Hãy giữ tệp ở nơi sang năm bạn vẫn còn.',
     readers: 'Ai đang đọc',
     readersHint: 'Mỗi người trên thiết bị này có huy hiệu và tiến độ riêng. Một tài khoản, một bản sao lưu.',
     readerName: 'Tên',

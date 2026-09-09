@@ -13,6 +13,8 @@ import { Landing } from './Landing';
 import { Preferences } from './Preferences';
 import { VerseImageEditor, type VerseImageJob } from './VerseImageEditor';
 import { VerseNote } from './VerseNote';
+import { BackupPrompt } from './BackupPrompt';
+import { needsBackup, type BackupTrigger } from './backupState';
 import { unlockRemoteAudio, setRemoteVolume } from './media';
 import { createWebSpeech, webClipboard, webStorage } from './platform';
 import { useDailyReminder } from './dailyReminder';
@@ -79,6 +81,9 @@ function App() {
   const [voiceState,setVoiceState] = useState('preparing');
   const [notice,setNotice] = useState('');
   const [noteVerse,setNoteVerse] = useState<number|null>(null);
+  // Ask for a backup the first time the account is worth keeping, not at first
+  // launch when there is nothing invested. docs/study-plans-framework.md §14a.
+  const [backupAsk,setBackupAsk] = useState<BackupTrigger>('none');
   const partyOpen = tools.entries.some(e=>e.id==='group');
   const { list: liveGroups, advertise: advertiseGroup, retract: retractGroup } = useStudyBoard(partyOpen || (party.active && party.findable && party.isHost));
   const verseRefs = useRef<Record<number, HTMLElement | null>>({});
@@ -201,6 +206,9 @@ function App() {
       advertisedCode.current = '';
     }
   }, [retractGroup, party.active, party.isHost, party.findable, party.code]);
+
+  useEffect(()=>{ if(ledger.justEarned.length&&needsBackup()) setBackupAsk('badge'); },[ledger.justEarned]);
+  useEffect(()=>{ if(study.circles.length&&needsBackup()) setBackupAsk((prev)=>prev==='none'?'circle':prev); },[study.circles.length]);
 
   const openTool = (id:ToolId) => { tools.open(id); if(window.innerWidth<=950)setLibrary(null); setMobileView('tools'); };
   const openLibrary = (next:'books'|'search'|'bookmarks') => { setLibrary(next); setMobileView('library'); };
@@ -385,6 +393,7 @@ function App() {
     })();}}>{label.shareLink}</button><button onClick={()=>app.selectedVerseNumbers.forEach(app.toggleBookmark)}>Bookmark</button><button onClick={()=>setNoteVerse(currentVerse)}>{ledger.noteAt(app.bookId,chapterNumber,currentVerse)?label.editNote:label.addNote}</button><button onClick={()=>inspect(currentVerse,'guide')}>Explore</button><button onClick={()=>{setImageJob({reference:selectedReference,text:selectedText,translation:app.translations.find(t=>t.id===app.translationId)?.shortName??'KJV',filename:verseImageFilename(bookName,chapterNumber),seed:selectedReference});openTool('image');}}>Image</button>{(!participant||!party.following)&&<button onClick={app.speakSelection}>{party.isHost?'Read to group':'Read selection'}</button>}{party.active&&party.isHost&&<button onClick={()=>party.showGroup(app.selectedVerseNumbers)}>Show group</button>}<button onClick={app.clearSelection} aria-label="Clear selection">×</button></div></div>}
     {dock}
   </div>
-  {welcome.open&&<Welcome party={party} onClose={welcome.close}/>}</>;
+  {welcome.open&&<Welcome party={party} onClose={welcome.close}/>}
+  {backupAsk!=='none'&&!welcome.open&&<BackupPrompt trigger={backupAsk} label={label} onDone={()=>{setBackupAsk('none');setNotice(label.backupDone);}} onLater={()=>setBackupAsk('none')}/>}</>;
 }
 export default App;
