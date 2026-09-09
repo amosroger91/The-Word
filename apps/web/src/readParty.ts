@@ -220,11 +220,12 @@ export function joinParty({ code, identity, handlers = {} }: {
     const stream = getLocalStream();
     if (!stream) return;
     for (const m of members) {
-      if (m.id === me.id || !m.av || !m.peerId) continue;
+      if (m.id === me.id || !m.peerId) continue;
       if (mediaConns.has(m.peerId)) continue;
-      if (myPeerId() < m.peerId) {
-        try { trackCall(peer.call(m.peerId, stream)); } catch { /* dial failed */ }
-      }
+      // Lower peer-id dials when both are in the call. If the other person
+      // has not unmuted yet, we still dial so they can hear us.
+      if (m.av && myPeerId() > m.peerId) continue;
+      try { trackCall(peer.call(m.peerId, stream)); } catch { /* dial failed */ }
     }
   }
   function pruneStaleMedia() {

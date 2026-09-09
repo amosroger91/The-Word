@@ -4,6 +4,7 @@
 
 let localStream: MediaStream | null = null;
 let state = { audio: false, video: false };
+const remotePlayers = new Set<HTMLMediaElement>();
 
 export function getState() { return { ...state }; }
 export function getLocalStream() { return localStream; }
@@ -17,7 +18,7 @@ export async function setMedia({ audio, video }: { audio: boolean; video: boolea
     return null;
   }
   const fresh = await navigator.mediaDevices.getUserMedia({
-    audio: want.audio,
+    audio: want.audio ? { echoCancellation: true, noiseSuppression: true, autoGainControl: true } : false,
     video: want.video ? { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' } : false,
   });
   stopLocal();
@@ -34,4 +35,23 @@ export function stopLocal() {
   }
   localStream = null;
   state = { audio: false, video: false };
+}
+
+// Remote playback is a dedicated <audio> (not the hidden avatar <video>).
+// Register each player so a later mic/join click can retry play() after
+// the autoplay gate, which is why the green ring can show with no sound.
+export function registerRemotePlayer(el: HTMLMediaElement) {
+  remotePlayers.add(el);
+  return () => {
+    remotePlayers.delete(el);
+    el.srcObject = null;
+  };
+}
+
+export function unlockRemoteAudio() {
+  for (const el of remotePlayers) {
+    el.muted = false;
+    el.volume = 1;
+    void el.play().catch(() => {});
+  }
 }

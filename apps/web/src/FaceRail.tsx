@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { MicOffIcon } from './icons';
+import { registerRemotePlayer } from './media';
 import type { PartyMember } from './readParty';
 
 function useTalking(stream: MediaStream | null, liveMic: boolean) {
@@ -57,16 +58,36 @@ function Tile({
   onPickPhoto?: (file: File) => void;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const hasVideo = Boolean(stream?.getVideoTracks().some((track) => track.readyState === 'live' && track.enabled));
   const talking = useTalking(stream, !muted);
 
   useEffect(() => {
-    const el = videoRef.current;
-    if (!el) return;
-    el.srcObject = stream;
-    return () => { el.srcObject = null; };
-  }, [stream]);
+    if (self) return;
+    const audio = audioRef.current;
+    if (!audio) return;
+    return registerRemotePlayer(audio);
+  }, [self]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    const audio = audioRef.current;
+    if (video) {
+      video.srcObject = stream;
+      if (stream) void video.play().catch(() => {});
+    }
+    if (audio) {
+      audio.srcObject = self ? null : stream;
+      audio.muted = false;
+      audio.volume = 1;
+      if (!self && stream) void audio.play().catch(() => {});
+    }
+    return () => {
+      if (video) video.srcObject = null;
+      if (audio) audio.srcObject = null;
+    };
+  }, [stream, self]);
 
   const className = [
     'meeting-tile',
@@ -79,6 +100,7 @@ function Tile({
   return (
     <div className={className} role="listitem">
       {stream ? <video ref={videoRef} autoPlay playsInline muted={self} /> : null}
+      {!self ? <audio ref={audioRef} autoPlay playsInline className="meeting-audio" /> : null}
       {!hasVideo && (
         avatar
           ? <div className="meeting-avatar photo" style={{ backgroundImage: `url("${avatar}")` }} aria-hidden="true" />

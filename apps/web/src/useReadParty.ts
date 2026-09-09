@@ -7,7 +7,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { WordApp } from '@the-word/core';
 import { joinParty, type PartyChatMessage, type PartyMember, type PartyRoom, type ReadingState } from './readParty';
 import { compressAvatar, loadIdentity, saveIdentity } from './identity';
-import { getLocalStream, setMedia, stopLocal } from './media';
+import { getLocalStream, setMedia, stopLocal, unlockRemoteAudio } from './media';
 
 function randomCode(): string { return Math.random().toString(36).slice(2, 7); }
 
@@ -115,11 +115,13 @@ export function useReadParty(app: WordApp) {
 
   const toggleMic = useCallback(() => {
     if (capped && !micOn) return;
+    unlockRemoteAudio();
     void applyMedia(!micOn, camOn);
   }, [applyMedia, capped, micOn, camOn]);
 
   const toggleCam = useCallback(() => {
     if (capped && !camOn) return;
+    unlockRemoteAudio();
     void applyMedia(micOn, !camOn);
   }, [applyMedia, capped, micOn, camOn]);
 

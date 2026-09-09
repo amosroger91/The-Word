@@ -236,6 +236,7 @@ select, input { border: 1px solid #c9c1b3; border-radius: 8px; background: trans
 }
 .meeting-tile video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .meeting-tile.avatar video { opacity: 0; }
+.meeting-audio { position: absolute; width: 1px; height: 1px; left: 0; bottom: 0; opacity: 0.01; pointer-events: none; }
 .meeting-avatar {
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
   font-size: 28px; font-weight: 600; color: #fff; background-size: cover; background-position: center;
@@ -492,6 +493,14 @@ select, input { border: 1px solid #c9c1b3; border-radius: 8px; background: trans
 .prefs-stepper button { min-width: 48px; min-height: 44px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: inherit; }
 .prefs-stepper button:hover { border-color: var(--accent); }
 .prefs-sample { flex: 1; margin: 0; padding: 8px 12px; border: 1px dashed var(--line); border-radius: 10px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.prefs-toggle { display: flex; align-items: center; gap: 10px; min-height: 44px; }
+.prefs-toggle input[type='checkbox'] { width: 20px; height: 20px; flex: 0 0 auto; padding: 0; accent-color: var(--accent); }
+.prefs-toggle input:disabled + span { opacity: 0.55; }
+.prefs-reminder { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.prefs-reminder input[type='time'] { width: auto; min-height: 44px; }
+.prefs-reminder button { border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: inherit; padding: 8px 14px; min-height: 44px; }
+.prefs-reminder button:hover { border-color: var(--accent); }
+.prefs-field .muted { margin: 0; font-size: 12px; }
 
 .image-editor-backdrop { position: fixed; inset: 0; z-index: 50; background: #0008; display: flex; align-items: center; justify-content: center; padding: 16px; }
 .image-editor { width: min(560px, 100%); max-height: calc(100vh - 32px); overflow: auto; background: var(--background, #f7f4ee); color: inherit; border-radius: 16px; padding: 16px 16px 20px; display: grid; gap: 14px; }

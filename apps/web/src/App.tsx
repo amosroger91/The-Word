@@ -8,7 +8,9 @@ import { FaceRail } from './FaceRail';
 import { Landing } from './Landing';
 import { Preferences } from './Preferences';
 import { VerseImageEditor, type VerseImageJob } from './VerseImageEditor';
+import { unlockRemoteAudio } from './media';
 import { createWebSpeech, webClipboard, webStorage } from './platform';
+import { useDailyReminder } from './dailyReminder';
 import { useReadParty } from './useReadParty';
 import { useStudyBoard } from './useStudyBoard';
 import './styles.css';
@@ -39,6 +41,9 @@ function App() {
   } = app;
 
   const party = useReadParty(app);
+  // Lives at the top of the app, not inside Preferences: the schedule has to be
+  // kept armed on every visit, whether or not the reader opens that panel.
+  const reminder = useDailyReminder({ title: label.reminderTitle, body: label.reminderBody });
   const activeTopic = app.topics.find((topic) => topic.id === app.selectedTopic);
   const [searchOpen, setSearchOpen] = useState(false);
   const [bookmarksOpen, setBookmarksOpen] = useState(false);
@@ -170,6 +175,7 @@ function App() {
             name={party.name}
             color={party.identity.color}
             avatar={party.avatar}
+            reminder={reminder}
             onNameChange={party.setName}
             onAvatarChange={(file) => { void party.setAvatar(file); }}
             onClose={() => setPrefsOpen(false)}
@@ -472,7 +478,7 @@ function App() {
                   <small>{label.findableHint}</small>
                 </span>
               </label>
-              <button className="party-primary" onClick={() => { speech.unlock?.(); party.createParty({ findable: createFindable }); }}>{label.startParty}</button>
+              <button className="party-primary" onClick={() => { speech.unlock?.(); unlockRemoteAudio(); party.createParty({ findable: createFindable }); }}>{label.startParty}</button>
               <div className="party-live-list">
                 <span className="section-label">{label.liveGroups}</span>
                 {liveGroups.length ? liveGroups.map((item) => {
@@ -483,7 +489,7 @@ function App() {
                       type="button"
                       className="party-live-item"
                       key={item.code}
-                      onClick={() => { speech.unlock?.(); party.joinParty(item.code); }}
+                      onClick={() => { speech.unlock?.(); unlockRemoteAudio(); party.joinParty(item.code); }}
                     >
                       <strong>{item.hostName}</strong>
                       <span>{label.peopleHere(item.members)}{where ? ` · ${where}` : ''}</span>
@@ -493,7 +499,7 @@ function App() {
                 }) : <p className="muted">{label.noLiveGroups}</p>}
               </div>
               <div className="party-or"><span>{label.orJoinParty}</span></div>
-              <form className="party-join" onSubmit={(event) => { event.preventDefault(); speech.unlock?.(); party.joinParty(partyCode); }}>
+              <form className="party-join" onSubmit={(event) => { event.preventDefault(); speech.unlock?.(); unlockRemoteAudio(); party.joinParty(partyCode); }}>
                 <input placeholder={label.partyCodePlaceholder} value={partyCode} onChange={(event) => setPartyCode(event.target.value)} />
                 <button type="submit" disabled={!partyCode.trim()}>{label.joinParty}</button>
               </form>
@@ -552,6 +558,7 @@ function App() {
           name={party.name}
           color={party.identity.color}
           avatar={party.avatar}
+          reminder={reminder}
           onNameChange={party.setName}
           onAvatarChange={(file) => { void party.setAvatar(file); }}
           onClose={() => setPrefsOpen(false)}
