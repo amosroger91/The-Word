@@ -101,6 +101,10 @@ select, input { border: 1px solid #c9c1b3; border-radius: 8px; background: trans
 .selection-bar span, .reading-bar-status span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #d9d0c2; font-size: 13px; }
 .selection-bar button, .reading-bar button { border-color: #746955; color: inherit; white-space: nowrap; }
 .speed-control { display: flex; align-items: center; gap: 6px; border: 1px solid #c9c1b3; border-radius: 8px; padding: 3px 8px; }
+.profile-control { display: flex; align-items: center; gap: 8px; border: 1px solid #c9c1b3; border-radius: 8px; padding: 3px 8px 3px 4px; }
+.profile-avatar { width: 30px; height: 30px; flex: 0 0 auto; border: 0; border-radius: 50%; padding: 0; color: #fff; font-size: 14px; font-weight: 600; background-size: cover; background-position: center; }
+.profile-name { width: 96px; border: 0; padding: 6px 0; background: transparent; }
+.profile-name:focus { outline: none; }
 .speed-control span { font-variant-numeric: tabular-nums; font-size: 13px; min-width: 40px; text-align: center; }
 .speed-control button { border: 0; background: transparent; color: inherit; padding: 4px 6px; font-size: 15px; line-height: 1; }
 .reading-bar .speed-control { border-color: #746955; }
@@ -153,6 +157,8 @@ select, input { border: 1px solid #c9c1b3; border-radius: 8px; background: trans
   .control-settings.open .combo-compact { flex: 1 1 130px; }
   .control-settings.open .combo-compact .combo-value { width: 100%; min-width: 0; }
   .control-settings.open .speed-control { flex: 1 1 auto; justify-content: center; }
+  .control-settings.open .profile-control { flex: 1 1 100%; }
+  .control-settings.open .profile-name { width: 100%; min-width: 0; }
   .combo-compact .combo-value { min-width: 0; }
   .layout { display: block; padding: 22px 18px 120px; }
   .sidebar { margin-bottom: 32px; gap: 16px; }

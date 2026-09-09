@@ -7,6 +7,7 @@ import { CrossRefMenu } from './CrossRefMenu';
 import { FaceRail } from './FaceRail';
 import { Landing } from './Landing';
 import { Preferences } from './Preferences';
+import { ProfileControl } from './ProfileControl';
 import { VerseImageEditor, type VerseImageJob } from './VerseImageEditor';
 import { unlockRemoteAudio } from './media';
 import { createWebSpeech, webClipboard, webStorage } from './platform';
@@ -230,6 +231,15 @@ function App() {
               <SearchableSelect compact className="voice-select" value={speechVoice} onChange={setSpeechVoice} label={label.voice} filterPlaceholder={label.filterPlaceholder} options={voiceOptions.map((voice) => ({ value: voice.id, label: voice.isDefault ? label.defaultVoice : voice.name }))} />
               {speedControl}
               {volumeControl}
+              <ProfileControl
+                name={party.name}
+                color={party.identity.color}
+                avatar={party.avatar}
+                nameLabel={label.displayName}
+                photoLabel={label.changePhoto}
+                onNameChange={party.setName}
+                onAvatarChange={(file) => { void party.setAvatar(file); }}
+              />
             </div>
             {speechControls}
             <button className={`icon-button settings-toggle ${settingsOpen ? 'active' : ''}`} onClick={() => setSettingsOpen((open) => !open)} aria-label={label.settings} title={label.settings} aria-expanded={settingsOpen}>⚙</button>
