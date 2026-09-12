@@ -375,15 +375,24 @@
 .device-toggle span { display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
 .device-toggle small { color: var(--ws-muted); font-size: 11px; line-height: 1.4; }
 
-/* Host's question put to the room */
-.question-backdrop { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(0,0,0,0.45); }
-.question-card { width: min(520px, 100%); display: flex; flex-direction: column; gap: 10px; padding: 20px; border-radius: 14px; background: var(--ws-bg, #fff); border: 1px solid var(--ws-line); box-shadow: 0 18px 50px rgba(0,0,0,0.28); }
-.question-card h2 { margin: 0; font-size: 19px; line-height: 1.35; }
-.question-card textarea { width: 100%; resize: vertical; padding: 10px; border-radius: 10px; border: 1px solid var(--ws-line); font: inherit; background: var(--ws-soft); color: inherit; }
-.question-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+/* Host's question put to the room. Sized to command the screen the way the
+   presented screen does - this is the one thing everyone is being asked to do. */
+.question-backdrop { position: fixed; inset: 0; z-index: 70; display: flex; align-items: center; justify-content: center; padding: 4vh 16px; background: rgba(0,0,0,0.6); }
+.question-card { width: min(920px, 96vw); max-height: 92vh; display: flex; flex-direction: column; gap: 14px; padding: clamp(20px, 4vw, 40px); border-radius: 16px; background: var(--ws-bg, #fff); border: 1px solid var(--ws-line); box-shadow: 0 24px 70px rgba(0,0,0,0.36); }
+.question-card h2 { margin: 0; font-size: clamp(22px, 3.4vw, 34px); line-height: 1.25; }
+.question-card textarea { flex: 1 1 auto; width: 100%; min-height: 28vh; resize: vertical; padding: 14px; border-radius: 12px; border: 1px solid var(--ws-line); font: inherit; font-size: 16px; line-height: 1.5; background: var(--ws-soft); color: inherit; }
+.question-actions { display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap; }
+.question-actions button { min-height: 44px; padding: 10px 20px; font-size: 15px; }
+@media (max-width: 700px) {
+  .question-backdrop { padding: 0; align-items: stretch; }
+  .question-card { width: 100%; max-height: none; height: 100%; border-radius: 0; border: 0; }
+  .question-card textarea { min-height: 34vh; }
+}
 
-/* Answers on everyone's screen */
-.answer-board { margin: 0 0 10px; padding: 10px 12px; border: 1px solid var(--ws-line); border-radius: 12px; background: var(--ws-soft); }
+/* Answers on everyone's screen. Floats above whatever view you are on, since
+   the host controls when it goes away - it must not depend on where you are. */
+.answer-board { position: fixed; z-index: 55; left: 50%; transform: translateX(-50%); top: 10px; width: min(720px, calc(100vw - 20px)); max-height: 42vh; overflow-y: auto; padding: 12px 14px; border: 1px solid var(--ws-line); border-radius: 12px; background: var(--ws-bg, #fff); box-shadow: 0 12px 36px rgba(0,0,0,0.22); }
+.host-question .answer-board { position: static; transform: none; width: auto; box-shadow: none; }
 .answer-board-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
 .answer-board-head strong { display: block; font-size: 14px; line-height: 1.35; }
 .answer-board-head button { min-height: 28px; font-size: 11px; padding: 4px 10px; flex: 0 0 auto; }
