@@ -41,7 +41,7 @@ const badgesUrl = transpile(path.join(here, '../src/badges.ts'), 'badges.mjs', (
   .replaceAll("'./ledger'", "'./ledger.mjs'")
   .replaceAll('"./ledger"', "'./ledger.mjs'"));
 
-const { appendEvent, mergeLedgers, uniqueChapters, alreadyReadToday, latestAnswers, eventId, shareCount } = await import(ledgerUrl);
+const { appendEvent, mergeLedgers, uniqueChapters, alreadyReadToday, latestAnswers, eventId, shareCount, distinctShareCount, imageShareStats, groupActionCount, groupActionsDone } = await import(ledgerUrl);
 const { evaluate, BADGES, progressToward, hashLedger, bibleProgress } = await import(badgesUrl);
 const { parseVerseHash, encodeVerseRef, readerViewFromHash } = await import(verseLinkUrl);
 const { BOOKS_DATA } = await import(pathToFileURL(path.join(compiledDir, 'schema.mjs')).href);
@@ -183,9 +183,12 @@ test('sharing a link or image earns the matching badges', () => {
   const one = [share('link', 1)];
   assert.ok(evaluate(one, BADGES).some((badge) => badge.id === 'share-link-1'));
   assert.equal(evaluate(one, BADGES).some((badge) => badge.id === 'share-image-1'), false);
-  const images = [1, 2, 3, 4, 5].map((n) => share('image', n));
-  assert.ok(evaluate(images, BADGES).some((badge) => badge.id === 'share-image-5'));
-  assert.equal(shareCount(images, 'image'), 5);
+  // Gallery counts distinct verses now: five exports of the SAME verse no longer earn it.
+  const sameVerse = [1, 2, 3, 4, 5].map((n) => share('image', n));
+  assert.equal(shareCount(sameVerse, 'image'), 5);
+  assert.equal(evaluate(sameVerse, BADGES).some((badge) => badge.id === 'share-image-5'), false);
+  const fiveVerses = [1, 2, 3, 4, 5].map((n) => ({ ...share('image', n), verse: 15 + n }));
+  assert.ok(evaluate(fiveVerses, BADGES).some((badge) => badge.id === 'share-image-5'));
   const mixed = [share('link', 1), share('image', 2), share('feed', 3)];
   assert.ok(evaluate(mixed, BADGES).some((badge) => badge.id === 'share-any-3'));
 });
@@ -195,4 +198,110 @@ test('ledger hash changes when an event is added', () => {
   const b = [...a, read('2026-09-02T12:00:00.000Z', 43, 2, 2)];
   assert.notEqual(hashLedger(a), hashLedger(b));
   assert.equal(hashLedger(b), hashLedger([...b].reverse()));
+});
+
+// --- verse-image achievements -------------------------------------------------
+
+function imageShare(n, { bookId = 43, chapter = 3, verse = 16, outcome } = {}) {
+  return { id: eventId(ACTOR, n), kind: 'share', at: `2026-06-${String(n).padStart(2, '0')}T12:00:00.000Z`,
+    bookId, chapter, verse, via: 'image', ...(outcome ? { outcome } : {}) };
+}
+
+test('distinctShareCount counts unique passages, not raw exports', () => {
+  const sameVerse = [1, 2, 3].map((n) => imageShare(n));
+  assert.equal(shareCount(sameVerse, 'image'), 3);
+  assert.equal(distinctShareCount(sameVerse, 'image', 'verse'), 1);
+  const threeVerses = [1, 2, 3].map((n) => imageShare(n, { verse: n }));
+  assert.equal(distinctShareCount(threeVerses, 'image', 'verse'), 3);
+});
+
+test('distinctShareCount by book measures breadth', () => {
+  const events = [imageShare(1, { bookId: 1 }), imageShare(2, { bookId: 1, verse: 2 }), imageShare(3, { bookId: 43 })];
+  assert.equal(distinctShareCount(events, 'image', 'verse'), 3);
+  assert.equal(distinctShareCount(events, 'image', 'book'), 2);
+});
+
+test('events written before outcome existed count as saved', () => {
+  const events = [imageShare(1), imageShare(2, { verse: 2, outcome: 'shared' })];
+  assert.equal(distinctShareCount(events, 'image', 'verse', 'saved'), 1);
+  assert.equal(distinctShareCount(events, 'image', 'verse', 'shared'), 1);
+});
+
+test('Out the Door needs an image that actually left the device', () => {
+  const saved = [imageShare(1)];
+  assert.equal(evaluate(saved, BADGES).some((badge) => badge.id === 'share-image-sent-1'), false);
+  const sent = [imageShare(1, { outcome: 'shared' })];
+  assert.ok(evaluate(sent, BADGES).some((badge) => badge.id === 'share-image-sent-1'));
+});
+
+test('Touring Show needs seven different books', () => {
+  const six = [1, 2, 3, 4, 5, 6].map((n) => imageShare(n, { bookId: n }));
+  assert.equal(evaluate(six, BADGES).some((badge) => badge.id === 'share-image-books-7'), false);
+  const seven = [...six, imageShare(7, { bookId: 7 })];
+  assert.ok(evaluate(seven, BADGES).some((badge) => badge.id === 'share-image-books-7'));
+});
+
+test('imageShareStats summarises totals, breadth and the top book', () => {
+  const events = [
+    imageShare(1, { bookId: 43, verse: 16 }),
+    imageShare(2, { bookId: 43, verse: 16 }),
+    imageShare(3, { bookId: 43, verse: 17, outcome: 'shared' }),
+    imageShare(4, { bookId: 19, verse: 1 }),
+    { id: eventId(ACTOR, 9), kind: 'share', at: '2026-06-09T12:00:00.000Z', bookId: 1, chapter: 1, verse: 1, via: 'link' },
+  ];
+  const stats = imageShareStats(events);
+  assert.equal(stats.total, 4);          // the link share is excluded
+  assert.equal(stats.verses, 3);         // 43:3:16, 43:3:17, 19:1:1
+  assert.equal(stats.books, 2);
+  assert.equal(stats.sent, 1);
+  assert.equal(stats.saved, 3);
+  assert.deepEqual(stats.topBook, { bookId: 43, count: 3 });
+  assert.equal(stats.recent[0].id, eventId(ACTOR, 4)); // newest first
+});
+
+// --- group-study achievements -------------------------------------------------
+
+function groupEvent(n, action) {
+  return { id: eventId(ACTOR, n), kind: 'group', at: `2026-07-${String(n).padStart(2, '0')}T12:00:00.000Z`, action };
+}
+
+test('groupActionCount filters by action', () => {
+  const events = [groupEvent(1, 'join'), groupEvent(2, 'mic'), groupEvent(3, 'mic')];
+  assert.equal(groupActionCount(events), 3);
+  assert.equal(groupActionCount(events, 'mic'), 2);
+  assert.equal(groupActionCount(events, 'cam'), 0);
+  assert.deepEqual([...groupActionsDone(events)].sort(), ['join', 'mic']);
+});
+
+test('each group-study first earns exactly its own badge', () => {
+  const pairs = [
+    ['join', 'group-join-1'],
+    ['chapter', 'group-chapter-1'],
+    ['mic', 'group-mic-1'],
+    ['cam', 'group-cam-1'],
+    ['public', 'group-public-1'],
+    ['private', 'group-private-1'],
+    ['friendRequest', 'group-friend-1'],
+  ];
+  for (const [action, badgeId] of pairs) {
+    const earned = evaluate([groupEvent(1, action)], BADGES).map((badge) => badge.id);
+    assert.ok(earned.includes(badgeId), `${action} should earn ${badgeId}`);
+    for (const [, other] of pairs) {
+      if (other !== badgeId) assert.equal(earned.includes(other), false, `${action} must not earn ${other}`);
+    }
+  }
+});
+
+test('group badges are unaffected by reading or sharing events', () => {
+  const events = [read('2026-07-01T12:00:00.000Z', 43, 1, 1)];
+  const earned = evaluate(events, BADGES).map((badge) => badge.id);
+  for (const id of ['group-join-1', 'group-mic-1', 'group-cam-1', 'group-friend-1']) {
+    assert.equal(earned.includes(id), false);
+  }
+});
+
+test('earnedAt is the group event that crossed the threshold', () => {
+  const events = [groupEvent(1, 'join'), groupEvent(5, 'mic')];
+  const mic = evaluate(events, BADGES).find((badge) => badge.id === 'group-mic-1');
+  assert.equal(mic.earnedAt, '2026-07-05T12:00:00.000Z');
 });

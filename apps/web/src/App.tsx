@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { localBible } from '@the-word/bible';
 import { useWordApp, verseImageFilename, verseRuns, type WordApp } from '@the-word/core';
 import { SearchableSelect } from './SearchableSelect';
-import { BookBibleIcon, CamIcon, MicIcon, VolumeHighIcon, VolumeLowIcon } from './icons';
+import { BookBibleIcon, CamIcon, MicIcon, ScreenIcon, VolumeHighIcon, VolumeLowIcon } from './icons';
+import { ScreenStage } from './ScreenStage';
 import { ToolDock, useTools, type ToolId } from './ToolDock';
 import { PassageTools, snapshot, type PassageSnapshot } from './PassageTools';
 import { Welcome, useWelcome, ReminderBanner } from './Welcome';
@@ -23,7 +24,8 @@ import { useDailyReminder } from './dailyReminder';
 import { useReadParty } from './useReadParty';
 import { useStudyBoard } from './useStudyBoard';
 import { takeRestoreToken } from './nostrAccount';
-import { parseVerseHash, readerViewFromHash, verseHash, verseShareUrl } from './verseLink';
+import { formatVerseReference, parseVerseHash, readerViewFromHash, verseHash, verseShareText, verseShareUrl } from './verseLink';
+import type { GroupAction } from './ledger';
 import { useChapterRead, useLedger } from './useLedger';
 import { ProgressPanel } from './ProgressPanel';
 import { localized } from './badges';
@@ -144,7 +146,35 @@ function App() {
     return () => io.disconnect();
   }, [chapter, lastVerse, chapterLoading, view]);
 
-  useChapterRead(ledger.recordChapterRead, {
+  // Group-study milestones. Recorded once per action per party session, so a mic
+  // toggled ten times appends one event, not ten.
+  const groupLogged = useRef<Set<string>>(new Set());
+  const logGroupOnce = useCallback((key: string, action: GroupAction, where?: { bookId?: number; chapter?: number }) => {
+    if (groupLogged.current.has(key)) return;
+    groupLogged.current.add(key);
+    void ledger.recordGroup(action, where);
+  }, [ledger.recordGroup]);
+
+  useEffect(() => {
+    if (!party.active) { groupLogged.current.clear(); return; }
+    logGroupOnce('join', 'join');
+    // Only the host chooses whether the room is listed, so only the host earns these.
+    if (party.isHost) {
+      const listing: GroupAction = party.findable ? 'public' : 'private';
+      logGroupOnce(listing, listing);
+    }
+  }, [party.active, party.isHost, party.findable, logGroupOnce]);
+
+  useEffect(() => { if (party.active && party.micOn) logGroupOnce('mic', 'mic'); }, [party.active, party.micOn, logGroupOnce]);
+  useEffect(() => { if (party.active && party.camOn) logGroupOnce('cam', 'cam'); }, [party.active, party.camOn, logGroupOnce]);
+
+  const recordChapterReadInGroup = useCallback(async (bookId: number, chapter: number, verses?: number[]) => {
+    const result = await ledger.recordChapterRead(bookId, chapter, verses);
+    if (party.active) logGroupOnce(`chapter:${bookId}:${chapter}`, 'chapter', { bookId, chapter });
+    return result;
+  }, [ledger.recordChapterRead, party.active, logGroupOnce]);
+
+  useChapterRead(recordChapterReadInGroup, {
     bookId: app.bookId,
     chapter: chapterNumber,
     lastVerse,
@@ -272,7 +302,7 @@ function App() {
     {party.error && <p role="alert">Could not connect: {party.error}. Leave the room and try joining again.</p>}
   </div>;
   const dock = <footer className="session-dock" aria-label={party.active?'Meeting and reading controls':'Reading controls'}>
-    {party.active && <div className="device-controls"><button aria-label="Microphone" aria-pressed={party.micOn} disabled={party.capped&&!party.micOn} onClick={party.toggleMic}><MicIcon/><span>{party.micOn?'Mic on':'Mic off'}</span></button><button aria-label="Camera" aria-pressed={party.camOn} disabled={party.capped&&!party.camOn} onClick={party.toggleCam}><CamIcon/><span>{party.camOn?'Camera on':'Camera off'}</span></button></div>}
+    {party.active && <div className="device-controls"><button aria-label="Microphone" aria-pressed={party.micOn} disabled={party.capped&&!party.micOn} onClick={party.toggleMic}><MicIcon/><span>{party.micOn?'Mic on':'Mic off'}</span></button><button aria-label="Camera" aria-pressed={party.camOn} disabled={party.capped&&!party.camOn} onClick={party.toggleCam}><CamIcon/><span>{party.camOn?'Camera on':'Camera off'}</span></button>{party.isHost&&<button aria-label="Share screen" aria-pressed={party.screenOn} disabled={party.capped&&!party.screenOn} onClick={()=>party.toggleScreen(true)}><ScreenIcon/><span>{party.screenOn?'Sharing screen':'Share screen'}</span></button>}</div>}
     <div className="transport"><div className="transport-status"><span className="workspace-eyebrow">{participant?(party.following?`Following ${hostName}`:'Browsing independently'):party.active?'You control group reading':'Your quiet place'}</span><strong>{party.active?stageReference:`${bookName} ${chapterNumber}${speakingVerse?`:${speakingVerse}`:''}`}</strong></div>
       {participant && party.following ? <><button onClick={party.toggleNarration} aria-pressed={party.narrationMuted}>{party.narrationMuted?'Unmute narration':'Mute narration'}</button>{(!party.following||!samePassage)&&<button className="primary" onClick={()=>{party.returnToHost();setMobileView('reader');}}>Return to host</button>}{party.needsArm&&<button onClick={()=>{speech.unlock?.();party.arm();}}>Enable narration</button>}</> : <>{speechControls}{participant&&<button onClick={party.returnToHost}>Return to host</button>}</>}
     </div>
@@ -289,6 +319,13 @@ function App() {
       <nav aria-label="Reader tools"><button onClick={()=>openLibrary('search')}><ReaderIcon name="search"/><span>Search</span></button><button onClick={()=>openLibrary('bookmarks')}><ReaderIcon name="bookmark"/><span>Saved</span></button><button onClick={()=>openTool('study')}><ReaderIcon name="book"/><span>{label.study}</span></button><button onClick={()=>openTool('progress')}><ReaderIcon name="award"/><span>{label.progress}</span></button><button onClick={()=>openTool('group')}><ReaderIcon name="people"/><span>Group Study</span></button><button aria-label="Settings" onClick={()=>openTool('settings')}><ReaderIcon name="settings"/></button><button aria-label={label.toggleTheme} onClick={app.toggleTheme}><ReaderIcon name={app.theme==='dark'?'sun':'moon'}/></button></nav>
     </header>
     {party.active&&<section className={`session-strip ${peopleMode}`} aria-label="Study participants"><div className="session-heading"><span><i className="live-dot"/>Group Study <small>· {party.isHost?'You are hosting':`${hostName} is hosting`} · {partyStatusText(party.status,label)}</small></span><div><button onClick={()=>setPeopleMode(peopleMode==='discussion'?'compact':'discussion')} aria-pressed={peopleMode==='discussion'}>{peopleMode==='discussion'?'Reading layout':'Discussion layout'}</button><button onClick={()=>setPeopleMode(peopleMode==='collapsed'?'compact':'collapsed')}>{peopleMode==='collapsed'?'Show people':'Hide people'}</button></div></div>
+      {party.active&&(party.screenOn||party.screenMemberId)&&<ScreenStage
+        stream={party.screenOn?party.screenStream:(party.screenMemberId?party.remoteStreams[party.screenMemberId]??null:null)}
+        isSelf={party.screenOn}
+        presenterName={party.members.find(m=>m.id===party.screenMemberId)?.name??''}
+        hasAudio={party.screenHasAudio}
+        onStop={party.stopScreen}
+      />}
       <FaceRail members={party.members} selfId={party.identity.id} selfAvatar={party.avatar} localStream={party.localStream} remoteStreams={party.remoteStreams} micOn={party.micOn} youSuffix={label.youSuffix} mutedLabel={label.muted} onPickPhoto={file=>{void party.setAvatar(file);}}/>
     </section>}
     <nav className="mobile-workspace-nav" aria-label="Workspace views"><button aria-pressed={mobileView==='reader'} onClick={()=>setMobileView('reader')}>Read</button><button aria-pressed={mobileView==='library'} onClick={()=>openLibrary(library??'books')}>Library</button><button aria-pressed={mobileView==='tools'} onClick={()=>{if(!tools.entries.length)openTool('group');else setMobileView('tools');}}>Tools {tools.entries.length||''}</button></nav>
@@ -366,9 +403,9 @@ function App() {
         })}</article>:<div className="empty-state"><h2>{label.chapterMissingTitle}</h2><p>{label.chapterMissingBody}</p></div>}
         <div className="reader-end"><span>Continue in the Word</span><button onClick={()=>navigate(app.bookId,chapterNumber+1)} disabled={!book||chapterNumber===book.chapters}>{label.next} →</button></div>
       </section>
-      <ToolDock tools={tools}>{ {group,settings:view==='reader'?preferences:null,sound,study:<StudyHub app={app} study={study} onOpenPassage={(b,c,v)=>navigate(b,c,v)} onReadTogether={()=>{openTool('group');if(!party.active)party.createParty();}} onSharedVerse={(b,c,v)=>{void ledger.recordShare('feed',b,c,v);}}/>,breakdown:<Breakdown app={app} target={breakdownRef} onNavigate={(b,c,v)=>{navigate(b,c,v);setBreakdownRef({bookId:b,chapter:c,verse:v});}}/>,progress:<ProgressPanel label={label} language={language} chapters={ledger.chapters} streak={ledger.streak} events={ledger.events} earned={ledger.earned}/>,references:<PassageTools passage={passage} app={app} onNavigate={navigate} onRefresh={()=>setPassage(snapshot(app,currentVerse))} follow={followTool} onFollow={setFollowTool}/>,guide:<PassageTools guide passage={guidePassage} app={app} onNavigate={navigate} onRefresh={()=>setGuidePassage(snapshot(app,currentVerse))} follow={followGuide} onFollow={setFollowGuide}/>,image:imageJob?<VerseImageEditor key={imageJob.reference+imageJob.text} embedded job={imageJob} fontStack={app.font.stack} label={label} onClose={()=>tools.close('image')} onSaved={()=>{void ledger.recordShare('image',app.bookId,chapterNumber,currentVerse);}}/>:<p>Select a verse to create an image.</p>} }</ToolDock>
+      <ToolDock tools={tools}>{ {group,settings:view==='reader'?preferences:null,sound,study:<StudyHub app={app} study={study} onOpenPassage={(b,c,v)=>navigate(b,c,v)} onReadTogether={()=>{openTool('group');if(!party.active)party.createParty();}} onSharedVerse={(b,c,v)=>{void ledger.recordShare('feed',b,c,v);}} onFriendRequest={()=>{if(party.active)logGroupOnce('friendRequest','friendRequest');}}/>,breakdown:<Breakdown app={app} target={breakdownRef} onNavigate={(b,c,v)=>{navigate(b,c,v);setBreakdownRef({bookId:b,chapter:c,verse:v});}}/>,progress:<ProgressPanel label={label} language={language} chapters={ledger.chapters} streak={ledger.streak} events={ledger.events} earned={ledger.earned}/>,references:<PassageTools passage={passage} app={app} onNavigate={navigate} onRefresh={()=>setPassage(snapshot(app,currentVerse))} follow={followTool} onFollow={setFollowTool}/>,guide:<PassageTools guide passage={guidePassage} app={app} onNavigate={navigate} onRefresh={()=>setGuidePassage(snapshot(app,currentVerse))} follow={followGuide} onFollow={setFollowGuide}/>,image:imageJob?<VerseImageEditor key={imageJob.reference+imageJob.text} embedded job={imageJob} fontStack={app.font.stack} label={label} onClose={()=>tools.close('image')} onSaved={()=>{void ledger.recordShare('image',app.bookId,chapterNumber,currentVerse,'saved');}} onShared={()=>{void ledger.recordShare('image',app.bookId,chapterNumber,currentVerse,'shared');}}/>:<p>Select a verse to create an image.</p>} }</ToolDock>
     </main>
-    {(notice||speechError||party.mediaError||party.capped)&&<div className="workspace-notice" role="status"><span>{notice||speechError||(party.mediaError==='photo'?'That photo could not be loaded.':party.mediaError?'Microphone or camera unavailable. Check your browser permissions.':'This room is above the 8-person voice/video threshold. Chat and passage sharing remain available.')}</span>{notice&&<button onClick={()=>setNotice('')} aria-label="Dismiss message">×</button>}</div>}
+    {(notice||speechError||party.mediaError||party.capped)&&<div className="workspace-notice" role="status"><span>{notice||speechError||(party.mediaError==='photo'?'That photo could not be loaded.':party.mediaError==='screen-audio'?'Screen is sharing, but without sound. Desktop audio needs Chrome or Edge, and the "Share audio" box ticked in the picker.':party.mediaError==='screen'?'That screen could not be shared.':party.mediaError?'Microphone or camera unavailable. Check your browser permissions.':'This room is above the 8-person voice/video threshold. Chat and passage sharing remain available.')}</span>{notice&&<button onClick={()=>setNotice('')} aria-label="Dismiss message">×</button>}</div>}
     {noteVerse!==null&&<VerseNote
       reference={`${bookName} ${chapterNumber}:${noteVerse}`}
       existing={ledger.noteAt(app.bookId,chapterNumber,noteVerse)}
@@ -386,17 +423,20 @@ function App() {
     {selectedVerses.size>0&&<div className="workspace-selection" aria-label="Selected verse actions"><strong>{selectedReference}</strong><div><button onClick={app.copySelection}>Copy</button><button onClick={()=>{void (async()=>{
       const verse=currentVerse;
       const url=verseShareUrl(app.bookId,chapterNumber,verse);
+      const reference=formatVerseReference(bookName,chapterNumber,app.selectedVerseNumbers);
+      const body=verseShareText({reference,text:selectedText,translation:app.translations.find(t=>t.id===app.translationId)?.shortName,url});
       try {
-        if (navigator.share) await navigator.share({ title: selectedReference, text: selectedText, url });
-        else await navigator.clipboard.writeText(`${selectedReference}\n${url}`);
-        setNotice(label.linkCopied);
+        // The block already ends with the link, so pass it as `text` rather than splitting
+        // text/url — targets that only read `url` would otherwise drop the passage itself.
+        if (navigator.share) await navigator.share({ title: reference, text: body });
+        else { await navigator.clipboard.writeText(body); setNotice(label.verseCopied); }
         void ledger.recordShare('link', app.bookId, chapterNumber, verse);
       } catch (error) {
         if ((error as {name?:string}).name==='AbortError') return;
-        try { await navigator.clipboard.writeText(url); setNotice(label.linkCopied); void ledger.recordShare('link', app.bookId, chapterNumber, verse); }
-        catch { setNotice(url); }
+        try { await navigator.clipboard.writeText(body); setNotice(label.verseCopied); void ledger.recordShare('link', app.bookId, chapterNumber, verse); }
+        catch { setNotice(body); }
       }
-    })();}}>{label.shareLink}</button><button onClick={()=>app.selectedVerseNumbers.forEach(app.toggleBookmark)}>Bookmark</button><button onClick={()=>{setBreakdownRef({bookId:app.bookId,chapter:chapterNumber,verse:currentVerse});openTool('breakdown');}}>{label.breakItDown}</button><button onClick={()=>setNoteVerse(currentVerse)}>{ledger.noteAt(app.bookId,chapterNumber,currentVerse)?label.editNote:label.addNote}</button><button onClick={()=>inspect(currentVerse,'guide')}>Explore</button><button onClick={()=>{setImageJob({reference:selectedReference,text:selectedText,translation:app.translations.find(t=>t.id===app.translationId)?.shortName??'KJV',filename:verseImageFilename(bookName,chapterNumber),seed:selectedReference});openTool('image');}}>Image</button>{(!participant||!party.following)&&<button onClick={app.speakSelection}>{party.isHost?'Read to group':'Read selection'}</button>}{party.active&&party.isHost&&<button onClick={()=>party.showGroup(app.selectedVerseNumbers)}>Show group</button>}<button onClick={app.clearSelection} aria-label="Clear selection">×</button></div></div>}
+    })();}}>{label.sharePassage}</button><button onClick={()=>app.selectedVerseNumbers.forEach(app.toggleBookmark)}>Bookmark</button><button onClick={()=>{setBreakdownRef({bookId:app.bookId,chapter:chapterNumber,verse:currentVerse});openTool('breakdown');}}>{label.breakItDown}</button><button onClick={()=>setNoteVerse(currentVerse)}>{ledger.noteAt(app.bookId,chapterNumber,currentVerse)?label.editNote:label.addNote}</button><button onClick={()=>inspect(currentVerse,'guide')}>Explore</button><button onClick={()=>{setImageJob({reference:selectedReference,text:selectedText,translation:app.translations.find(t=>t.id===app.translationId)?.shortName??'KJV',filename:verseImageFilename(bookName,chapterNumber),seed:selectedReference});openTool('image');}}>Image</button>{(!participant||!party.following)&&<button onClick={app.speakSelection}>{party.isHost?'Read to group':'Read selection'}</button>}{party.active&&party.isHost&&<button onClick={()=>party.showGroup(app.selectedVerseNumbers)}>Show group</button>}<button onClick={app.clearSelection} aria-label="Clear selection">×</button></div></div>}
     {dock}
   </div>
   {welcome.open&&<Welcome party={party} onClose={welcome.close}/>}

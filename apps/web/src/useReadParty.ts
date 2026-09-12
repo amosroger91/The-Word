@@ -7,7 +7,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { WordApp } from '@the-word/core';
 import { joinParty, type PartyChatMessage, type PartyMember, type PartyRoom, type ReadingState } from './readParty';
 import { compressAvatar, loadIdentity, saveIdentity } from './identity';
-import { getLocalStream, setMedia, stopLocal, unlockRemoteAudio, setDevices } from './media';
+import { getCameraStream, getLocalStream, getScreenStream, getVoiceFilter, setMedia, setVoiceFilter as applyVoiceFilter, startScreenShare, stopLocal, stopScreenShare, unlockRemoteAudio, setDevices } from './media';
 
 function randomCode(): string { return Math.random().toString(36).slice(2, 7); }
 
@@ -33,6 +33,11 @@ export function useReadParty(app: WordApp) {
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
   const [mediaError, setMediaError] = useState('');
+  const [voiceFilter, setVoiceFilterState] = useState(getVoiceFilter);
+  const autoMicRef = useRef(false);
+  const [screenOn, setScreenOn] = useState(false);
+  const [screenStream, setScreenStreamState] = useState<MediaStream | null>(null);
+  const [screenHasAudio, setScreenHasAudio] = useState(false);
   const [capped, setCapped] = useState(false);
   const [focusVerse, setFocusVerseState] = useState<number | null>(null);
   const [shared, setShared] = useState<ReadingState | null>(null);
@@ -95,6 +100,7 @@ export function useReadParty(app: WordApp) {
     setRoom(null); setIsHost(false); setMembers([]); setMessages([]);
     setStatus(''); setError(''); setCode(''); setRemoteReading(null); setArmed(false);
     setMediaError(''); setCapped(false); setFocusVerseState(null); setFindable(false);
+    setScreenOn(false); setScreenStreamState(null); setScreenHasAudio(false);
     lastSentRef.current = '';
   }, [room]);
 
@@ -111,7 +117,8 @@ export function useReadParty(app: WordApp) {
       await setMedia({ audio, video });
       setMicOn(audio);
       setCamOn(video);
-      setLocalStream(getLocalStream());
+      // The self tile shows your camera; peers receive the composite from media.ts.
+      setLocalStream(getCameraStream());
       room.refreshMedia();
     } catch {
       setMicOn(false);
@@ -121,6 +128,37 @@ export function useReadParty(app: WordApp) {
       room.refreshMedia();
       setMediaError('denied');
     }
+  }, [room]);
+
+  // Join with your voice already live, rather than everyone opening on mute and
+   // asking "can you hear me?". A refusal here is deliberately SILENT: the mic
+  // button still works, and nagging on every join is worse than a quiet no.
+  useEffect(() => {
+    if (!room || status !== 'connected') {
+      if (!room) autoMicRef.current = false;
+      return;
+    }
+    if (autoMicRef.current) return;
+    autoMicRef.current = true;
+    void (async () => {
+      try {
+        await setMedia({ audio: true, video: false });
+        setMicOn(true);
+        setLocalStream(getCameraStream());
+        unlockRemoteAudio();
+        room.refreshMedia();
+      } catch {
+        // No device, or permission refused. Leave the mic off and stay quiet.
+      }
+    })();
+  }, [room, status]);
+
+  const setVoiceFiltering = useCallback((on: boolean) => {
+    applyVoiceFilter(on);
+    setVoiceFilterState(on);
+    setLocalStream(getCameraStream());
+    // The published stream changed, so peers need the new one.
+    room?.refreshMedia();
   }, [room]);
 
   const toggleMic = useCallback(() => {
@@ -134,6 +172,45 @@ export function useReadParty(app: WordApp) {
     unlockRemoteAudio();
     void applyMedia(micOn, !camOn);
   }, [applyMedia, capped, micOn, camOn]);
+
+  const stopScreen = useCallback(() => {
+    stopScreenShare();
+    setScreenOn(false);
+    setScreenStreamState(null);
+    setScreenHasAudio(false);
+    room?.refreshMedia();
+  }, [room]);
+
+  const startScreen = useCallback(async (withAudio = true) => {
+    if (!room || !isHost) return;
+    setMediaError('');
+    try {
+      const { gotAudio } = await startScreenShare({
+        withAudio,
+        // Fires when the host stops sharing from the browser's own bar rather than our button.
+        onEnded: () => {
+          stopScreenShare();
+          setScreenOn(false); setScreenStreamState(null); setScreenHasAudio(false);
+          room.refreshMedia();
+        },
+      });
+      setScreenOn(true);
+      setScreenStreamState(getScreenStream());
+      setScreenHasAudio(gotAudio);
+      // Desktop audio is Chromium-only, and even there the picker has a checkbox
+      // the host can leave off — say so instead of pretending music is going out.
+      if (withAudio && !gotAudio) setMediaError('screen-audio');
+      room.refreshMedia();
+    } catch (error) {
+      // Dismissing the picker is not a failure.
+      if ((error as { name?: string }).name === 'NotAllowedError') return;
+      setMediaError('screen');
+    }
+  }, [room, isHost]);
+
+  const toggleScreen = useCallback((withAudio = true) => {
+    if (screenOn) stopScreen(); else void startScreen(withAudio);
+  }, [screenOn, startScreen, stopScreen]);
 
   const showGroup = useCallback((verses: number[]) => {
     if (!room || !isHost) return;
@@ -327,6 +404,15 @@ export function useReadParty(app: WordApp) {
     camOn,
     toggleMic,
     toggleCam,
+    voiceFilter,
+    setVoiceFiltering,
+    screenOn,
+    screenStream,
+    screenHasAudio,
+    toggleScreen,
+    stopScreen,
+    // Whoever is presenting a screen right now, so viewers can render it large.
+    screenMemberId: members.find((m) => m.screen)?.id ?? null,
     localStream,
     remoteStreams,
     mediaError,

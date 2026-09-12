@@ -6,9 +6,12 @@ import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex, utf8ToBytes } from '@noble/hashes/utils.js';
 import {
   chaptersOfBook,
+  distinctShareCount,
+  groupActionCount,
   readDayKeys,
   shareCount,
   uniqueChapters,
+  type GroupAction,
   type LedgerEvent,
 } from './ledger';
 
@@ -29,7 +32,12 @@ export interface BadgeDefinition {
     | { kind: 'planComplete'; planId: string | 'any'; count?: number }
     | { kind: 'questionsAnswered'; count: number }
     | { kind: 'circleSessions'; count: number }
-    | { kind: 'verseShares'; via: 'link' | 'image' | 'feed' | 'any'; count: number };
+    | { kind: 'verseShares'; via: 'link' | 'image' | 'feed' | 'any'; count: number }
+    // Counts unique passages (or unique books) instead of raw events, so a badge
+    // cannot be earned by exporting the same verse over and over.
+    | { kind: 'distinctVerseShares'; via: 'link' | 'image' | 'feed' | 'any'; by: 'verse' | 'book';
+        count: number; outcome?: 'saved' | 'shared' }
+    | { kind: 'groupActions'; action: GroupAction | 'any'; count: number };
 }
 
 export interface EarnedBadge {
@@ -393,7 +401,49 @@ export const BADGES: BadgeDefinition[] = [
       vi: 'Làm năm ảnh câu. Tủ lạnh hết chỗ nam châm.',
     },
     icon: 'M3 7h7v7H3V7Zm11 0h7v4h-7V7ZM3 16h7v4H3v-4Zm11 6h7v7h-7v-7Z',
-    criteria: { kind: 'verseShares', via: 'image', count: 5 },
+    criteria: { kind: 'distinctVerseShares', via: 'image', by: 'verse', count: 5 },
+  },
+  {
+    id: 'share-image-15',
+    tier: 'gold',
+    title: { en: 'Exhibition', es: 'Exposición', fr: 'Exposition', zh: '展览', vi: 'Triển lãm' },
+    description: {
+      en: 'Make images for fifteen different verses.',
+      es: 'Crea imágenes de quince versículos distintos.',
+      fr: 'Créer des images pour quinze versets différents.',
+      zh: '为十五节不同的经文制作图片。',
+      vi: 'Tạo ảnh cho mười lăm câu khác nhau.',
+    },
+    icon: 'M3 5h18v14H3V5Zm3 10 3-4 3 3 3-5 3 6',
+    criteria: { kind: 'distinctVerseShares', via: 'image', by: 'verse', count: 15 },
+  },
+  {
+    id: 'share-image-books-7',
+    tier: 'silver',
+    title: { en: 'Touring Show', es: 'Gira', fr: 'Tournée', zh: '巡展', vi: 'Lưu diễn' },
+    description: {
+      en: 'Make verse images drawn from seven different books.',
+      es: 'Crea imágenes de versículos de siete libros distintos.',
+      fr: 'Créer des images de versets tirés de sept livres différents.',
+      zh: '用七卷不同书卷的经文制作图片。',
+      vi: 'Tạo ảnh câu từ bảy sách khác nhau.',
+    },
+    icon: 'M4 5h6v14H4V5Zm7 0h4v14h-4V5Zm5 0h4v14h-4V5Z',
+    criteria: { kind: 'distinctVerseShares', via: 'image', by: 'book', count: 7 },
+  },
+  {
+    id: 'share-image-sent-1',
+    tier: 'bronze',
+    title: { en: 'Out the Door', es: 'Enviado', fr: 'Envoyé', zh: '寄出去了', vi: 'Đã gửi đi' },
+    description: {
+      en: 'Send a verse image straight to someone, not just to your downloads.',
+      es: 'Envía una imagen de un versículo a alguien, no solo a tus descargas.',
+      fr: 'Envoyer une image de verset à quelqu’un, pas seulement dans vos téléchargements.',
+      zh: '把经文图片直接发给别人，而不只是存到下载夹。',
+      vi: 'Gửi ảnh câu thẳng cho ai đó, không chỉ lưu vào máy.',
+    },
+    icon: 'M3 12 21 4l-7 17-2-7-9-2Z',
+    criteria: { kind: 'distinctVerseShares', via: 'image', by: 'verse', count: 1, outcome: 'shared' },
   },
   {
     id: 'share-any-3',
@@ -408,6 +458,104 @@ export const BADGES: BadgeDefinition[] = [
     },
     icon: 'M5 8h9l4 4v8H5V8Zm4 4h6M9 16h4',
     criteria: { kind: 'verseShares', via: 'any', count: 3 },
+  },
+  {
+    id: 'group-join-1',
+    tier: 'bronze',
+    title: { en: 'Pull Up a Chair', es: 'Acércate una silla', fr: 'Prends une chaise', zh: '搬把椅子来', vi: 'Kéo ghế ngồi' },
+    description: {
+      en: 'Join a group study for the first time.',
+      es: 'Únete a un estudio en grupo por primera vez.',
+      fr: 'Rejoindre une étude en groupe pour la première fois.',
+      zh: '第一次加入小组学习。',
+      vi: 'Lần đầu tham gia buổi học nhóm.',
+    },
+    icon: 'M4 19v-2a4 4 0 0 1 4-4h2m6 6v-2a4 4 0 0 0-3-3.87M9 7a3 3 0 1 0 6 0 3 3 0 0 0-6 0Z',
+    criteria: { kind: 'groupActions', action: 'join', count: 1 },
+  },
+  {
+    id: 'group-chapter-1',
+    tier: 'silver',
+    title: { en: 'Read Together', es: 'Leer juntos', fr: 'Lire ensemble', zh: '一起读完', vi: 'Đọc cùng nhau' },
+    description: {
+      en: 'Finish a chapter while reading with a group.',
+      es: 'Termina un capítulo leyendo con un grupo.',
+      fr: 'Terminer un chapitre en lisant avec un groupe.',
+      zh: '和小组一起读完一章。',
+      vi: 'Đọc xong một đoạn cùng với nhóm.',
+    },
+    icon: 'M4 5h7v14H4V5Zm9 0h7v14h-7V5Z',
+    criteria: { kind: 'groupActions', action: 'chapter', count: 1 },
+  },
+  {
+    id: 'group-mic-1',
+    tier: 'bronze',
+    title: { en: 'Say Something', es: 'Di algo', fr: 'Dis quelque chose', zh: '说句话', vi: 'Lên tiếng' },
+    description: {
+      en: 'Unmute your microphone in a group study.',
+      es: 'Activa tu micrófono en un estudio en grupo.',
+      fr: 'Activer votre micro pendant une étude en groupe.',
+      zh: '在小组学习中打开麦克风。',
+      vi: 'Bật micro trong buổi học nhóm.',
+    },
+    icon: 'M12 3a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3Zm-7 9a7 7 0 0 0 14 0M12 19v2',
+    criteria: { kind: 'groupActions', action: 'mic', count: 1 },
+  },
+  {
+    id: 'group-cam-1',
+    tier: 'bronze',
+    title: { en: 'Face to Face', es: 'Cara a cara', fr: 'Face à face', zh: '面对面', vi: 'Mặt đối mặt' },
+    description: {
+      en: 'Turn your camera on in a group study.',
+      es: 'Enciende tu cámara en un estudio en grupo.',
+      fr: 'Allumer votre caméra pendant une étude en groupe.',
+      zh: '在小组学习中打开摄像头。',
+      vi: 'Bật camera trong buổi học nhóm.',
+    },
+    icon: 'M3 7h11v10H3V7Zm11 3 7-3v10l-7-3',
+    criteria: { kind: 'groupActions', action: 'cam', count: 1 },
+  },
+  {
+    id: 'group-public-1',
+    tier: 'bronze',
+    title: { en: 'Open Door', es: 'Puerta abierta', fr: 'Porte ouverte', zh: '敞开的门', vi: 'Cửa mở' },
+    description: {
+      en: 'Host a group study that anyone can find.',
+      es: 'Organiza un estudio en grupo que cualquiera pueda encontrar.',
+      fr: 'Animer une étude en groupe que tout le monde peut trouver.',
+      zh: '主持一场任何人都能找到的小组学习。',
+      vi: 'Chủ trì buổi học nhóm ai cũng tìm thấy được.',
+    },
+    icon: 'M4 20V5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v15M9 12h.01M15 20h5',
+    criteria: { kind: 'groupActions', action: 'public', count: 1 },
+  },
+  {
+    id: 'group-private-1',
+    tier: 'bronze',
+    title: { en: 'Invitation Only', es: 'Solo con invitación', fr: 'Sur invitation', zh: '仅限受邀', vi: 'Chỉ theo lời mời' },
+    description: {
+      en: 'Host an unlisted group study for the people you invite.',
+      es: 'Organiza un estudio en grupo privado para quienes invites.',
+      fr: 'Animer une étude en groupe non listée pour vos invités.',
+      zh: '为你邀请的人主持一场不公开的小组学习。',
+      vi: 'Chủ trì buổi học nhóm kín cho người bạn mời.',
+    },
+    icon: 'M7 11V8a5 5 0 0 1 10 0v3M5 11h14v9H5v-9Z',
+    criteria: { kind: 'groupActions', action: 'private', count: 1 },
+  },
+  {
+    id: 'group-friend-1',
+    tier: 'silver',
+    title: { en: 'New Friend', es: 'Nuevo amigo', fr: 'Nouvel ami', zh: '新朋友', vi: 'Bạn mới' },
+    description: {
+      en: 'Send a friend request during a group study.',
+      es: 'Envía una solicitud de amistad durante un estudio en grupo.',
+      fr: 'Envoyer une demande d’ami pendant une étude en groupe.',
+      zh: '在小组学习中发出好友请求。',
+      vi: 'Gửi lời mời kết bạn trong buổi học nhóm.',
+    },
+    icon: 'M16 11a4 4 0 1 0-8 0 4 4 0 0 0 8 0Zm-12 9a6 6 0 0 1 12 0M19 8v6M22 11h-6',
+    criteria: { kind: 'groupActions', action: 'friendRequest', count: 1 },
   },
   ...bookBadges(),
 ];
@@ -489,6 +637,14 @@ export function progressToward(definition: BadgeDefinition, events: LedgerEvent[
   }
   if (criteria.kind === 'verseShares') {
     const have = shareCount(events, criteria.via);
+    return { have, need: criteria.count, done: have >= criteria.count };
+  }
+  if (criteria.kind === 'distinctVerseShares') {
+    const have = distinctShareCount(events, criteria.via, criteria.by, criteria.outcome);
+    return { have, need: criteria.count, done: have >= criteria.count };
+  }
+  if (criteria.kind === 'groupActions') {
+    const have = groupActionCount(events, criteria.action);
     return { have, need: criteria.count, done: have >= criteria.count };
   }
   const have = circleSessions(events);

@@ -28,6 +28,7 @@ export function VerseImageEditor({
   label,
   onClose,
   onSaved,
+  onShared,
   embedded = false,
 }: {
   embedded?: boolean;
@@ -36,6 +37,7 @@ export function VerseImageEditor({
   label: Strings;
   onClose: () => void;
   onSaved?: () => void;
+  onShared?: () => void;
 }) {
   const base = import.meta.env.BASE_URL;
   const [draft, setDraft] = useState<VerseImageDraft>(() => draftForBackground(backgroundForSeed(job.seed || job.reference)));
@@ -90,6 +92,44 @@ export function VerseImageEditor({
       backgroundId: next.id,
       overlayOpacity: overlayFor(next.kind),
     }));
+  }
+
+  // Web Share Level 2 (files) is not everywhere — probe once so the button only
+  // appears where the share sheet can actually take an image.
+  const [canShareFiles] = useState(() => {
+    if (typeof navigator === 'undefined' || typeof navigator.canShare !== 'function') return false;
+    try {
+      return navigator.canShare({ files: [new File([new Blob([], { type: 'image/png' })], 'probe.png', { type: 'image/png' })] });
+    } catch {
+      return false;
+    }
+  });
+
+  async function shareImage() {
+    const canvas = previewRef.current;
+    if (!canvas) return;
+    setSaving(true);
+    if (!imageRef.current) {
+      try { imageRef.current = await loadVerseImage(src); paint(); } catch { /* keep fallback fill */ }
+    } else paint();
+    const blob = await new Promise<Blob | null>((resolve) => { canvas.toBlob(resolve, 'image/png'); });
+    if (!blob) { setSaving(false); void save(); return; }
+    try {
+      await navigator.share({
+        files: [new File([blob], job.filename, { type: 'image/png' })],
+        title: job.reference,
+        text: `${job.reference} (${job.translation})`,
+      });
+    } catch (error) {
+      setSaving(false);
+      // Backing out of the share sheet is not a failure, and records nothing.
+      if ((error as { name?: string }).name === 'AbortError') return;
+      void save();
+      return;
+    }
+    setSaving(false);
+    onShared?.();
+    onClose();
   }
 
   async function save() {
@@ -149,7 +189,10 @@ export function VerseImageEditor({
             <span className="section-label">{label.overlay} · {Math.round(draft.overlayOpacity * 100)}%</span>
             <input type="range" min={0} max={80} value={Math.round(draft.overlayOpacity * 100)} onChange={(event) => setDraft((current) => ({ ...current, overlayOpacity: Number(event.target.value) / 100 }))} />
           </label>
-          <button type="button" className="image-editor-save" onClick={() => { void save(); }} disabled={saving}>{saving ? label.exporting : label.saveImage}</button>
+          <div className="image-editor-actions">
+            {canShareFiles && <button type="button" className="image-editor-send" onClick={() => { void shareImage(); }} disabled={saving}>{label.sendImage}</button>}
+            <button type="button" className="image-editor-save" onClick={() => { void save(); }} disabled={saving}>{saving ? label.exporting : label.saveImage}</button>
+          </div>
         </div>
       </div>
     </div>

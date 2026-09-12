@@ -13,12 +13,14 @@ export function StudyHub({
   onOpenPassage,
   onReadTogether,
   onSharedVerse,
+  onFriendRequest,
 }: {
   app: WordApp;
   study: ReturnType<typeof useStudy>;
   onOpenPassage: (bookId: number, chapter: number, verse?: number) => void;
   onReadTogether: () => void;
   onSharedVerse?: (bookId: number, chapter: number, verse: number) => void;
+  onFriendRequest?: () => void;
 }) {
   const { label, language } = app;
   const [tab, setTab] = useState<Tab>('plans');
@@ -147,7 +149,7 @@ export function StudyHub({
       {tab === 'friends' && (
         <div className="friend-list">
           <label>{label.friendNpub}<input value={friendKey} onChange={(event) => setFriendKey(event.target.value)} /></label>
-          <button type="button" onClick={() => { if (friendKey.trim()) void study.addFriend(friendKey.trim()); setFriendKey(''); }}>{label.addFriend}</button>
+          <button type="button" onClick={() => { if (friendKey.trim()) { void study.addFriend(friendKey.trim()); onFriendRequest?.(); } setFriendKey(''); }}>{label.addFriend}</button>
           <ul>{study.friends.map((friend) => <li key={friend.npub}>{friend.npub}</li>)}</ul>
           <h3>{label.directMessages}</h3>
           <label>{label.friendNpub}<input value={dmTo} onChange={(event) => setDmTo(event.target.value)} /></label>

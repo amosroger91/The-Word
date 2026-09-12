@@ -121,6 +121,16 @@
 .badge-card strong { font-size: 14px; }
 .badge-card small { color: var(--ws-muted); font-size: 12px; line-height: 1.45; }
 .badge-card.locked { opacity: 0.62; }
+
+/* Verse-image share stats */
+.share-stat-grid { list-style: none; margin: 10px 0 0; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.share-stat { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 10px 6px; border: 1px solid var(--ws-line); border-radius: 10px; background: var(--ws-soft); }
+.share-stat strong { font-size: 20px; line-height: 1; font-variant-numeric: tabular-nums; }
+.share-stat small { color: var(--ws-muted); font-size: 11px; text-align: center; }
+.share-recent { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.share-recent li { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 12px; }
+.share-recent small { color: var(--ws-muted); font-size: 11px; }
+@media (max-width: 520px) { .share-stat-grid { grid-template-columns: repeat(2, 1fr); } }
 .badge-meter { font-size: 11px; color: var(--ws-accent); letter-spacing: 0.02em; }
 .read-bar { display: grid; gap: 6px; margin: 0 0 12px; }
 .read-bar.large { margin-bottom: 16px; }
@@ -180,7 +190,7 @@
 .transport-status .workspace-eyebrow { font-size:9px; letter-spacing:.08em; }
 .room-controls .leave-button { border-color:#b37766; color:#b37766; }
 .workspace-selection { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:8px 24px; background:var(--ws-soft); border-top:1px solid var(--ws-line); font-size:12px; }
-.workspace-selection>div { display:flex; gap:6px; overflow-x:auto; }
+.workspace-selection>div { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:6px; }  /* wrap, never scroll: a host in a group study gets two extra buttons (Read to group / Show group) and horizontal scrolling pushed Copy and Share out of reach. */
 .workspace-selection button { white-space:nowrap; font-size:11px; min-height:32px; }
 .workspace-selection strong { white-space:nowrap; }
 .workspace-notice { display:flex; align-items:center; gap:10px; justify-content:space-between; background:var(--ws-highlight); padding:6px 24px; font-size:12px; max-height:90px; overflow:auto; }
@@ -351,3 +361,16 @@
 .breakdown-generated { margin: 0; padding: 10px 12px; border-radius: 10px; background: #eef2e8; line-height: 1.55; }
 :root[data-theme='dark'] .breakdown-generated { background: #272f27; }
 .breakdown-generated.question { background: transparent; padding: 0 2px; font-style: italic; }
+
+/* Presented screen, above the face rail */
+.screen-stage { position: relative; margin: 0 0 10px; border: 1px solid var(--ws-line); border-radius: 12px; overflow: hidden; background: #000; }
+.screen-stage video { display: block; width: 100%; max-height: 46vh; object-fit: contain; background: #000; }
+.screen-stage-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 10px; background: var(--ws-soft); border-top: 1px solid var(--ws-line); font-size: 11px; }
+.screen-stage-bar span { color: var(--ws-muted); }
+.screen-stage-bar button { min-height: 28px; font-size: 11px; padding: 4px 10px; }
+
+/* Noise-reduction toggle in device settings */
+.device-toggle { display: flex; align-items: flex-start; gap: 8px; margin: 8px 0; cursor: pointer; }
+.device-toggle input { margin-top: 2px; flex: 0 0 auto; }
+.device-toggle span { display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+.device-toggle small { color: var(--ws-muted); font-size: 11px; line-height: 1.4; }

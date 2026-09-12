@@ -16,6 +16,7 @@ import {
   uniqueChapters,
   type LedgerEvent,
   type NoteEvent,
+  type GroupAction,
 } from './ledger';
 import { BADGES, bibleProgress, evaluate, hashLedger, type EarnedBadge } from './badges';
 
@@ -136,6 +137,8 @@ export function useLedger() {
     bookId: number,
     chapter: number,
     verse: number,
+    // 'saved' = exported to this device; 'shared' = handed to the OS share sheet.
+    outcome: 'saved' | 'shared' = 'saved',
   ) => {
     const all = await loadEvents();
     const mine = eventsForActor(all, gunPub.current);
@@ -147,6 +150,30 @@ export function useLedger() {
       chapter,
       verse,
       via,
+      outcome,
+    });
+    const merged = mergeLedgers(all, [event]);
+    await saveEvents(merged);
+    const after = refresh(merged);
+    const known = new Set(before.map((badge) => badge.id));
+    const fresh = after.filter((badge) => !known.has(badge.id));
+    if (fresh.length) setJustEarned(fresh);
+    return fresh;
+  }, [refresh]);
+
+  const recordGroup = useCallback(async (
+    action: GroupAction,
+    where?: { bookId?: number; chapter?: number },
+  ) => {
+    const all = await loadEvents();
+    const mine = eventsForActor(all, gunPub.current);
+    const before = evaluate(mine, BADGES);
+    const { event } = appendEvent(mine, gunPub.current, {
+      kind: 'group',
+      at: new Date().toISOString(),
+      action,
+      ...(where?.bookId != null ? { bookId: where.bookId } : {}),
+      ...(where?.chapter != null ? { chapter: where.chapter } : {}),
     });
     const merged = mergeLedgers(all, [event]);
     await saveEvents(merged);
@@ -187,6 +214,7 @@ export function useLedger() {
     saveNote,
     removeNote,
     recordShare,
+    recordGroup,
   };
 }
 

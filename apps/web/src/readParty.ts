@@ -27,7 +27,7 @@ import { Peer, type DataConnection, type MediaConnection } from 'peerjs';
 import { getLocalStream, hasMedia, getState } from './media';
 
 export interface PartyIdentity { id: string; name: string; color: string; avatar?: string | null; }
-export interface PartyMember { id: string; name: string; color: string; peerId: string; host?: boolean; av?: boolean; mic?: boolean; cam?: boolean; avatar?: string | null; }
+export interface PartyMember { id: string; name: string; color: string; peerId: string; host?: boolean; av?: boolean; mic?: boolean; cam?: boolean; screen?: boolean; avatar?: string | null; }
 export interface PartyChatMessage {
   id: string;
   kind: 'chat' | 'system';
@@ -117,7 +117,7 @@ export function joinParty({ code, identity, handlers = {} }: {
   const capped = () => members.length > MESH_CAP;
 
   function selfMember(): PartyMember {
-    return { id: me.id, name: me.name, color: me.color, avatar: me.avatar || null, peerId: myPeerId(), host: me.id === presenterId, av: hasMedia(), mic: getState().audio, cam: getState().video };
+    return { id: me.id, name: me.name, color: me.color, avatar: me.avatar || null, peerId: myPeerId(), host: me.id === presenterId, av: hasMedia(), mic: getState().audio, cam: getState().video, screen: getState().screen };
   }
   function upsert(m: PartyMember) {
     const i = members.findIndex((x) => x.id === m.id);
@@ -175,7 +175,7 @@ export function joinParty({ code, identity, handlers = {} }: {
       else transfer(String(env.d));
     } else if (env.t === 'hello') {
       const m = (env.d || {}) as Partial<PartyMember>;
-      upsert({ id: m.id!, name: m.name || 'Reader', color: m.color || '#888', avatar: m.avatar || null, peerId: fromPeerId || '', av: Boolean(m.av), mic: Boolean(m.mic), cam: Boolean(m.cam) });
+      upsert({ id: m.id!, name: m.name || 'Reader', color: m.color || '#888', avatar: m.avatar || null, peerId: fromPeerId || '', av: Boolean(m.av), mic: Boolean(m.mic), cam: Boolean(m.cam), screen: Boolean(m.screen) });
       const conn = fromPeerId ? clientConns.get(fromPeerId) : null;
       if (conn) {
         try { conn.send({ t: 'welcome', d: { roster: members.slice(), chat: chatLog.slice(-CHAT_HISTORY), reading: readingState } }); } catch { /* dropped */ }
@@ -202,6 +202,7 @@ export function joinParty({ code, identity, handlers = {} }: {
         if (d.av != null) members[i].av = Boolean(d.av);
         if (d.mic != null) members[i].mic = Boolean(d.mic);
         if (d.cam != null) members[i].cam = Boolean(d.cam);
+        if (d.screen != null) members[i].screen = Boolean(d.screen);
         emitRoster(); broadcast({ t: 'roster', d: members.slice() });
       }
     }
@@ -288,7 +289,7 @@ export function joinParty({ code, identity, handlers = {} }: {
     hubConn = c;
     c.on('open', () => {
       status('connected');
-      try { c.send({ t: 'hello', d: { id: me.id, name: me.name, color: me.color, avatar: me.avatar || null, av: hasMedia(), mic: getState().audio, cam: getState().video } }); } catch { /* dropped */ }
+      try { c.send({ t: 'hello', d: { id: me.id, name: me.name, color: me.color, avatar: me.avatar || null, av: hasMedia(), mic: getState().audio, cam: getState().video, screen: getState().screen } }); } catch { /* dropped */ }
     });
     c.on('data', handleFromHub);
     c.on('close', () => { if (!leaving) reelect(); });
@@ -395,14 +396,14 @@ export function joinParty({ code, identity, handlers = {} }: {
       const i = members.findIndex((x) => x.id === me.id);
       if (i >= 0) { members[i].name = me.name; members[i].color = me.color; members[i].avatar = me.avatar || null; }
       if (isHub) { emitRoster(); broadcast({ t: 'roster', d: members.slice() }); }
-      else toHub({ t: 'meta', d: { name: me.name, color: me.color, avatar: me.avatar || null, av: hasMedia(), mic: getState().audio, cam: getState().video } });
+      else toHub({ t: 'meta', d: { name: me.name, color: me.color, avatar: me.avatar || null, av: hasMedia(), mic: getState().audio, cam: getState().video, screen: getState().screen } });
     },
     refreshMedia() {
       closeAllMedia();
       const i = members.findIndex((x) => x.id === me.id);
-      if (i >= 0) { members[i].av = hasMedia(); members[i].mic = getState().audio; members[i].cam = getState().video; }
+      if (i >= 0) { members[i].av = hasMedia(); members[i].mic = getState().audio; members[i].cam = getState().video; members[i].screen = getState().screen; }
       if (isHub) { emitRoster(); broadcast({ t: 'roster', d: members.slice() }); }
-      else { toHub({ t: 'meta', d: { av: hasMedia(), mic: getState().audio, cam: getState().video } }); scheduleReconcile(); }
+      else { toHub({ t: 'meta', d: { av: hasMedia(), mic: getState().audio, cam: getState().video, screen: getState().screen } }); scheduleReconcile(); }
     },
     leave() {
       leaving = true;

@@ -1,7 +1,7 @@
 import { BOOKS_DATA } from '@the-word/bible';
 import type { Language, WordApp } from '@the-word/core';
 import { BADGES, bibleProgress, localized, progressToward, type EarnedBadge } from './badges';
-import type { LedgerEvent } from './ledger';
+import { imageShareStats, type LedgerEvent } from './ledger';
 
 export function ProgressPanel({
   label,
@@ -23,6 +23,8 @@ export function ProgressPanel({
   const milestones = BADGES.filter((badge) => !badge.id.startsWith('book-'));
   const earnedMilestones = earned.filter((badge) => !badge.id.startsWith('book-'));
   const lockedMilestones = milestones.filter((badge) => !earnedIds.has(badge.id));
+  const images = imageShareStats(events);
+  const bookName = (bookId: number) => BOOKS_DATA.find((book) => book.id === bookId)?.name ?? String(bookId);
 
   return (
     <div className="progress-panel">
@@ -50,6 +52,31 @@ export function ProgressPanel({
           </ul>
         </div>
       ) : <p className="muted">{label.noBadgesYet}</p>}
+
+      {images.total ? (
+        <div className="badge-block">
+          <span className="section-label">{label.imageShares}</span>
+          <ul className="share-stat-grid">
+            <li className="share-stat"><strong>{images.total}</strong><small>{label.imageShares}</small></li>
+            <li className="share-stat"><strong>{images.verses}</strong><small>{label.versesCovered}</small></li>
+            <li className="share-stat"><strong>{images.books}</strong><small>{label.booksCovered}</small></li>
+            <li className="share-stat"><strong>{images.sent}</strong><small>{label.imagesSent}</small></li>
+          </ul>
+          {images.topBook ? (
+            <p className="muted">{label.mostShared}: {bookName(images.topBook.bookId)} ({images.topBook.count})</p>
+          ) : null}
+          {images.recent.length ? (
+            <ul className="share-recent">
+              {images.recent.map((event) => (
+                <li key={event.id}>
+                  <span>{bookName(event.bookId)} {event.chapter}:{event.verse}</span>
+                  <small>{(event.outcome ?? 'saved') === 'shared' ? label.imagesSent : label.imagesSaved}</small>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="badge-block">
         <span className="section-label">{label.bookBadges}</span>

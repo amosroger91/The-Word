@@ -44,6 +44,15 @@ export interface Strings {
   copy: string;
   shareLink: string;
   linkCopied: string;
+  sharePassage: string;
+  verseCopied: string;
+  sendImage: string;
+  imageShares: string;
+  imagesSaved: string;
+  imagesSent: string;
+  versesCovered: string;
+  booksCovered: string;
+  mostShared: string;
   image: string;
   exporting: string;
   clearSelection: string;
@@ -333,6 +342,15 @@ export const strings: Record<Language, Strings> = {
     copy: 'Copy',
     shareLink: 'Share link',
     linkCopied: 'Link copied.',
+    sharePassage: 'Share',
+    verseCopied: 'Verse and link copied.',
+    sendImage: 'Send',
+    imageShares: 'Verse images',
+    imagesSaved: 'Saved',
+    imagesSent: 'Sent',
+    versesCovered: 'Verses',
+    booksCovered: 'Books',
+    mostShared: 'Most shared',
     image: 'Image',
     exporting: 'Exporting…',
     clearSelection: 'Unhighlight selected',
@@ -614,6 +632,15 @@ export const strings: Record<Language, Strings> = {
     copy: 'Copiar',
     shareLink: 'Compartir enlace',
     linkCopied: 'Enlace copiado.',
+    sharePassage: 'Compartir',
+    verseCopied: 'Versículo y enlace copiados.',
+    sendImage: 'Enviar',
+    imageShares: 'Imágenes de versículos',
+    imagesSaved: 'Guardadas',
+    imagesSent: 'Enviadas',
+    versesCovered: 'Versículos',
+    booksCovered: 'Libros',
+    mostShared: 'Más compartido',
     image: 'Imagen',
     exporting: 'Exportando…',
     clearSelection: 'Quitar selección',
@@ -895,6 +922,15 @@ export const strings: Record<Language, Strings> = {
     copy: 'Copier',
     shareLink: 'Partager le lien',
     linkCopied: 'Lien copié.',
+    sharePassage: 'Partager',
+    verseCopied: 'Verset et lien copiés.',
+    sendImage: 'Envoyer',
+    imageShares: 'Images de versets',
+    imagesSaved: 'Enregistrées',
+    imagesSent: 'Envoyées',
+    versesCovered: 'Versets',
+    booksCovered: 'Livres',
+    mostShared: 'Le plus partagé',
     image: 'Image',
     exporting: 'Exportation…',
     clearSelection: 'Désélectionner',
@@ -1176,6 +1212,15 @@ export const strings: Record<Language, Strings> = {
     copy: '复制',
     shareLink: '分享链接',
     linkCopied: '链接已复制。',
+    sharePassage: '分享',
+    verseCopied: '经文和链接已复制。',
+    sendImage: '发送',
+    imageShares: '经文图片',
+    imagesSaved: '已保存',
+    imagesSent: '已发送',
+    versesCovered: '经文',
+    booksCovered: '书卷',
+    mostShared: '分享最多',
     image: '图片',
     exporting: '正在导出…',
     clearSelection: '取消选择',
@@ -1457,6 +1502,15 @@ export const strings: Record<Language, Strings> = {
     copy: 'Sao chép',
     shareLink: 'Chia sẻ liên kết',
     linkCopied: 'Đã sao chép liên kết.',
+    sharePassage: 'Chia sẻ',
+    verseCopied: 'Đã sao chép câu và liên kết.',
+    sendImage: 'Gửi',
+    imageShares: 'Ảnh câu Kinh Thánh',
+    imagesSaved: 'Đã lưu',
+    imagesSent: 'Đã gửi',
+    versesCovered: 'Câu',
+    booksCovered: 'Sách',
+    mostShared: 'Chia sẻ nhiều nhất',
     image: 'Hình ảnh',
     exporting: 'Đang xuất…',
     clearSelection: 'Bỏ chọn',

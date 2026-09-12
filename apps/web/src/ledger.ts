@@ -16,6 +16,10 @@ export type AnswerValue =
  *  before readers existed, which reads as the household. */
 export type ReaderId = string;
 
+/** What a reader did inside a Read Party. `public`/`private` are recorded for the
+ *  host who opened the room, since only the host chooses whether it is listed. */
+export type GroupAction = 'join' | 'chapter' | 'mic' | 'cam' | 'public' | 'private' | 'friendRequest';
+
 export type LedgerEvent =
   | { id: EventId; kind: 'read'; at: string; readerId?: ReaderId; bookId: number; chapter: number; verses?: number[] }
   | { id: EventId; kind: 'answer'; at: string; readerId?: ReaderId; planId: string; sessionId: string; questionId: string;
@@ -28,8 +32,16 @@ export type LedgerEvent =
   | { id: EventId; kind: 'note'; at: string; readerId?: ReaderId; bookId: number; chapter: number; verse: number;
       text: string; share: 'private' | 'friends' }
   | { id: EventId; kind: 'share'; at: string; readerId?: ReaderId; bookId: number; chapter: number; verse: number;
-      via: 'link' | 'image' | 'feed' };
+      // `outcome` distinguishes an image that was merely exported to disk from one
+      // that actually left the device through the share sheet. Events written before
+      // this field existed have no outcome and are treated as 'saved'.
+      via: 'link' | 'image' | 'feed'; outcome?: 'saved' | 'shared' }
+  // Something the reader did inside a Read Party. Recorded once per action per
+  // party session (App.tsx dedupes) so toggling a mic does not flood the ledger.
+  | { id: EventId; kind: 'group'; at: string; readerId?: ReaderId; action: GroupAction;
+      bookId?: number; chapter?: number };
 
+export type GroupEvent = Extract<LedgerEvent, { kind: 'group' }>;
 export type ReadEvent = Extract<LedgerEvent, { kind: 'read' }>;
 export type NoteEvent = Extract<LedgerEvent, { kind: 'note' }>;
 export type AnswerEvent = Extract<LedgerEvent, { kind: 'answer' }>;
@@ -104,6 +116,83 @@ export function shareCount(events: LedgerEvent[], via: 'link' | 'image' | 'feed'
   return events.filter((event) => (
     event.kind === 'share' && (via === 'any' || event.via === via)
   )).length;
+}
+
+export function shareOutcome(event: ShareEvent): 'saved' | 'shared' {
+  return event.outcome ?? 'saved';
+}
+
+function matchingShares(
+  events: LedgerEvent[],
+  via: 'link' | 'image' | 'feed' | 'any',
+  outcome?: 'saved' | 'shared',
+): ShareEvent[] {
+  return events.filter((event): event is ShareEvent => (
+    event.kind === 'share'
+    && (via === 'any' || event.via === via)
+    && (!outcome || shareOutcome(event) === outcome)
+  ));
+}
+
+/**
+ * Shares counted by unique passage rather than by raw event, so re-exporting the
+ * same verse ten times still counts once. `by: 'book'` measures breadth instead.
+ */
+export function distinctShareCount(
+  events: LedgerEvent[],
+  via: 'link' | 'image' | 'feed' | 'any' = 'any',
+  by: 'verse' | 'book' = 'verse',
+  outcome?: 'saved' | 'shared',
+): number {
+  const keys = new Set<string>();
+  for (const event of matchingShares(events, via, outcome)) {
+    keys.add(by === 'book' ? String(event.bookId) : `${event.bookId}:${event.chapter}:${event.verse}`);
+  }
+  return keys.size;
+}
+
+export interface ImageShareStats {
+  total: number;
+  saved: number;
+  sent: number;
+  verses: number;
+  books: number;
+  topBook: { bookId: number; count: number } | null;
+  recent: ShareEvent[];
+}
+
+export function imageShareStats(events: LedgerEvent[], recentLimit = 5): ImageShareStats {
+  const images = matchingShares(events, 'image');
+  const perBook = new Map<number, number>();
+  for (const event of images) perBook.set(event.bookId, (perBook.get(event.bookId) ?? 0) + 1);
+  let topBook: { bookId: number; count: number } | null = null;
+  for (const [bookId, count] of perBook) {
+    // Ties resolve to the lower book id so the panel doesn't flicker between equals.
+    if (!topBook || count > topBook.count || (count === topBook.count && bookId < topBook.bookId)) {
+      topBook = { bookId, count };
+    }
+  }
+  return {
+    total: images.length,
+    saved: images.filter((event) => shareOutcome(event) === 'saved').length,
+    sent: images.filter((event) => shareOutcome(event) === 'shared').length,
+    verses: distinctShareCount(events, 'image', 'verse'),
+    books: perBook.size,
+    topBook,
+    recent: [...images].sort((a, b) => (a.at < b.at ? 1 : -1)).slice(0, recentLimit),
+  };
+}
+
+export function groupActionCount(events: LedgerEvent[], action: GroupAction | 'any' = 'any'): number {
+  return events.filter((event) => (
+    event.kind === 'group' && (action === 'any' || event.action === action)
+  )).length;
+}
+
+export function groupActionsDone(events: LedgerEvent[]): Set<GroupAction> {
+  const done = new Set<GroupAction>();
+  for (const event of events) if (event.kind === 'group') done.add(event.action);
+  return done;
 }
 
 export function chaptersOfBook(events: LedgerEvent[], bookId: number): Set<number> {
