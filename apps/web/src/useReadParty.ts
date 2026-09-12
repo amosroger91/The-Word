@@ -7,7 +7,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { WordApp } from '@the-word/core';
 import { joinParty, type PartyAnswer, type PartyChatMessage, type PartyMember, type PartyQuestion, type PartyRoom, type ReadingState, type SharedAnswers } from './readParty';
 import { compressAvatar, loadIdentity, saveIdentity } from './identity';
-import { getCameraStream, getLocalStream, getScreenStream, getVoiceFilter, setMedia, setVoiceFilter as applyVoiceFilter, startScreenShare, stopLocal, stopScreenShare, unlockRemoteAudio, setDevices } from './media';
+import { getCameraStream, getLocalStream, getScreenStream, getSystemAudioVolume, getVoiceFilter, setMedia, setSystemAudioVolume as applySystemAudioVolume, setVoiceFilter as applyVoiceFilter, startScreenShare, startSystemAudio, stopLocal, stopScreenShare, stopSystemAudio, unlockRemoteAudio, setDevices } from './media';
 
 function randomCode(): string { return Math.random().toString(36).slice(2, 7); }
 
@@ -39,6 +39,8 @@ export function useReadParty(app: WordApp) {
   // Which question this device has already replied to, so the prompt closes
   // for you without waiting on a round trip.
   const [answeredId, setAnsweredId] = useState<string | null>(null);
+  const [systemAudioOn, setSystemAudioOn] = useState(false);
+  const [systemAudioVolume, setSystemAudioVolumeState] = useState(getSystemAudioVolume);
   const [voiceFilter, setVoiceFilterState] = useState(getVoiceFilter);
   const autoMicRef = useRef(false);
   const [screenOn, setScreenOn] = useState(false);
@@ -117,6 +119,7 @@ export function useReadParty(app: WordApp) {
     setMediaError(''); setCapped(false); setFocusVerseState(null); setFindable(false);
     setScreenOn(false); setScreenStreamState(null); setScreenHasAudio(false);
     setQuestion(null); setAnswerList([]); setSharedAnswers(null); setAnsweredId(null);
+    setSystemAudioOn(false);
     lastSentRef.current = '';
   }, [room]);
 
@@ -216,6 +219,37 @@ export function useReadParty(app: WordApp) {
   const skipQuestion = useCallback(() => {
     if (question) setAnsweredId(question.id);
   }, [question]);
+
+  const stopSysAudio = useCallback(() => {
+    stopSystemAudio();
+    setSystemAudioOn(false);
+    room?.refreshMedia();
+  }, [room]);
+
+  const startSysAudio = useCallback(async () => {
+    if (!room || !isHost) return;
+    setMediaError('');
+    try {
+      await startSystemAudio({
+        // The browser's own "stop sharing" bar, rather than our button.
+        onEnded: () => { stopSystemAudio(); setSystemAudioOn(false); room.refreshMedia(); },
+      });
+      setSystemAudioOn(true);
+      room.refreshMedia();
+    } catch (error) {
+      const name = (error as { name?: string; message?: string });
+      if (name.name === 'NotAllowedError') return;   // picker dismissed
+      setMediaError(name.message === 'system-audio-none' ? 'system-audio-none' : 'system-audio');
+    }
+  }, [room, isHost]);
+
+  const toggleSystemAudio = useCallback(() => {
+    if (systemAudioOn) stopSysAudio(); else void startSysAudio();
+  }, [systemAudioOn, startSysAudio, stopSysAudio]);
+
+  const setSystemVolume = useCallback((next: number) => {
+    setSystemAudioVolumeState(applySystemAudioVolume(next));
+  }, []);
 
   const stopScreen = useCallback(() => {
     stopScreenShare();
@@ -461,6 +495,10 @@ export function useReadParty(app: WordApp) {
     sharingAnswers: Boolean(sharedAnswers),
     voiceFilter,
     setVoiceFiltering,
+    systemAudioOn,
+    systemAudioVolume,
+    toggleSystemAudio,
+    setSystemVolume,
     screenOn,
     screenStream,
     screenHasAudio,

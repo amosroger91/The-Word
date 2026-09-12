@@ -407,3 +407,8 @@
 .host-question form { display: flex; gap: 6px; }
 .host-question input { flex: 1 1 auto; min-width: 0; padding: 7px 9px; border-radius: 8px; border: 1px solid var(--ws-line); font: inherit; background: var(--ws-soft); color: inherit; }
 .host-question .answer-list { max-height: 220px; overflow-y: auto; }
+
+/* Inline fader for shared desktop audio */
+.system-audio-level { display: inline-flex; align-items: center; gap: 6px; padding: 0 8px; }
+.system-audio-level input[type="range"] { width: 92px; }
+@media (max-width: 700px) { .system-audio-level input[type="range"] { width: 68px; } }

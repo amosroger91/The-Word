@@ -6,8 +6,20 @@
 // getUserMedia; `screenStream` is getDisplayMedia. What peers actually receive is
 // `localStream`, a composite: the screen's video when presenting (otherwise the
 // camera's), and the mic mixed with desktop audio when both are live.
+// Declared before the state below: the readers run at module load, and a const
+// declared further down would sit in its temporal dead zone. The ReferenceError
+// is swallowed by the try/catch in each reader, so the symptom is not a crash --
+// it is a stored preference that silently never loads.
+const VOICE_FILTER_KEY = 'word.voiceFilter';
+const SYS_VOLUME_KEY = 'word.systemAudioVolume';
+
 let camStream: MediaStream | null = null;
 let screenStream: MediaStream | null = null;
+// Desktop audio shared on its own, with no picture. getDisplayMedia always hands
+// back a video track, so we keep the audio and stop the video immediately.
+let sysAudioStream: MediaStream | null = null;
+let sysGain: GainNode | null = null;
+let sysVolume = readSystemAudioVolume();
 let localStream: MediaStream | null = null;
 let audioCtx: AudioContext | null = null;
 let gateTimer = 0;
@@ -40,7 +52,28 @@ function stopTracks(stream: MediaStream | null) {
   }
 }
 
-const VOICE_FILTER_KEY = 'word.voiceFilter';
+function readSystemAudioVolume(): number {
+  try {
+    const raw = Number(localStorage.getItem(SYS_VOLUME_KEY));
+    return Number.isFinite(raw) && raw >= 0 && raw <= 1 ? raw : 0.8;
+  } catch { return 0.8; }
+}
+
+export function getSystemAudioVolume() { return sysVolume; }
+
+/**
+ * Desktop audio rides in at its own level, like a second voice in the room.
+ * Applied straight to the live gain node so a drag of the slider is heard
+ * immediately, with no stream rebuild and no reconnect.
+ */
+export function setSystemAudioVolume(next: number) {
+  sysVolume = Math.max(0, Math.min(1, Number(next) || 0));
+  try { localStorage.setItem(SYS_VOLUME_KEY, String(sysVolume)); } catch { /* private mode */ }
+  if (sysGain) sysGain.gain.value = sysVolume;
+  return sysVolume;
+}
+
+export function isSharingSystemAudio() { return Boolean(sysAudioStream); }
 
 function readVoiceFilterPref(): boolean {
   try { return localStorage.getItem(VOICE_FILTER_KEY) !== '0'; } catch { return true; }
@@ -58,6 +91,7 @@ export function setVoiceFilter(on: boolean) {
 
 function disposeAudioGraph() {
   if (gateTimer) { clearInterval(gateTimer); gateTimer = 0; }
+  sysGain = null;
   if (!audioCtx) return;
   void audioCtx.close().catch(() => {});
   audioCtx = null;
@@ -146,13 +180,17 @@ function rebuild() {
   disposeAudioGraph();
   const camAudio = camStream?.getAudioTracks() ?? [];
   const screenAudio = screenStream?.getAudioTracks() ?? [];
+  const sysAudio = sysAudioStream?.getAudioTracks() ?? [];
+  const desktopAudio = [...screenAudio, ...sysAudio];
   const screenVideo = screenStream?.getVideoTracks() ?? [];
   const camVideo = camStream?.getVideoTracks() ?? [];
 
-  // A graph is only worth building to condition the mic, or to fold mic and
-  // desktop audio into the one track a peer connection carries.
-  const wantsGraph = camAudio.length > 0 && (voiceFilter || screenAudio.length > 0);
-  let audio: MediaStreamTrack[] = camAudio.length ? camAudio : screenAudio;
+  // A graph is worth building to condition the mic, to fold several sources
+  // into the one track a peer connection carries, or to put desktop audio
+  // behind a fader.
+  const wantsGraph = (camAudio.length > 0 && (voiceFilter || desktopAudio.length > 0))
+    || desktopAudio.length > 0;
+  let audio: MediaStreamTrack[] = camAudio.length ? camAudio : desktopAudio.slice(0, 1);
 
   if (wantsGraph) {
     const ctx = newAudioContext();
@@ -160,20 +198,27 @@ function rebuild() {
       audioCtx = ctx;
       try {
         const destination = ctx.createMediaStreamDestination();
-        const mic = voiceFilter
-          ? buildVoiceChain(ctx, camAudio[0])
-          : ctx.createMediaStreamSource(new MediaStream([camAudio[0]]));
-        mic.connect(destination);
-        // Desktop audio is music or a soundtrack: pass it through untouched.
-        // Gating or high-passing it would wreck the thing it exists for.
-        for (const track of screenAudio) {
-          try { ctx.createMediaStreamSource(new MediaStream([track])).connect(destination); } catch { /* skip */ }
+        if (camAudio.length) {
+          const mic = voiceFilter
+            ? buildVoiceChain(ctx, camAudio[0])
+            : ctx.createMediaStreamSource(new MediaStream([camAudio[0]]));
+          mic.connect(destination);
+        }
+        if (desktopAudio.length) {
+          // Desktop audio is music or a soundtrack: never gated or high-passed,
+          // only levelled, so it sits under the voices instead of over them.
+          sysGain = ctx.createGain();
+          sysGain.gain.value = sysVolume;
+          sysGain.connect(destination);
+          for (const track of desktopAudio) {
+            try { ctx.createMediaStreamSource(new MediaStream([track])).connect(sysGain); } catch { /* skip */ }
+          }
         }
         const out = destination.stream.getAudioTracks()[0];
         if (out) audio = [out];
       } catch {
         disposeAudioGraph();
-        audio = camAudio.length ? camAudio : screenAudio;
+        audio = camAudio.length ? camAudio : desktopAudio.slice(0, 1);
       }
     }
   }
@@ -226,6 +271,42 @@ export async function startScreenShare({ withAudio, onEnded }: { withAudio: bool
   return { stream: localStream, gotAudio: display.getAudioTracks().length > 0 };
 }
 
+/**
+ * Share desktop audio with no picture — music, a video's soundtrack, anything
+ * playing on this machine — mixed in as another voice at its own level.
+ *
+ * getDisplayMedia has no audio-only mode: a picture source must be picked, and
+ * a video track always comes back. We stop that track immediately and keep only
+ * the audio, so nothing is transmitted and the capture indicator reflects audio
+ * alone. Chromium only offers the audio checkbox for a tab or the whole screen,
+ * never a single window, so a missing audio track usually means the box was
+ * left unticked rather than a browser that cannot do it.
+ */
+export async function startSystemAudio({ onEnded }: { onEnded?: () => void }) {
+  const display = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+  const audio = display.getAudioTracks();
+  // Drop the picture the moment we have it; only the sound is wanted.
+  for (const track of display.getVideoTracks()) {
+    try { track.stop(); display.removeTrack(track); } catch { /* already gone */ }
+  }
+  if (!audio.length) {
+    stopTracks(display);
+    throw new Error('system-audio-none');
+  }
+  stopTracks(sysAudioStream);
+  sysAudioStream = display;
+  audio[0].addEventListener('ended', () => { onEnded?.(); }, { once: true });
+  rebuild();
+  return localStream;
+}
+
+export function stopSystemAudio() {
+  stopTracks(sysAudioStream);
+  sysAudioStream = null;
+  rebuild();
+  return localStream;
+}
+
 export function stopScreenShare() {
   stopTracks(screenStream);
   screenStream = null;
@@ -236,9 +317,11 @@ export function stopScreenShare() {
 export function stopLocal() {
   stopTracks(camStream);
   stopTracks(screenStream);
+  stopTracks(sysAudioStream);
   disposeAudioGraph();
   camStream = null;
   screenStream = null;
+  sysAudioStream = null;
   localStream = null;
   state = { audio: false, video: false, screen: false };
 }
