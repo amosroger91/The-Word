@@ -28,6 +28,13 @@ import { getLocalStream, hasMedia, getState } from './media';
 
 export interface PartyIdentity { id: string; name: string; color: string; avatar?: string | null; }
 export interface PartyMember { id: string; name: string; color: string; peerId: string; host?: boolean; av?: boolean; mic?: boolean; cam?: boolean; screen?: boolean; avatar?: string | null; }
+/** A question the host puts to the room. One at a time; asking again replaces it. */
+export interface PartyQuestion { id: string; text: string; ts: number; }
+/** One person's reply. Keyed by member, so answering again overwrites. */
+export interface PartyAnswer { questionId: string; memberId: string; name: string; color: string; text: string; ts: number; }
+/** The set the host has chosen to put on everyone's screen. Null = not sharing. */
+export interface SharedAnswers { questionId: string; question: string; items: PartyAnswer[]; }
+
 export interface PartyChatMessage {
   id: string;
   kind: 'chat' | 'system';
@@ -59,6 +66,10 @@ export interface PartyHandlers {
   onChat?(message: PartyChatMessage): void;
   onReading?(state: ReadingState | null): void;
   onError?(code: string): void;
+  onQuestion?(question: PartyQuestion | null): void;
+  /** Host only: the answers collected so far. */
+  onAnswerList?(answers: PartyAnswer[]): void;
+  onSharedAnswers?(shared: SharedAnswers | null): void;
   onRemoteStream?(memberId: string, stream: MediaStream): void;
   onRemoteEnd?(memberId: string): void;
 }
@@ -82,6 +93,14 @@ export interface PartyRoom {
   sendChat(text: string): void;
   /** Host only: publish the shared reading state to everyone. No-op for clients. */
   setReadingState(state: ReadingState): void;
+  /** Host only: put a question to the room. Replaces any question already open. */
+  askQuestion(text: string): void;
+  /** Host only: take the question off everyone's screen. */
+  closeQuestion(): void;
+  /** Answer the open question. Answering again replaces your previous answer. */
+  sendAnswer(questionId: string, text: string): void;
+  /** Host only: show or hide the collected answers on everyone's screen. */
+  shareAnswers(on: boolean): void;
   transferHost(memberId: string): void;
   updateIdentity(next: Partial<PartyIdentity>): void;
   /** Call after setMedia(): refresh streams across the mesh and announce A/V. */
@@ -105,6 +124,9 @@ export function joinParty({ code, identity, handlers = {} }: {
   const clientConns = new Map<string, DataConnection>(); // hub: remotePeerId -> connection
   let members: PartyMember[] = [];
   let readingState: ReadingState | null = null;      // last known shared reading state (survives re-election)
+  let question: PartyQuestion | null = null;
+  const answers = new Map<string, PartyAnswer>();   // memberId -> their latest answer (hub only)
+  let sharedAnswers: SharedAnswers | null = null;
   const chatLog: PartyChatMessage[] = [];
   let leaving = false;
   let reelectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -151,6 +173,51 @@ export function joinParty({ code, identity, handlers = {} }: {
     return { id: newId(), kind: 'system', text, ts: Date.now(), event, name };
   }
 
+  function publishQuestion(text: string) {
+    const clean = String(text ?? '').trim().slice(0, 300);
+    if (!clean) return;
+    question = { id: newId(), text: clean, ts: Date.now() };
+    answers.clear();
+    sharedAnswers = null;   // a new question retires the previous answer board
+    broadcast({ t: 'ask', d: question });
+    broadcast({ t: 'answers', d: null });
+    h.onQuestion?.(question);
+    h.onAnswerList?.([]);
+    h.onSharedAnswers?.(null);
+  }
+
+  function closeQuestionAtHub() {
+    question = null;
+    broadcast({ t: 'ask', d: null });
+    h.onQuestion?.(null);
+  }
+
+  function recordAnswer(answer: PartyAnswer) {
+    // Ignore replies to a question that has already been replaced.
+    if (!question || answer.questionId !== question.id) return;
+    if (!answers.has(answer.memberId) && answers.size >= 200) return;
+    answers.set(answer.memberId, answer);
+    h.onAnswerList?.([...answers.values()]);
+    // While the board is up, a late answer should appear on it rather than
+    // waiting for the host to toggle sharing off and on again.
+    if (sharedAnswers && sharedAnswers.questionId === question.id) {
+      sharedAnswers = { ...sharedAnswers, items: [...answers.values()] };
+      broadcast({ t: 'answers', d: sharedAnswers });
+      h.onSharedAnswers?.(sharedAnswers);
+    }
+  }
+
+  function publishSharedAnswers(on: boolean) {
+    if (on) {
+      if (!question) return;
+      sharedAnswers = { questionId: question.id, question: question.text, items: [...answers.values()] };
+    } else {
+      sharedAnswers = null;
+    }
+    broadcast({ t: 'answers', d: sharedAnswers });
+    h.onSharedAnswers?.(sharedAnswers);
+  }
+
   function publishReading(state: ReadingState) {
     if (!state || !Number.isInteger(state.bookId) || !Number.isInteger(state.chapter)
       || !['idle','playing','paused','live'].includes(state.action)) return;
@@ -173,12 +240,36 @@ export function joinParty({ code, identity, handlers = {} }: {
       if (sender !== presenterId) return;
       if (env.t === 'reading') publishReading(env.d as ReadingState);
       else transfer(String(env.d));
+    } else if (env.t === 'ask' || env.t === 'share-answers') {
+      // Only whoever holds the floor may drive the question board.
+      const sender = fromPeerId ? members.find(m => m.peerId === fromPeerId)?.id : me.id;
+      if (sender !== presenterId) return;
+      if (env.t === 'ask') {
+        const d = (env.d || null) as { text?: string } | null;
+        if (d && d.text) publishQuestion(d.text); else closeQuestionAtHub();
+      } else {
+        publishSharedAnswers(Boolean((env.d as { on?: boolean } | null)?.on));
+      }
+    } else if (env.t === 'answer') {
+      const member = fromPeerId
+        ? members.find(m => m.peerId === fromPeerId)
+        : members.find(m => m.id === me.id);
+      if (!member) return;
+      const d = (env.d || {}) as { questionId?: string; text?: string };
+      recordAnswer({
+        questionId: String(d.questionId ?? ''),
+        memberId: member.id,
+        name: member.name || 'Reader',
+        color: member.color || '#888',
+        text: String(d.text ?? '').trim().slice(0, 2000),
+        ts: Date.now(),
+      });
     } else if (env.t === 'hello') {
       const m = (env.d || {}) as Partial<PartyMember>;
       upsert({ id: m.id!, name: m.name || 'Reader', color: m.color || '#888', avatar: m.avatar || null, peerId: fromPeerId || '', av: Boolean(m.av), mic: Boolean(m.mic), cam: Boolean(m.cam), screen: Boolean(m.screen) });
       const conn = fromPeerId ? clientConns.get(fromPeerId) : null;
       if (conn) {
-        try { conn.send({ t: 'welcome', d: { roster: members.slice(), chat: chatLog.slice(-CHAT_HISTORY), reading: readingState } }); } catch { /* dropped */ }
+        try { conn.send({ t: 'welcome', d: { roster: members.slice(), chat: chatLog.slice(-CHAT_HISTORY), reading: readingState, question, answers: sharedAnswers } }); } catch { /* dropped */ }
       }
       const sm = systemMessage(`${m.name || 'Someone'} joined the party`, 'joined', m.name || 'Someone');
       recordChat(sm); broadcast({ t: 'chat', d: sm });
@@ -213,17 +304,29 @@ export function joinParty({ code, identity, handlers = {} }: {
     const env = raw as Envelope;
     if (!env || !env.t) return;
     if (env.t === 'welcome') {
-      const d = (env.d || {}) as { roster?: PartyMember[]; chat?: PartyChatMessage[]; reading?: ReadingState | null };
+      const d = (env.d || {}) as { roster?: PartyMember[]; chat?: PartyChatMessage[]; reading?: ReadingState | null;
+        question?: PartyQuestion | null; answers?: SharedAnswers | null };
       members = (d.roster || []).slice();
       readingState = d.reading || null;
       (d.chat || []).forEach((m) => h.onChat?.(m));
       if (readingState) h.onReading?.(readingState);
+      // Someone joining mid-question still gets the prompt and any shared board.
+      question = d.question || null;
+      sharedAnswers = d.answers || null;
+      if (question) h.onQuestion?.(question);
+      if (sharedAnswers) h.onSharedAnswers?.(sharedAnswers);
       emitRoster();
     } else if (env.t === 'roster') {
       members = ((env.d || []) as PartyMember[]).slice();
       emitRoster();
     } else if (env.t === 'chat') {
       h.onChat?.(env.d as PartyChatMessage);
+    } else if (env.t === 'ask') {
+      question = (env.d || null) as PartyQuestion | null;
+      h.onQuestion?.(question);
+    } else if (env.t === 'answers') {
+      sharedAnswers = (env.d || null) as SharedAnswers | null;
+      h.onSharedAnswers?.(sharedAnswers);
     } else if (env.t === 'reading') {
       const incoming = (env.d || null) as ReadingState | null;
       if (incoming && incoming.revision != null && readingState?.revision != null && incoming.revision <= readingState.revision) return;
@@ -387,6 +490,10 @@ export function joinParty({ code, identity, handlers = {} }: {
       if (presenterId !== me.id) return;
       toHub({ t: 'reading', d: state });
     },
+    askQuestion(text: string) { toHub({ t: 'ask', d: { text } }); },
+    closeQuestion() { toHub({ t: 'ask', d: null }); },
+    sendAnswer(questionId: string, text: string) { toHub({ t: 'answer', d: { questionId, text } }); },
+    shareAnswers(on: boolean) { toHub({ t: 'share-answers', d: { on } }); },
     transferHost(memberId: string) {
       if (presenterId !== me.id) return;
       toHub({ t: 'transfer', d: memberId });

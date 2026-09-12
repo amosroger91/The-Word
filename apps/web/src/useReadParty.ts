@@ -5,7 +5,7 @@
 //    reads with its own Scripture and Piper voice.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { WordApp } from '@the-word/core';
-import { joinParty, type PartyChatMessage, type PartyMember, type PartyRoom, type ReadingState } from './readParty';
+import { joinParty, type PartyAnswer, type PartyChatMessage, type PartyMember, type PartyQuestion, type PartyRoom, type ReadingState, type SharedAnswers } from './readParty';
 import { compressAvatar, loadIdentity, saveIdentity } from './identity';
 import { getCameraStream, getLocalStream, getScreenStream, getVoiceFilter, setMedia, setVoiceFilter as applyVoiceFilter, startScreenShare, stopLocal, stopScreenShare, unlockRemoteAudio, setDevices } from './media';
 
@@ -33,6 +33,12 @@ export function useReadParty(app: WordApp) {
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
   const [mediaError, setMediaError] = useState('');
+  const [question, setQuestion] = useState<PartyQuestion | null>(null);
+  const [answerList, setAnswerList] = useState<PartyAnswer[]>([]);
+  const [sharedAnswers, setSharedAnswers] = useState<SharedAnswers | null>(null);
+  // Which question this device has already replied to, so the prompt closes
+  // for you without waiting on a round trip.
+  const [answeredId, setAnsweredId] = useState<string | null>(null);
   const [voiceFilter, setVoiceFilterState] = useState(getVoiceFilter);
   const autoMicRef = useRef(false);
   const [screenOn, setScreenOn] = useState(false);
@@ -75,6 +81,15 @@ export function useReadParty(app: WordApp) {
         onSelf: ({ host }) => setIsHost(host),
         onRoster: (list, meta) => { setMembers(list); setIsHost(meta.host); setCapped(meta.capped); },
         onChat: (msg) => setMessages((prev) => [...prev.slice(-199), msg]),
+        onQuestion: (next) => {
+          setQuestion(next);
+          // A fresh question re-opens the prompt even for someone who answered the last one.
+          if (!next) setAnsweredId(null);
+          else setAnsweredId((prev) => (prev === next.id ? prev : null));
+          if (!next) setAnswerList([]);
+        },
+        onAnswerList: (list) => setAnswerList(list),
+        onSharedAnswers: (shared) => setSharedAnswers(shared),
         onReading: (state) => { setRemoteReading(state); setShared(state); },
         onError: (c) => setError(c),
         onRemoteStream: (id, stream) => setRemoteStreams((prev) => ({ ...prev, [id]: stream })),
@@ -101,6 +116,7 @@ export function useReadParty(app: WordApp) {
     setStatus(''); setError(''); setCode(''); setRemoteReading(null); setArmed(false);
     setMediaError(''); setCapped(false); setFocusVerseState(null); setFindable(false);
     setScreenOn(false); setScreenStreamState(null); setScreenHasAudio(false);
+    setQuestion(null); setAnswerList([]); setSharedAnswers(null); setAnsweredId(null);
     lastSentRef.current = '';
   }, [room]);
 
@@ -172,6 +188,34 @@ export function useReadParty(app: WordApp) {
     unlockRemoteAudio();
     void applyMedia(micOn, !camOn);
   }, [applyMedia, capped, micOn, camOn]);
+
+  const askQuestion = useCallback((text: string) => {
+    if (!room || !isHost) return;
+    room.askQuestion(text);
+  }, [room, isHost]);
+
+  const closeQuestion = useCallback(() => {
+    if (!room || !isHost) return;
+    room.closeQuestion();
+  }, [room, isHost]);
+
+  const shareAnswers = useCallback((on: boolean) => {
+    if (!room || !isHost) return;
+    room.shareAnswers(on);
+  }, [room, isHost]);
+
+  const sendAnswer = useCallback((text: string) => {
+    if (!room || !question) return;
+    const clean = text.trim();
+    if (!clean) return;
+    room.sendAnswer(question.id, clean);
+    setAnsweredId(question.id);
+  }, [room, question]);
+
+  /** Dismiss the prompt without replying. Nothing is sent. */
+  const skipQuestion = useCallback(() => {
+    if (question) setAnsweredId(question.id);
+  }, [question]);
 
   const stopScreen = useCallback(() => {
     stopScreenShare();
@@ -404,6 +448,17 @@ export function useReadParty(app: WordApp) {
     camOn,
     toggleMic,
     toggleCam,
+    question,
+    answerList,
+    sharedAnswers,
+    // True while this device still owes the open question a reply.
+    questionOpen: Boolean(question) && answeredId !== question?.id,
+    askQuestion,
+    closeQuestion,
+    sendAnswer,
+    skipQuestion,
+    shareAnswers,
+    sharingAnswers: Boolean(sharedAnswers),
     voiceFilter,
     setVoiceFiltering,
     screenOn,

@@ -74,3 +74,112 @@ test('hub loss elects a host without restarting narration',async()=>{
     assert.equal(guest.isHost,true);assert.equal(b.at(-1).action,'live');assert.equal(b.at(-1).verse,16);
   }finally{guest.leave();host.leave();}
 });
+
+// --- host question board -----------------------------------------------------
+
+function asker(id) {
+  const seen = {questions: [], answers: [], shared: []};
+  return {
+    seen,
+    spec: {
+      code: 'test-private',
+      identity: {id, name: id, color: '#947849'},
+      handlers: {
+        onQuestion: (q) => seen.questions.push(q),
+        // Array.from re-creates the list in THIS realm; arrays built inside the vm
+        // context have a different Array.prototype and fail deepStrictEqual.
+        onAnswerList: (list) => seen.answers.push(Array.from(list, (a) => `${a.name}:${a.text}`)),
+        onSharedAnswers: (shared) => seen.shared.push(shared),
+      },
+    },
+  };
+}
+
+test('the host asks, answers come back, and only the host can put them on screen', async () => {
+  const {join} = harness();
+  const anna = asker('Anna'), ben = asker('Ben'), cara = asker('Cara');
+  const host = join(anna.spec); await tick();
+  const guest = join(ben.spec); await tick();
+  const other = join(cara.spec); await tick();
+  try {
+    host.askQuestion('What stood out to you?'); await tick();
+
+    // Everyone sees the question, with the same id.
+    const asked = anna.seen.questions.at(-1);
+    assert.equal(asked.text, 'What stood out to you?');
+    assert.equal(ben.seen.questions.at(-1).id, asked.id);
+    assert.equal(cara.seen.questions.at(-1).id, asked.id);
+
+    // A guest answering reaches the host only — it is not broadcast.
+    guest.sendAnswer(asked.id, 'The bit about bread.'); await tick();
+    assert.deepEqual(anna.seen.answers.at(-1), ['Ben:The bit about bread.']);
+    // Asking retires any previous board, so a null does arrive; what must not
+    // arrive is an actual set of answers.
+    assert.equal(ben.seen.shared.at(-1) ?? null, null, 'answers must not be visible before the host shares them');
+
+    // Answering again replaces rather than appends.
+    guest.sendAnswer(asked.id, 'Actually, the bread AND the fish.'); await tick();
+    assert.deepEqual(anna.seen.answers.at(-1), ['Ben:Actually, the bread AND the fish.']);
+
+    // A reply to a question that has been replaced is dropped.
+    other.sendAnswer('some-stale-id', 'late to the party'); await tick();
+    assert.deepEqual(anna.seen.answers.at(-1), ['Ben:Actually, the bread AND the fish.']);
+
+    // A guest cannot drive the board.
+    guest.askQuestion('my own question'); await tick();
+    assert.equal(anna.seen.questions.at(-1).id, asked.id, 'a guest must not be able to ask');
+    guest.shareAnswers(true); await tick();
+    assert.equal(ben.seen.shared.at(-1) ?? null, null, 'a guest must not be able to share');
+
+    // The host shares: it lands on everyone.
+    host.shareAnswers(true); await tick();
+    assert.equal(ben.seen.shared.at(-1).items.length, 1);
+    assert.equal(cara.seen.shared.at(-1).question, 'What stood out to you?');
+
+    // An answer arriving while the board is up appears on it immediately.
+    other.sendAnswer(asked.id, 'the walking on water'); await tick();
+    assert.equal(ben.seen.shared.at(-1).items.length, 2);
+
+    // And the host can take it back down.
+    host.shareAnswers(false); await tick();
+    assert.equal(ben.seen.shared.at(-1), null);
+  } finally {
+    host.leave(); guest.leave(); other.leave();
+  }
+});
+
+test('a late joiner receives the open question and the shared board', async () => {
+  const {join} = harness();
+  const anna = asker('Anna'), ben = asker('Ben'), dave = asker('Dave');
+  const host = join(anna.spec); await tick();
+  const guest = join(ben.spec); await tick();
+  try {
+    host.askQuestion('Where did you see grace?'); await tick();
+    const asked = anna.seen.questions.at(-1);
+    guest.sendAnswer(asked.id, 'In verse two.'); await tick();
+    host.shareAnswers(true); await tick();
+
+    const latecomer = join(dave.spec); await tick();
+    try {
+      assert.equal(dave.seen.questions.at(-1).text, 'Where did you see grace?');
+      assert.equal(dave.seen.shared.at(-1).items.length, 1);
+    } finally { latecomer.leave(); }
+  } finally {
+    host.leave(); guest.leave();
+  }
+});
+
+test('closing the question clears it everywhere', async () => {
+  const {join} = harness();
+  const anna = asker('Anna'), ben = asker('Ben');
+  const host = join(anna.spec); await tick();
+  const guest = join(ben.spec); await tick();
+  try {
+    host.askQuestion('One word for this chapter?'); await tick();
+    assert.ok(ben.seen.questions.at(-1));
+    host.closeQuestion(); await tick();
+    assert.equal(ben.seen.questions.at(-1), null);
+  } finally {
+    host.leave(); guest.leave();
+  }
+});
