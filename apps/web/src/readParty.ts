@@ -108,10 +108,11 @@ export interface PartyRoom {
   leave(): void;
 }
 
-export function joinParty({ code, identity, handlers = {} }: {
+export function joinParty({ code, identity, handlers = {}, create = true }: {
   code: string;
   identity: PartyIdentity;
   handlers?: PartyHandlers;
+  create?: boolean;
 }): PartyRoom {
   const HUB_ID = partyPeerId(code);
   const h = handlers;
@@ -129,12 +130,29 @@ export function joinParty({ code, identity, handlers = {} }: {
   let sharedAnswers: SharedAnswers | null = null;
   const chatLog: PartyChatMessage[] = [];
   let leaving = false;
+  let joined = false;
   let reelectTimer: ReturnType<typeof setTimeout> | null = null;
   let me = identity;
   const mediaConns = new Map<string, MediaConnection>();
   let reconcileTimer: ReturnType<typeof setTimeout> | null = null;
+  let connectionTimer: ReturnType<typeof setTimeout> | null = null;
 
-  const status = (s: string) => h.onStatus?.(s);
+  const status = (s: string) => {
+    if (s === 'hosting' || s === 'connected') h.onError?.('');
+    h.onStatus?.(s);
+  };
+  function watchConnection() {
+    if (connectionTimer) clearTimeout(connectionTimer);
+    connectionTimer = setTimeout(() => {
+      if (leaving) return;
+      if (joined) reelect();
+      else { status('disconnected'); h.onError?.('connection-timeout'); }
+    }, 20000);
+  }
+  function connectionReady() {
+    if (connectionTimer) clearTimeout(connectionTimer);
+    connectionTimer = null;
+  }
   const myPeerId = () => (peer && peer.id) || '';
   const capped = () => members.length > MESH_CAP;
 
@@ -182,14 +200,27 @@ export function joinParty({ code, identity, handlers = {} }: {
     broadcast({ t: 'ask', d: question });
     broadcast({ t: 'answers', d: null });
     h.onQuestion?.(question);
-    h.onAnswerList?.([]);
+    deliverAnswerList();
     h.onSharedAnswers?.(null);
   }
 
   function closeQuestionAtHub() {
     question = null;
+    answers.clear();
+    sharedAnswers = null;
     broadcast({ t: 'ask', d: null });
+    broadcast({ t: 'answers', d: null });
     h.onQuestion?.(null);
+    h.onSharedAnswers?.(null);
+    deliverAnswerList();
+  }
+
+  function deliverAnswerList() {
+    const list = [...answers.values()];
+    h.onAnswerList?.(presenterId === me.id ? list : []);
+    const host = members.find(m => m.id === presenterId);
+    const connection = host ? clientConns.get(host.peerId) : null;
+    if (connection?.open) connection.send({ t: 'answer-list', d: list });
   }
 
   function recordAnswer(answer: PartyAnswer) {
@@ -197,7 +228,7 @@ export function joinParty({ code, identity, handlers = {} }: {
     if (!question || answer.questionId !== question.id) return;
     if (!answers.has(answer.memberId) && answers.size >= 200) return;
     answers.set(answer.memberId, answer);
-    h.onAnswerList?.([...answers.values()]);
+    deliverAnswerList();
     // While the board is up, a late answer should appear on it rather than
     // waiting for the host to toggle sharing off and on again.
     if (sharedAnswers && sharedAnswers.questionId === question.id) {
@@ -221,7 +252,9 @@ export function joinParty({ code, identity, handlers = {} }: {
   function publishReading(state: ReadingState) {
     if (!state || !Number.isInteger(state.bookId) || !Number.isInteger(state.chapter)
       || !['idle','playing','paused','live'].includes(state.action)) return;
-    readingState = { ...state, highlights: (state.highlights || []).filter(v => Number.isInteger(v) && v > 0).slice(0,200), revision: ++revision, ts: Date.now() };
+    if (state.bookId < 1 || state.bookId > 66 || state.chapter < 1 || state.chapter > 150
+      || (state.verse !== null && (!Number.isInteger(state.verse) || state.verse < 1 || state.verse > 176))) return;
+    readingState = { ...state, highlights: (Array.isArray(state.highlights) ? state.highlights : []).filter(v => Number.isInteger(v) && v > 0).slice(0,200), revision: ++revision, ts: Date.now() };
     broadcast({ t: 'reading', d: readingState });
     h.onReading?.(readingState);
   }
@@ -230,6 +263,7 @@ export function joinParty({ code, identity, handlers = {} }: {
     presenterId = memberId;
     if (readingState) publishReading({ ...readingState, action: 'live' });
     emitRoster(); broadcast({ t: 'roster', d: members.slice() });
+    deliverAnswerList();
   }
 
   /* ---------------- hub: handle an incoming envelope ---------------- */
@@ -304,23 +338,30 @@ export function joinParty({ code, identity, handlers = {} }: {
     const env = raw as Envelope;
     if (!env || !env.t) return;
     if (env.t === 'welcome') {
+      connectionReady();
+      joined = true;
       const d = (env.d || {}) as { roster?: PartyMember[]; chat?: PartyChatMessage[]; reading?: ReadingState | null;
         question?: PartyQuestion | null; answers?: SharedAnswers | null };
       members = (d.roster || []).slice();
       readingState = d.reading || null;
-      (d.chat || []).forEach((m) => h.onChat?.(m));
+      chatLog.length = 0;
+      (d.chat || []).slice(-CHAT_HISTORY).forEach(recordChat);
       if (readingState) h.onReading?.(readingState);
       // Someone joining mid-question still gets the prompt and any shared board.
       question = d.question || null;
       sharedAnswers = d.answers || null;
-      if (question) h.onQuestion?.(question);
-      if (sharedAnswers) h.onSharedAnswers?.(sharedAnswers);
+      h.onQuestion?.(question);
+      h.onSharedAnswers?.(sharedAnswers);
       emitRoster();
     } else if (env.t === 'roster') {
       members = ((env.d || []) as PartyMember[]).slice();
       emitRoster();
+      pruneStaleMedia();
+      if (presenterId !== me.id) h.onAnswerList?.([]);
     } else if (env.t === 'chat') {
-      h.onChat?.(env.d as PartyChatMessage);
+      recordChat(env.d as PartyChatMessage);
+    } else if (env.t === 'answer-list') {
+      if (presenterId === me.id && Array.isArray(env.d)) h.onAnswerList?.(env.d as PartyAnswer[]);
     } else if (env.t === 'ask') {
       question = (env.d || null) as PartyQuestion | null;
       h.onQuestion?.(question);
@@ -341,17 +382,30 @@ export function joinParty({ code, identity, handlers = {} }: {
   }
   function trackCall(call: MediaConnection) {
     const pid = call.peer;
+    const previous = mediaConns.get(pid);
     mediaConns.set(pid, call);
-    call.on('stream', (s) => h.onRemoteStream?.(resolveMemberId(pid), s));
-    call.on('close', () => { mediaConns.delete(pid); h.onRemoteEnd?.(resolveMemberId(pid)); scheduleReconcile(); });
-    call.on('error', () => { mediaConns.delete(pid); h.onRemoteEnd?.(resolveMemberId(pid)); scheduleReconcile(); });
+    previous?.close();
+    call.on('stream', (s) => {
+      if (mediaConns.get(pid) === call) h.onRemoteStream?.(resolveMemberId(pid), s);
+    });
+    const ended = () => {
+      if (mediaConns.get(pid) !== call) return;
+      mediaConns.delete(pid); h.onRemoteEnd?.(resolveMemberId(pid));
+      call.close(); scheduleReconcile();
+    };
+    call.on('close', ended);
+    call.on('error', ended);
+    call.peerConnection?.addEventListener('connectionstatechange', () => {
+      if (call.peerConnection.connectionState === 'failed') ended();
+    });
   }
   function scheduleReconcile() {
+    if (leaving) return;
     if (reconcileTimer) clearTimeout(reconcileTimer);
     reconcileTimer = setTimeout(reconcileMesh, 350);
   }
   function reconcileMesh() {
-    if (capped() || !hasMedia() || !peer) return;
+    if (leaving || capped() || !hasMedia() || !peer) return;
     const stream = getLocalStream();
     if (!stream) return;
     for (const m of members) {
@@ -382,8 +436,11 @@ export function joinParty({ code, identity, handlers = {} }: {
   }
   function answerCalls() {
     peer!.on('call', (call) => {
-      call.answer(getLocalStream() || undefined);
+      if (leaving || capped()) { call.close(); return; }
+      // When both sides refresh together, keep the lower peer's outgoing call.
+      if (mediaConns.has(call.peer) && myPeerId() < call.peer) { call.close(); return; }
       trackCall(call);
+      call.answer(getLocalStream() || undefined);
     });
   }
 
@@ -395,12 +452,18 @@ export function joinParty({ code, identity, handlers = {} }: {
       try { c.send({ t: 'hello', d: { id: me.id, name: me.name, color: me.color, avatar: me.avatar || null, av: hasMedia(), mic: getState().audio, cam: getState().video, screen: getState().screen } }); } catch { /* dropped */ }
     });
     c.on('data', handleFromHub);
-    c.on('close', () => { if (!leaving) reelect(); });
-    c.on('error', () => { if (!leaving) reelect(); });
+    const lost = () => {
+      if (leaving || hubConn !== c) return;
+      if (joined) reelect(); else { status('disconnected'); h.onError?.('room-unavailable'); }
+    };
+    c.on('close', lost);
+    c.on('error', lost);
   }
 
   function startAsHub() {
+    connectionReady();
     isHub = true;
+    joined = true;
     presenterId = me.id;
     revision = readingState?.revision || 0;
     if (readingState) readingState = { ...readingState, action: 'live', revision: ++revision };
@@ -440,8 +503,10 @@ export function joinParty({ code, identity, handlers = {} }: {
     if (leaving) return;
     closeAllMedia();
     if (reelectTimer) clearTimeout(reelectTimer);
-    try { peer?.destroy(); } catch { /* ignore */ }
+    const oldPeer = peer;
     peer = null; hubConn = null;
+    clientConns.clear();
+    try { oldPeer?.destroy(); } catch { /* ignore */ }
     status('reconnecting');
     // Jitter so clients don't stampede the hub id at once.
     reelectTimer = setTimeout(connect, 300 + Math.random() * 900);
@@ -450,23 +515,42 @@ export function joinParty({ code, identity, handlers = {} }: {
   function connect() {
     if (leaving) return;
     status('connecting');
+    watchConnection();
+    if (!create && !joined) { connectAsClient(); return; }
     peer = new Peer(HUB_ID);
-    peer.on('open', () => startAsHub());
+    const attempt = peer;
+    peer.once('open', () => startAsHub());
+    keepSignalingAlive(attempt);
     peer.on('error', (e: { type?: string }) => {
+      if (leaving || peer !== attempt) return;
       const type = e?.type || String(e);
       if (type === 'unavailable-id') {
         // Someone already hosts this party → join as a client.
         try { peer?.destroy(); } catch { /* ignore */ }
-        peer = new Peer();
-        peer.on('open', () => startAsClient());
-        peer.on('error', (e2: { type?: string }) => {
-          const t2 = e2?.type || String(e2);
-          if (t2 === 'peer-unavailable' && !leaving) reelect(); // hub vanished mid-join
-          else if (!leaving) h.onError?.(t2);
-        });
+        connectAsClient();
       } else if (!leaving) {
         h.onError?.(type);
       }
+    });
+  }
+
+  function connectAsClient() {
+    peer = new Peer();
+    const attempt = peer;
+    peer.once('open', startAsClient);
+    keepSignalingAlive(attempt);
+    peer.on('error', (error: { type?: string }) => {
+      if (leaving || peer !== attempt) return;
+      if (error.type === 'peer-unavailable' && joined) reelect();
+      else { status('disconnected'); h.onError?.(error.type === 'peer-unavailable' ? 'room-unavailable' : error.type || 'connection-error'); }
+    });
+  }
+
+  function keepSignalingAlive(candidate: Peer) {
+    candidate.on('disconnected', () => {
+      if (leaving || peer !== candidate || candidate.destroyed) return;
+      // Existing WebRTC streams can stay live while the signaling socket returns.
+      try { candidate.reconnect(); } catch { h.onError?.('signaling-disconnected'); }
     });
   }
 
@@ -514,6 +598,7 @@ export function joinParty({ code, identity, handlers = {} }: {
     },
     leave() {
       leaving = true;
+      connectionReady();
       closeAllMedia();
       if (reelectTimer) clearTimeout(reelectTimer);
       if (reconcileTimer) clearTimeout(reconcileTimer);

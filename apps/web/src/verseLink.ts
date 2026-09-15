@@ -11,7 +11,9 @@ export function verseHash(bookId: number, chapter: number, verse: number): strin
 }
 
 export function parseVerseHash(hash: string): ParsedReference | null {
-  const raw = decodeURIComponent(String(hash || '').replace(/^#/, '')).trim();
+  let raw: string;
+  try { raw = decodeURIComponent(String(hash || '').replace(/^#/, '')).trim(); }
+  catch { return null; }
   if (!raw || raw === 'read' || raw.toLowerCase().startsWith('restore=')) return null;
   const match = raw.match(/^(.+)[.-](\d+)[.-](\d+)$/);
   if (!match) return null;
@@ -28,7 +30,7 @@ export function verseShareUrl(bookId: number, chapter: number, verse: number): s
 export function readerViewFromHash(hash = typeof window === 'undefined' ? '' : window.location.hash): 'home' | 'reader' {
   if (!hash || hash === '#') return 'home';
   if (hash.toLowerCase().startsWith('#restore=')) return 'home';
-  if (hash === '#read' || parseVerseHash(hash)) return 'reader';
+  if (hash === '#read' || /^#group=[a-z0-9-]{1,40}$/i.test(hash) || parseVerseHash(hash)) return 'reader';
   return 'home';
 }
 

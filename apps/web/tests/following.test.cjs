@@ -20,9 +20,9 @@ function harness(){
   const modules={react:React,'./readParty':{joinParty(options){handlers=options.handlers;return room;}},'./identity':{loadIdentity:()=>identity,saveIdentity(){},compressAvatar(){}},'./media':{getLocalStream:()=>null,setMedia:async()=>{},stopLocal(){},unlockRemoteAudio(){},setDevices(){}}};
   const exports={};const code=ts.transpileModule(fs.readFileSync(require('node:path').join(__dirname,'../src/useReadParty.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText;
   vm.runInNewContext(code,{exports,require:id=>modules[id],setInterval,clearInterval,Date,Math});
-  function flush(){dirty=true;let n=0;while(dirty){if(++n>40)throw Error('Hook render loop');dirty=false;cursor=0;effects=[];result=exports.useReadParty(app);effects.forEach(f=>f());}return result;}
+  function flush(){dirty=true;let n=0;while(dirty){if(++n>40)throw Error('Hook render loop');dirty=false;cursor=0;effects=[];result=exports.useReadParty({...app});effects.forEach(f=>f());}return result;}
   flush();
-  return {app,sent,spoken,flush,get current(){return result;},join(isHost){result.joinParty('test');flush();host=isHost;handlers.onStatus(isHost?'hosting':'connected');handlers.onRoster([],{host:isHost,capped:false});flush();},receive(state){handlers.onReading(state);return flush();},dispose(){slots.forEach(s=>s?.cleanup?.());}};
+  return {app,sent,spoken,flush,get current(){return result;},join(isHost){result.joinParty('test');flush();host=isHost;handlers.onStatus(isHost?'hosting':'connected');handlers.onRoster([],{host:isHost,capped:false});flush();},role(isHost){handlers.onRoster([],{host:isHost,capped:false});flush();},receive(state){handlers.onReading(state);return flush();},dispose(){slots.forEach(s=>s?.cleanup?.());}};
 }
 const reading={bookId:43,chapter:3,verse:16,highlights:[16,17],action:'playing',ts:1};
 test('host private navigation and selections do not change shared passage',()=>{
@@ -31,6 +31,13 @@ test('host private navigation and selections do not change shared passage',()=>{
   h.current.browseIndependently();h.app.goTo(1,2);h.flush();assert.equal(h.sent.at(-1).bookId,43);assert.equal(h.sent.at(-1).chapter,3);
   h.current.showGroup([4]);h.flush();assert.equal(h.sent.at(-1).bookId,1);assert.equal(h.sent.at(-1).chapter,2);
  }finally{h.dispose();}
+});
+test('the original connection host follows after handing presentation to someone else',()=>{
+  const h=harness();try{
+    h.join(true);h.role(false);h.receive(reading);
+    assert.deepEqual(h.spoken,[16]);
+    assert.equal(h.current.stageVerse,16);
+  }finally{h.dispose();}
 });
 test('joining auto-follows; heartbeat does not restart audio; mute keeps highlights; private browse stays private',()=>{
  const h=harness();try{

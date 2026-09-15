@@ -21,6 +21,9 @@ let sysAudioStream: MediaStream | null = null;
 let sysGain: GainNode | null = null;
 let sysVolume = readSystemAudioVolume();
 let localStream: MediaStream | null = null;
+let cameraRequest = 0;
+let screenRequest = 0;
+let systemRequest = 0;
 let audioCtx: AudioContext | null = null;
 let gateTimer = 0;
 let voiceFilter = readVoiceFilterPref();
@@ -54,7 +57,9 @@ function stopTracks(stream: MediaStream | null) {
 
 function readSystemAudioVolume(): number {
   try {
-    const raw = Number(localStorage.getItem(SYS_VOLUME_KEY));
+    const saved = localStorage.getItem(SYS_VOLUME_KEY);
+    if (saved === null) return 0.8;
+    const raw = Number(saved);
     return Number.isFinite(raw) && raw >= 0 && raw <= 1 ? raw : 0.8;
   } catch { return 0.8; }
 }
@@ -231,6 +236,7 @@ function rebuild() {
 }
 
 export async function setMedia({ audio, video }: { audio: boolean; video: boolean }) {
+  const request = ++cameraRequest;
   const want = { audio: Boolean(audio), video: Boolean(video) };
   if (!want.audio && !want.video) {
     stopTracks(camStream);
@@ -242,6 +248,10 @@ export async function setMedia({ audio, video }: { audio: boolean; video: boolea
     audio: want.audio ? { echoCancellation: true, noiseSuppression: true, autoGainControl: true, ...(devices.microphone ? { deviceId: { exact: devices.microphone } } : {}) } : false,
     video: want.video ? { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user', ...(devices.camera ? { deviceId: { exact: devices.camera } } : {}) } : false,
   });
+  if (request !== cameraRequest) {
+    stopTracks(fresh);
+    throw new DOMException('Capture request superseded', 'AbortError');
+  }
   stopTracks(camStream);
   camStream = fresh;
   rebuild();
@@ -255,10 +265,15 @@ export async function setMedia({ audio, video }: { audio: boolean; video: boolea
  * `onEnded` fires when the viewer stops sharing from the browser's own bar.
  */
 export async function startScreenShare({ withAudio, onEnded }: { withAudio: boolean; onEnded?: () => void }) {
+  const request = ++screenRequest;
   const display = await navigator.mediaDevices.getDisplayMedia({
     video: { frameRate: { ideal: 15, max: 30 } },
     audio: withAudio,
   });
+  if (request !== screenRequest) {
+    stopTracks(display);
+    throw new DOMException('Screen request superseded', 'AbortError');
+  }
   const video = display.getVideoTracks()[0];
   if (!video) {
     stopTracks(display);
@@ -266,7 +281,7 @@ export async function startScreenShare({ withAudio, onEnded }: { withAudio: bool
   }
   stopTracks(screenStream);
   screenStream = display;
-  video.addEventListener('ended', () => { onEnded?.(); }, { once: true });
+  video.addEventListener('ended', () => { if (screenStream === display) onEnded?.(); }, { once: true });
   rebuild();
   return { stream: localStream, gotAudio: display.getAudioTracks().length > 0 };
 }
@@ -283,7 +298,12 @@ export async function startScreenShare({ withAudio, onEnded }: { withAudio: bool
  * left unticked rather than a browser that cannot do it.
  */
 export async function startSystemAudio({ onEnded }: { onEnded?: () => void }) {
+  const request = ++systemRequest;
   const display = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+  if (request !== systemRequest) {
+    stopTracks(display);
+    throw new DOMException('Audio request superseded', 'AbortError');
+  }
   const audio = display.getAudioTracks();
   // Drop the picture the moment we have it; only the sound is wanted.
   for (const track of display.getVideoTracks()) {
@@ -295,12 +315,13 @@ export async function startSystemAudio({ onEnded }: { onEnded?: () => void }) {
   }
   stopTracks(sysAudioStream);
   sysAudioStream = display;
-  audio[0].addEventListener('ended', () => { onEnded?.(); }, { once: true });
+  audio[0].addEventListener('ended', () => { if (sysAudioStream === display) onEnded?.(); }, { once: true });
   rebuild();
   return localStream;
 }
 
 export function stopSystemAudio() {
+  systemRequest += 1;
   stopTracks(sysAudioStream);
   sysAudioStream = null;
   rebuild();
@@ -308,6 +329,7 @@ export function stopSystemAudio() {
 }
 
 export function stopScreenShare() {
+  screenRequest += 1;
   stopTracks(screenStream);
   screenStream = null;
   rebuild();
@@ -315,6 +337,9 @@ export function stopScreenShare() {
 }
 
 export function stopLocal() {
+  cameraRequest += 1;
+  screenRequest += 1;
+  systemRequest += 1;
   stopTracks(camStream);
   stopTracks(screenStream);
   stopTracks(sysAudioStream);

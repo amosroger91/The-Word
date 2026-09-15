@@ -5,16 +5,26 @@ const vm = require('node:vm');
 const {EventEmitter} = require('node:events');
 const ts = require('typescript');
 
-function harness() {
+function harness({media = false} = {}) {
   let sequence=0;
   class Connection extends EventEmitter {
     constructor(peer) { super(); this.peer=peer; this.open=false; }
     send(data) { if(this.open) queueMicrotask(()=>this.other.emit('data',structuredClone(data))); }
     close() { if(!this.open)return; this.open=false; this.other.open=false; this.emit('close');this.other.emit('close'); }
   }
+  class Call extends EventEmitter {
+    constructor(peer) { super(); this.peer=peer; this.open=true; }
+    answer(stream) {
+      queueMicrotask(()=>{if(this.open){this.emit('stream',this.other.stream);this.other.emit('stream',stream);}});
+    }
+    close() {
+      if(!this.open)return;
+      this.open=false;this.other.open=false;this.emit('close');this.other.emit('close');
+    }
+  }
   class Peer extends EventEmitter {
     static registry=new Map();
-    constructor(id) { super(); this.id=id||`client-${++sequence}`; this.connections=[]; queueMicrotask(()=>{
+    constructor(id) { super(); this.id=id||`client-${++sequence}`; this.connections=[];this.calls=[]; queueMicrotask(()=>{
       if(this.dead)return;
       if(Peer.registry.has(this.id))this.emit('error',{type:'unavailable-id'});
       else {Peer.registry.set(this.id,this);this.emit('open',this.id);}
@@ -27,12 +37,17 @@ function harness() {
         remote.emit('connection',b);a.open=true;b.open=true;b.emit('open');a.emit('open');
       }); return a;
     }
+    call(id,stream) {
+      const remote=Peer.registry.get(id);if(!remote)throw new Error('unavailable');
+      const a=new Call(id),b=new Call(this.id);a.other=b;b.other=a;a.stream=stream;
+      this.calls.push(a);remote.calls.push(b);queueMicrotask(()=>remote.emit('call',b));return a;
+    }
     destroy(){this.dead=true;if(Peer.registry.get(this.id)===this)Peer.registry.delete(this.id);this.connections.forEach(c=>c.close());}
   }
   const source=fs.readFileSync(require('node:path').join(__dirname,'../src/readParty.ts'),'utf8');
   const js=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText;
   const exports={};
-  vm.runInNewContext(js,{exports,require:(id)=>id==='peerjs'?{Peer}:{getLocalStream:()=>null,hasMedia:()=>false,getState:()=>({audio:false,video:false})},setTimeout,clearTimeout,Date,Math,Map,Set});
+  vm.runInNewContext(js,{exports,require:(id)=>id==='peerjs'?{Peer}:{getLocalStream:()=>media?{id:'test-stream'}:null,hasMedia:()=>media,getState:()=>({audio:media,video:false})},setTimeout,clearTimeout,Date,Math,Map,Set});
   return {join:exports.joinParty,Peer};
 }
 const tick=()=>new Promise(resolve=>setTimeout(resolve,30));
@@ -182,4 +197,43 @@ test('closing the question clears it everywhere', async () => {
   } finally {
     host.leave(); guest.leave();
   }
+});
+
+test('five people stay connected through simultaneous media refresh and host handoff', async () => {
+  const {join,Peer}=harness({media:true});
+  const rooms=[],seen=[];
+  try {
+    for(let i=0;i<5;i++) {
+      const state={streams:new Set(),questions:[],answers:[]};seen.push(state);
+      rooms.push(join({code:'five-readers',identity:{id:`reader-${i}`,name:`Reader ${i}`,color:'#888'},handlers:{
+        onRemoteStream:id=>state.streams.add(id),onRemoteEnd:id=>state.streams.delete(id),
+        onQuestion:q=>state.questions.push(q),onAnswerList:a=>state.answers.push(a),
+      }}));await tick();
+    }
+    await new Promise(r=>setTimeout(r,500));
+    seen.forEach(s=>assert.equal(s.streams.size,4));
+    const oldCalls=[...Peer.registry.values()].flatMap(p=>p.calls);
+    rooms.forEach(room=>room.refreshMedia());
+    await new Promise(r=>setTimeout(r,800));
+    // A delayed close event from a replaced call cannot remove the new stream.
+    oldCalls.forEach(call=>call.emit('close'));
+    seen.forEach(s=>assert.equal(s.streams.size,4));
+    assert.equal([...Peer.registry.values()].flatMap(p=>p.calls).filter(c=>c.open).length,20);
+    rooms[0].transferHost('reader-1');await tick();
+    rooms[1].askQuestion('What stands out?');await tick();
+    const q=seen[1].questions.at(-1);
+    rooms[4].sendAnswer(q.id,'The promise.');await tick();
+    assert.equal(seen[1].answers.at(-1)[0].text,'The promise.');
+    assert.equal(seen[0].answers.at(-1).length,0,'former host must not receive private answers');
+    rooms[1].transferHost('reader-2');await tick();
+    assert.equal(seen[2].answers.at(-1)[0].text,'The promise.');
+    assert.equal(seen[1].answers.at(-1).length,0);
+  } finally {rooms.forEach(room=>room.leave());}
+});
+
+test('an invite to a missing room never claims its host ID',async()=>{
+  const {join,Peer}=harness();const errors=[];
+  const room=join({code:'missing',create:false,identity:{id:'guest',name:'Guest',color:'#888'},handlers:{onError:e=>errors.push(e)}});
+  try {await tick();assert.equal(room.isHost,false);assert.equal(Peer.registry.has('tw-party-missing'),false);assert.ok(errors.includes('room-unavailable'));}
+  finally{room.leave();}
 });

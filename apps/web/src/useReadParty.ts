@@ -42,7 +42,9 @@ export function useReadParty(app: WordApp) {
   const [systemAudioOn, setSystemAudioOn] = useState(false);
   const [systemAudioVolume, setSystemAudioVolumeState] = useState(getSystemAudioVolume);
   const [voiceFilter, setVoiceFilterState] = useState(getVoiceFilter);
-  const autoMicRef = useRef(false);
+  const roomRef = useRef<PartyRoom | null>(null);
+  const capturePending = useRef(false);
+  const [mediaBusy, setMediaBusy] = useState(false);
   const [screenOn, setScreenOn] = useState(false);
   const [screenStream, setScreenStreamState] = useState<MediaStream | null>(null);
   const [screenHasAudio, setScreenHasAudio] = useState(false);
@@ -58,6 +60,7 @@ export function useReadParty(app: WordApp) {
   const [findable, setFindable] = useState(false);
 
   const identityRef = useRef(loadIdentity());
+  const sessionIdRef = useRef(identityRef.current.id);
   const [name, setNameValue] = useState(identityRef.current.name);
   const [avatar, setAvatarValue] = useState<string | null>(identityRef.current.avatar);
   // The last reading state the HOST broadcast, so we don't re-send identical updates.
@@ -66,9 +69,12 @@ export function useReadParty(app: WordApp) {
   // same verse on every heartbeat (which would stutter). Reset when position resets.
   const spokenVerseRef = useRef<number | null>(null);
 
-  const startParty = useCallback((joinCode: string, opts?: { armed?: boolean; findable?: boolean }) => {
+  const startParty = useCallback((joinCode: string, opts?: { armed?: boolean; findable?: boolean; create?: boolean }) => {
+    if (roomRef.current) return;
     const clean = joinCode.trim().toLowerCase();
     if (!clean) return;
+    // Account identity is stable; membership belongs to this tab's room session.
+    sessionIdRef.current = `${identityRef.current.id}-${Math.random().toString(36).slice(2, 10)}`;
     appRef.current.stopSpeech(); setShared(null); setPresenting(false); setNarrationMuted(false);
     setError(''); setMessages([]); setMembers([]); setRemoteReading(null);
     setArmed(Boolean(opts?.armed)); setFollowing(true); lastSentRef.current = '';
@@ -77,12 +83,13 @@ export function useReadParty(app: WordApp) {
     setFindable(Boolean(opts?.findable));
     const r = joinParty({
       code: clean,
-      identity: identityRef.current,
+      create: Boolean(opts?.create),
+      identity: { ...identityRef.current, id: sessionIdRef.current },
       handlers: {
         onStatus: setStatus,
         onSelf: ({ host }) => setIsHost(host),
         onRoster: (list, meta) => { setMembers(list); setIsHost(meta.host); setCapped(meta.capped); },
-        onChat: (msg) => setMessages((prev) => [...prev.slice(-199), msg]),
+        onChat: (msg) => setMessages((prev) => prev.some(item => item.id === msg.id) ? prev : [...prev.slice(-199), msg]),
         onQuestion: (next) => {
           setQuestion(next);
           // A fresh question re-opens the prompt even for someone who answered the last one.
@@ -103,14 +110,18 @@ export function useReadParty(app: WordApp) {
       },
     });
     setCode(clean);
+    roomRef.current = r;
     setRoom(r);
   }, []);
 
-  const createParty = useCallback((opts?: { findable?: boolean }) => startParty(randomCode(), { armed: true, findable: opts?.findable }), [startParty]);
+  const createParty = useCallback((opts?: { findable?: boolean }) => startParty(randomCode(), { create: true, armed: true, findable: opts?.findable }), [startParty]);
 
   const leaveParty = useCallback(() => {
     appRef.current.stopSpeech();
     room?.leave();
+    roomRef.current = null;
+    capturePending.current = false;
+    setMediaBusy(false);
     setShared(null); setPresenting(false);
     stopLocal();
     setLocalStream(null); setMicOn(false); setCamOn(false); setRemoteStreams({});
@@ -123,54 +134,39 @@ export function useReadParty(app: WordApp) {
     lastSentRef.current = '';
   }, [room]);
 
-  const sendChat = useCallback((text: string) => { room?.sendChat(text); }, [room]);
+  const sendChat = useCallback((text: string) => {
+    if (!room || (status !== 'connected' && status !== 'hosting')) { setError('connection-not-ready'); return false; }
+    room.sendChat(text); return true;
+  }, [room, status]);
   const arm = useCallback(() => {
     spokenVerseRef.current = null;
     setArmed(true);
   }, []);
 
   const applyMedia = useCallback(async (audio: boolean, video: boolean) => {
-    if (!room) return;
+    if (!room || capturePending.current) return;
+    capturePending.current = true;
+    setMediaBusy(true);
     setMediaError('');
     try {
       await setMedia({ audio, video });
+      if (roomRef.current !== room) return;
       setMicOn(audio);
       setCamOn(video);
       // The self tile shows your camera; peers receive the composite from media.ts.
       setLocalStream(getCameraStream());
       room.refreshMedia();
-    } catch {
-      setMicOn(false);
-      setCamOn(false);
-      setLocalStream(null);
-      stopLocal();
-      room.refreshMedia();
+    } catch (error) {
+      if (roomRef.current !== room || (error as Error).name === 'AbortError') return;
+      // A refused camera must not tear down an already working microphone.
       setMediaError('denied');
+    } finally {
+      if (roomRef.current === room) { capturePending.current = false; setMediaBusy(false); }
     }
   }, [room]);
 
-  // Join with your voice already live, rather than everyone opening on mute and
-   // asking "can you hear me?". A refusal here is deliberately SILENT: the mic
-  // button still works, and nagging on every join is worse than a quiet no.
-  useEffect(() => {
-    if (!room || status !== 'connected') {
-      if (!room) autoMicRef.current = false;
-      return;
-    }
-    if (autoMicRef.current) return;
-    autoMicRef.current = true;
-    void (async () => {
-      try {
-        await setMedia({ audio: true, video: false });
-        setMicOn(true);
-        setLocalStream(getCameraStream());
-        unlockRemoteAudio();
-        room.refreshMedia();
-      } catch {
-        // No device, or permission refused. Leave the mic off and stay quiet.
-      }
-    })();
-  }, [room, status]);
+  // Joining follows Scripture immediately; capture starts only from the visible
+  // microphone/camera controls, matching the join screen's promise.
 
   const setVoiceFiltering = useCallback((on: boolean) => {
     applyVoiceFilter(on);
@@ -209,11 +205,12 @@ export function useReadParty(app: WordApp) {
 
   const sendAnswer = useCallback((text: string) => {
     if (!room || !question) return;
+    if (status !== 'connected' && status !== 'hosting') { setError('connection-not-ready'); return; }
     const clean = text.trim();
     if (!clean) return;
     room.sendAnswer(question.id, clean);
     setAnsweredId(question.id);
-  }, [room, question]);
+  }, [room, question, status]);
 
   /** Dismiss the prompt without replying. Nothing is sent. */
   const skipQuestion = useCallback(() => {
@@ -234,9 +231,11 @@ export function useReadParty(app: WordApp) {
         // The browser's own "stop sharing" bar, rather than our button.
         onEnded: () => { stopSystemAudio(); setSystemAudioOn(false); room.refreshMedia(); },
       });
+      if (roomRef.current !== room) return;
       setSystemAudioOn(true);
       room.refreshMedia();
     } catch (error) {
+      if (roomRef.current !== room || (error as Error).name === 'AbortError') return;
       const name = (error as { name?: string; message?: string });
       if (name.name === 'NotAllowedError') return;   // picker dismissed
       setMediaError(name.message === 'system-audio-none' ? 'system-audio-none' : 'system-audio');
@@ -272,6 +271,7 @@ export function useReadParty(app: WordApp) {
           room.refreshMedia();
         },
       });
+      if (roomRef.current !== room) return;
       setScreenOn(true);
       setScreenStreamState(getScreenStream());
       setScreenHasAudio(gotAudio);
@@ -280,6 +280,7 @@ export function useReadParty(app: WordApp) {
       if (withAudio && !gotAudio) setMediaError('screen-audio');
       room.refreshMedia();
     } catch (error) {
+      if (roomRef.current !== room || (error as Error).name === 'AbortError') return;
       // Dismissing the picker is not a failure.
       if ((error as { name?: string }).name === 'NotAllowedError') return;
       setMediaError('screen');
@@ -303,7 +304,10 @@ export function useReadParty(app: WordApp) {
   const setFocusVerse = useCallback((verse: number) => showGroup([verse]), [showGroup]);
   const liveFloor = shared?.action === 'live';
 
-  useEffect(() => () => { room?.leave(); }, [room]);
+  useEffect(() => () => {
+    room?.leave();
+    if (room && roomRef.current === room) { roomRef.current = null; stopLocal(); }
+  }, [room]);
 
   // Leadership changes stop old narration before the new host deliberately starts.
   useEffect(() => {
@@ -383,7 +387,10 @@ export function useReadParty(app: WordApp) {
   // host's passage AND current verse, reading each verse with the local TTS.
   useEffect(() => {
     if (!room || isHost || !remoteReading || !following) return;
-    if (status !== 'connected') { appRef.current.stopSpeech(); spokenVerseRef.current = null; return; }
+    if (status !== 'connected' && status !== 'hosting') {
+      if (app.speechState !== 'idle') appRef.current.stopSpeech();
+      spokenVerseRef.current = null; return;
+    }
     const rs = remoteReading;
     // 1. Follow the host to the passage first; re-runs once the new chapter loads.
     if (app.bookId !== rs.bookId || app.chapterNumber !== rs.chapter) {
@@ -469,7 +476,8 @@ export function useReadParty(app: WordApp) {
     arm,
     needsArm,
     hostVerse,
-    identity: identityRef.current,
+    identity: { ...identityRef.current, id: sessionIdRef.current },
+    mediaBusy,
     name,
     setName,
     avatar,

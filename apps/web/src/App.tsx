@@ -4,6 +4,7 @@ import { useWordApp, verseImageFilename, verseRuns, type WordApp } from '@the-wo
 import { SearchableSelect } from './SearchableSelect';
 import { BookBibleIcon, CamIcon, MicIcon, ScreenIcon, SpeakerIcon, VolumeHighIcon, VolumeLowIcon } from './icons';
 import { ScreenStage } from './ScreenStage';
+import { groupInviteUrl, parseGroupHash } from './groupLink';
 import { AnswerBoard, HostQuestionPanel, QuestionPrompt } from './GroupQuestion';
 import { ToolDock, useTools, type ToolId } from './ToolDock';
 import { PassageTools, snapshot, type PassageSnapshot } from './PassageTools';
@@ -68,10 +69,12 @@ function App() {
   const reminder = useDailyReminder({ title: label.reminderTitle, body: label.reminderBody });
   const activeTopic = app.topics.find((topic) => topic.id === app.selectedTopic);
   const tools = useTools();
+  const toolsRef = useRef(tools);
+  toolsRef.current = tools;
   const restorePrefill = useMemo(() => takeRestoreToken() ?? '', []);
   const welcome = useWelcome();
   const [library, setLibrary] = useState<'books'|'search'|'bookmarks'|null>(null);
-  const [partyCode, setPartyCode] = useState('');
+  const [partyCode, setPartyCode] = useState(() => parseGroupHash(window.location.hash) ?? '');
   const [partyChat, setPartyChat] = useState('');
   const [createFindable, setCreateFindable] = useState(false);
   const [view, setView] = useState<'home'|'reader'>(viewFromHash);
@@ -122,6 +125,31 @@ function App() {
     if (window.location.hash !== '#read') window.location.hash = 'read';
     else setView('reader');
   }, []);
+
+  useEffect(() => {
+    const openInvite = () => {
+      const code = parseGroupHash(window.location.hash);
+      if (!code) return;
+      setPartyCode(code);
+      setView('reader');
+      setLibrary(null);
+      setMobileView('tools');
+      toolsRef.current.open('group');
+    };
+    openInvite();
+    window.addEventListener('hashchange', openInvite);
+    return () => window.removeEventListener('hashchange', openInvite);
+  }, []);
+
+  const copyInvite = async () => {
+    const url = groupInviteUrl(party.code, window.location.href);
+    try {
+      await navigator.clipboard.writeText(url);
+      setNotice('Invite link copied. Send it to your study group.');
+    } catch {
+      setNotice(`Copy this invite link: ${url}`);
+    }
+  };
 
   const openHome = useCallback(() => {
     if (window.location.hash && window.location.hash !== '') window.location.hash = '';
@@ -296,7 +324,7 @@ function App() {
       <button className="primary" onClick={()=>{speech.unlock?.();unlockRemoteAudio();party.createParty({findable:createFindable});}}>Start a group</button>
       <form className="join-form" onSubmit={e=>{e.preventDefault();speech.unlock?.();unlockRemoteAudio();party.joinParty(partyCode);}}><label>Have a room code?<input aria-label="Room code" value={partyCode} onChange={e=>setPartyCode(e.target.value)} placeholder="Enter code"/></label><button disabled={!partyCode.trim()}>Join group</button></form>
       <h3>Open study groups</h3>{liveGroups.length?liveGroups.map(item=><button className="party-live-item" key={item.code} onClick={()=>{speech.unlock?.();unlockRemoteAudio();party.joinParty(item.code);}}><strong>{item.hostName}</strong><span>{item.members} people · Join group</span></button>):<p className="muted">No public groups are live right now.</p>}
-    </> : <><div className="group-summary"><span className="workspace-eyebrow">{party.isHost?'You are hosting':`Hosted by ${hostName}`}</span><h2>{stageReference}</h2><p>{partyStatusText(party.status,label)} · {party.members.length} people</p><button onClick={()=>{void navigator.clipboard.writeText(party.code).then(()=>setNotice('Room code copied.')).catch(()=>setNotice(`Room code: ${party.code}`));}}>Copy code · {party.code}</button></div>
+    </> : <><div className="group-summary"><span className="workspace-eyebrow">{party.isHost?'You are hosting':`Hosted by ${hostName}`}</span><h2>{stageReference}</h2><p>{partyStatusText(party.status,label)} · {party.members.length} people</p><button onClick={copyInvite}>Copy invite link</button><p>Room code: <strong>{party.code}</strong></p>{parseGroupHash(window.location.hash) && parseGroupHash(window.location.hash)!==party.code && <p role="status">This invitation is for room {partyCode}. Leave your current room before joining it.</p>}</div>
       <details className="people-list"><summary>People & host controls ({party.members.length})</summary>{party.members.map(member=><div className="member-row" key={member.id}><span className="member-avatar" style={{background:member.color}}>{member.avatar?<img src={member.avatar} alt=""/>:member.name.slice(0,1)}</span><span>{member.name}{member.id===party.identity.id?' (you)':''}<small>{member.host?'Host':member.mic?'Microphone on':'Microphone off'}</small></span>{party.isHost && member.id!==party.identity.id && <button onClick={()=>party.transferHost(member.id)}>Make host</button>}</div>)}<p className="muted">Passing the host role pauses group narration. The new host chooses when to resume.</p></details>
       {party.isHost&&<HostQuestionPanel question={party.question} answers={party.answerList} sharing={party.sharingAnswers} onAsk={party.askQuestion} onClose={party.closeQuestion} onShare={party.shareAnswers}/>}
       <div className="party-chat"><h3>Conversation</h3><div className="party-messages" role="log" aria-label="Group messages" aria-live="polite">{party.messages.map(msg=>msg.kind==='system'?<div className="party-msg system" key={msg.id}>{msg.event==='joined'?label.partyJoined(msg.name||''):msg.event==='left'?label.partyLeft(msg.name||''):msg.text}</div>:<div className="party-msg" key={msg.id}><strong>{msg.name}</strong><span>{msg.text}</span></div>)}</div><form onSubmit={e=>{e.preventDefault();if(partyChat.trim()){party.sendChat(partyChat);setPartyChat('');}}}><input aria-label="Message the group" placeholder="Share a thought…" maxLength={2000} value={partyChat} onChange={e=>setPartyChat(e.target.value)}/><button disabled={!partyChat.trim()}>Send</button></form></div>
