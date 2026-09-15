@@ -1,7 +1,28 @@
 # The Word — working notes / TODO
 
-Status as of 2026-09-04. Live site: https://amosroger91.github.io/The-Word/
+Status as of 2026-09-15. Live site: https://amosroger91.github.io/The-Word/
 Deploy: `bash scripts/deploy-pages.sh` (builds `apps/web`, force-pushes `dist/` to `gh-pages`). No CI — see "Why no CI" below.
+Working branch is `codex/landing-redesign`, tracking `origin/main` — pushing it pushes straight to `main` on GitHub, this is not a stray branch.
+
+## Recently shipped (this session, committed locally, not yet pushed)
+
+Reliability sweep (commit `2b1f27b`), fixing five ways the app or relay could get stuck or silently lose data rather than degrade:
+- Added `apps/web/src/ErrorBoundary.tsx`, wired into `main.tsx`. There was no error boundary at all before this — any render-time throw in any feature (Group Study mesh, breakdown panel, a bad bookmark entry) white-screened the whole reader. Fallback: Reload, plus a confirmed "clear word.* local data" escape hatch for a corrupted-state crash loop.
+- `packages/core/src/useWordApp.ts`: chapter/search-loading effects had no `.catch`. A rejected dynamic import (flaky network, or a stale tab after a redeploy changes chunk hashes) left `chapterLoading`/`searchLoading` stuck `true` forever — a permanent spinner on the core reading feature. Chapter load now retries once, then falls back to the existing "chapter not available" state; search clears to no-results; cross-ref loading no longer leaves an unhandled rejection either.
+- `apps/web/src/nostrAccount.ts` `loadAccount()`: a present-but-unparseable `word.account` record (torn write, bad version, corrupt key bytes) silently minted and persisted a brand-new random identity over it — irreversible by this app's own no-recovery design, with zero warning shown anywhere. Now logs loudly and preserves the unreadable bytes under a `word.account.corrupted.*` key before minting a replacement.
+- `apps/web/src/gunGraph.ts`: `pushRelays`/`pullRelays` had no fetch timeout. A relay that accepts the TCP connection but never answers hung sync indefinitely, and `pullRelays` loops relays sequentially, so one stuck relay blocked every relay listed after it. Added a 10s `AbortController` timeout (`fetchWithTimeout`), falls into the existing try/catch as "relay down."
+- `services/relay/server.mjs` `readBody()` buffered an unbounded request body before any size check ran — a large POST could exhaust the process's memory before `acceptable()`'s per-node size check ever got a chance to reject it. Capped at 256KB, connection dropped over that. Hardened `json()` to no-op instead of throwing when writing to an already-destroyed socket (the exact path the new cap exercises via `req.destroy()`). Added process-level `uncaughtException`/`unhandledRejection` logging as a backstop. Added a relay test proving the server survives and keeps serving after an oversized raw upload (`services/relay/test.mjs`, now 12/12 passing).
+
+Verified: `npm --prefix packages/core run typecheck` and `npm --prefix apps/web run typecheck` both clean, `node services/relay/test.mjs` 12/12, production `build:web` succeeds, and a live dev-server smoke test (landing → onboarding skip → reader → chapter nav) showed zero console errors. **Not pushed or deployed yet** — was asked for a stability sweep, not a ship; push + `deploy-pages.sh` still need running.
+
+Added a `.claude/launch.json` entry named `the-word` in the Wellspring-website session's config (this repo has no `.claude/` of its own) so the dev server can be driven via `preview_start` in future sessions from there.
+
+### Deliberately left alone (found, not fixed — lower priority / different shape of fix needed)
+From the same sweep, reported by an Explore-agent pass over WebRTC/media/timers/localStorage:
+- Relay `nodes` Map (in-memory) and the per-account `quota` Map both grow unbounded with no eviction — fine at "single small relay" scale per its own design comment, would need real accounting if usage grows a lot.
+- Relay's `persistNode`/`writeJson` use synchronous `fs` calls that block the event loop under write bursts (soft latency, not a crash) — again a scale question, not an active bug today.
+- `useReadParty.ts` calls `room?.leave()` twice on a manual party exit (once explicitly, once from the unmount-cleanup effect closing over the old room). `PartyRoom.leave()` is idempotent, so this is cosmetic only.
+- `media.ts`, `readParty.ts`, `studyBoard.ts`, `FaceRail.tsx`/`ScreenStage.tsx`, `breakdown/client.ts`, `ledger.ts` were all checked and found already solid: every `getUserMedia`/`getDisplayMedia` track stopped on every teardown path, every timer/interval tracked and cleared, all storage reads wrapped in try/catch with sane fallbacks, the breakdown pipeline already has a 30s per-request timeout and full `.then/.catch/.finally`.
 
 ## Requested, not yet started
 
