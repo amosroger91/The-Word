@@ -226,6 +226,13 @@ export function loadAccount(): WordAccount {
   if (stored) {
     const parsed = parseStored(stored);
     if (parsed) return persist(parsed);
+    // A record was present but unusable (corrupted JSON, a version we do not
+    // recognise, bad key bytes — e.g. a torn write during a crash). Minting a
+    // replacement below is the only way to keep the app usable, but that mint
+    // is otherwise silent and, per the no-recovery design above, irreversible.
+    // Keep the raw bytes under a side key so the original is not simply gone.
+    console.error('word.account could not be read; a new account key is being minted. The unreadable value was preserved under a word.account.corrupted.* key.');
+    writeStorage(`${ACCOUNT_KEY}.corrupted.${Date.now()}`, stored);
   }
   return persist(accountFromSecret(generateSecretKey(), legacyProfile()));
 }

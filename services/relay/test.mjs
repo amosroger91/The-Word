@@ -99,6 +99,21 @@ try {
   const h = await post('/v1/put', huge);
   check('an oversized node is rejected', h.status === 400 && h.body.error === 'too-big', JSON.stringify(h.body));
 
+  // A raw body well past any single node's legitimate size is cut off before it
+  // is ever buffered whole. The connection may just drop client-side — what
+  // matters is the server process survives it and keeps answering afterward.
+  let rawOversizeSurvived = true;
+  try {
+    await fetch(BASE + '/v1/put', {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: 'x'.repeat(2 * 1024 * 1024),
+    });
+  } catch { /* connection reset is an expected outcome here, not a test failure */ }
+  try {
+    const stillUp = await fetch(`${BASE}/v1/issuer`);
+    rawOversizeSurvived = stillUp.status === 200;
+  } catch { rawOversizeSurvived = false; }
+  check('the relay survives and keeps serving after an oversized raw upload', rawOversizeSurvived);
+
   // Cursor: a node written after the first sync point comes back, earlier ones do not.
   const mark = new Date().toISOString();
   await new Promise((r) => setTimeout(r, 5));

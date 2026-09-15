@@ -7,6 +7,13 @@ import { fileURLToPath } from 'node:url';
 import { p256 } from '@noble/curves/nist.js';
 import { bytesToHex, hexToBytes, utf8ToBytes } from '@noble/hashes/utils.js';
 
+// A single bad request already can't crash a route (each is try/caught below),
+// but this is the backstop for anything outside that — a stray rejected
+// promise, a bug in a future route — so the relay degrades to a logged error
+// instead of taking every connected client's sync down with it.
+process.on('uncaughtException', (error) => console.error('uncaughtException:', error));
+process.on('unhandledRejection', (error) => console.error('unhandledRejection:', error));
+
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 // Overridable so tests get a scratch directory instead of the live graph.
 const DATA = process.env.RELAY_DATA || path.join(ROOT, 'data');
@@ -127,19 +134,40 @@ function withinQuota(gunPub, bytes) {
 }
 
 function json(res, status, body) {
-  res.writeHead(status, {
-    'content-type': 'application/json',
-    'access-control-allow-origin': '*',
-    'access-control-allow-headers': 'content-type',
-    'access-control-allow-methods': 'GET,POST,OPTIONS',
-  });
-  res.end(JSON.stringify(body));
+  // A destroyed request (e.g. readBody() cutting off an oversized upload) can
+  // take the underlying socket with it; writing to it after that would throw.
+  if (res.writableEnded || res.destroyed) return;
+  try {
+    res.writeHead(status, {
+      'content-type': 'application/json',
+      'access-control-allow-origin': '*',
+      'access-control-allow-headers': 'content-type',
+      'access-control-allow-methods': 'GET,POST,OPTIONS',
+    });
+    res.end(JSON.stringify(body));
+  } catch {
+    // Socket already gone; nothing to do.
+  }
 }
+
+// A generous ceiling above MAX_NODE_BYTES (the real per-node limit, enforced in
+// acceptable()) — this one just stops a client from streaming an unbounded body
+// into memory before that check ever runs.
+const MAX_BODY_BYTES = 256 * 1024;
 
 function readBody(req) {
   return new Promise((resolve, reject) => {
     const chunks = [];
-    req.on('data', (chunk) => chunks.push(chunk));
+    let total = 0;
+    req.on('data', (chunk) => {
+      total += chunk.length;
+      if (total > MAX_BODY_BYTES) {
+        req.destroy();
+        reject(new Error('body-too-large'));
+        return;
+      }
+      chunks.push(chunk);
+    });
     req.on('end', () => {
       try { resolve(JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}')); }
       catch (error) { reject(error); }

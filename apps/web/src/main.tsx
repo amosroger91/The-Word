@@ -9,7 +9,8 @@ import '@fontsource/atkinson-hyperlegible/latin-700.css';
 import '@fontsource/opendyslexic/latin-400.css';
 import '@fontsource/opendyslexic/latin-700.css';
 import App from './App';
+import { ErrorBoundary } from './ErrorBoundary';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode><App /></React.StrictMode>,
+  <React.StrictMode><ErrorBoundary><App /></ErrorBoundary></React.StrictMode>,
 );

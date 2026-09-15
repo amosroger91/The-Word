@@ -18,6 +18,16 @@ export interface GraphNode {
 const DB = 'word-graph';
 const STORE = 'nodes';
 const MEMORY_KEY = 'word.graph';
+
+// A relay that accepts the connection but never answers would otherwise hang
+// a plain fetch() indefinitely — with pullRelays looping over relays
+// sequentially, one stuck relay would stall sync with every relay after it.
+const RELAY_TIMEOUT_MS = 10000;
+function fetchWithTimeout(url: string, init?: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), RELAY_TIMEOUT_MS);
+  return fetch(url, { ...init, signal: controller.signal }).finally(() => clearTimeout(timer));
+}
 const GOSSIP_ID = 'tw-graph-v1';
 
 type Listener = (soul: string, node: GraphNode) => void;
@@ -138,7 +148,7 @@ export async function nodesWithPrefix(prefix: string): Promise<GraphNode[]> {
 async function pushRelays(node: GraphNode, relays: RelayConfig) {
   for (const url of relays.urls) {
     try {
-      await fetch(`${url.replace(/\/$/, '')}/v1/put`, {
+      await fetchWithTimeout(`${url.replace(/\/$/, '')}/v1/put`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(node),
@@ -168,7 +178,7 @@ export async function pullRelays(relays = loadRelays()): Promise<number> {
       // graph on every sync, so bandwidth grew with history times syncs.
       let cursor = cursors()[base] || '';
       for (let page = 0; page < 50; page += 1) {
-        const res = await fetch(`${base}/v1/since?t=${encodeURIComponent(cursor)}`);
+        const res = await fetchWithTimeout(`${base}/v1/since?t=${encodeURIComponent(cursor)}`);
         if (!res.ok) break;
         const payload = await res.json() as { nodes?: GraphNode[]; next?: string; more?: boolean } | GraphNode[];
         // Older relays answered with a bare array; keep reading those too.

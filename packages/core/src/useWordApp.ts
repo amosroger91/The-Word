@@ -150,11 +150,19 @@ export function useWordApp({ storage, speech, clipboard, voices }: Platform, ini
   useEffect(() => {
     let active = true;
     setChapterLoading(true);
-    void localBible.getChapter(translationId, bookId, chapterNumber).then((loaded) => {
-      if (!active) return;
-      setChapter(loaded);
-      setChapterLoading(false);
-    });
+    // A translation chunk is a dynamic import over the network (see local.ts);
+    // it can reject on a flaky connection or a stale tab after a redeploy
+    // changes chunk hashes. One retry clears the common transient case; if it
+    // still fails, stop the spinner and fall through to the existing "chapter
+    // not available" empty state rather than spinning forever.
+    void localBible.getChapter(translationId, bookId, chapterNumber)
+      .catch(() => localBible.getChapter(translationId, bookId, chapterNumber))
+      .catch(() => null)
+      .then((loaded) => {
+        if (!active) return;
+        setChapter(loaded);
+        setChapterLoading(false);
+      });
     return () => { active = false; };
   }, [translationId, bookId, chapterNumber]);
 
@@ -162,6 +170,9 @@ export function useWordApp({ storage, speech, clipboard, voices }: Platform, ini
     let active = true;
     void loadBookCrossRefs(bookId).then((loaded) => {
       if (active) setBookCrossRefs(loaded);
+    }).catch(() => {
+      // Cross-references are a supplement to the reader, not required to read
+      // the chapter; leave whatever was previously loaded rather than crash.
     });
     return () => { active = false; };
   }, [bookId]);
@@ -183,6 +194,12 @@ export function useWordApp({ storage, speech, clipboard, voices }: Platform, ini
         const matchesTestament = searchTestament === 'all' || localBible.getBook(result.verse.ref.bookId)?.testament === searchTestament;
         return matchesBook && matchesTestament;
       }));
+      setSearchLoading(false);
+    }).catch(() => {
+      // A failed search (e.g. a translation chunk that didn't load) should show
+      // no results, not spin the loading indicator forever.
+      if (!active) return;
+      setSearchResults([]);
       setSearchLoading(false);
     });
     return () => { active = false; };
