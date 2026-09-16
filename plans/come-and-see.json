@@ -1,0 +1,91 @@
+{
+  "format": "the-word.plan",
+  "id": "come-and-see",
+  "version": 1,
+  "title": {
+    "en": "Come and see",
+    "es": "Ven y verás",
+    "fr": "Viens et vois",
+    "zh": "你们来看",
+    "vi": "Hãy đến mà xem"
+  },
+  "summary": {
+    "en": "An hour in John 1, where the first disciples follow Jesus.",
+    "es": "Una hora en Juan 1, donde los primeros discípulos siguen a Jesús.",
+    "fr": "Une heure dans Jean 1, où les premiers disciples suivent Jésus.",
+    "zh": "约翰福音第一章的一小时，初召门徒跟随耶稣。",
+    "vi": "Một giờ trong Giăng 1, khi các môn đồ đầu tiên theo Chúa Giê-su."
+  },
+  "author": "The Word",
+  "license": "Public Domain",
+  "audience": ["solo", "couple", "family", "friends"],
+  "tags": ["gospel", "john"],
+  "sessions": [
+    {
+      "id": "hour-1",
+      "title": {
+        "en": "What are you seeking?",
+        "es": "¿Qué buscas?",
+        "fr": "Que cherchez-vous ?",
+        "zh": "你在寻找什么？",
+        "vi": "Các ngươi tìm gì?"
+      },
+      "passages": [{ "bookId": 43, "chapter": 1, "verses": [35, 42] }],
+      "estimatedMinutes": 20,
+      "blocks": [
+        {
+          "kind": "prose",
+          "id": "intro",
+          "text": {
+            "en": "Two of John's disciples hear him name Jesus the Lamb of God. They follow. Jesus turns and asks them what they are seeking. Begin there.",
+            "es": "Dos discípulos de Juan oyen que llama a Jesús el Cordero de Dios. Lo siguen. Jesús se vuelve y les pregunta qué buscan. Empieza ahí.",
+            "fr": "Deux disciples de Jean l'entendent nommer Jésus l'Agneau de Dieu. Ils le suivent. Jésus se retourne et leur demande ce qu'ils cherchent. Commencez là.",
+            "zh": "约翰的两个门徒听见他称耶稣为神的羔羊，便跟着去。耶稣转身问他们寻找什么。从这里开始。",
+            "vi": "Hai môn đồ của Giăng nghe ông gọi Chúa Giê-su là Chiên Con của Đức Chúa Trời. Họ đi theo. Chúa quay lại hỏi họ tìm gì. Hãy bắt đầu từ đó."
+          }
+        },
+        {
+          "kind": "passage",
+          "id": "read-john",
+          "ref": { "bookId": 43, "chapter": 1, "verses": [35, 42] },
+          "note": {
+            "en": "Read these verses slowly, then sit with them.",
+            "es": "Lee despacio estos versículos y quédate con ellos.",
+            "fr": "Lisez ces versets lentement, puis demeurez-y.",
+            "zh": "慢慢读这几节，然后静静停留。",
+            "vi": "Hãy đọc chậm những câu này, rồi ở lại với chúng."
+          }
+        },
+        {
+          "kind": "question",
+          "id": "seeking",
+          "question": {
+            "type": "free",
+            "prompt": {
+              "en": "What are you seeking as you open this Gospel?",
+              "es": "¿Qué buscas al abrir este Evangelio?",
+              "fr": "Que cherchez-vous en ouvrant cet Évangile ?",
+              "zh": "打开这卷福音书时，你在寻找什么？",
+              "vi": "Khi mở sách Phúc Âm này, bạn đang tìm gì?"
+            }
+          }
+        },
+        {
+          "kind": "question",
+          "id": "stay-with",
+          "question": {
+            "type": "versePick",
+            "prompt": {
+              "en": "Which verse stays with you?",
+              "es": "¿Qué versículo se queda contigo?",
+              "fr": "Quel verset demeure en vous ?",
+              "zh": "哪一节经文留在你心里？",
+              "vi": "Câu nào ở lại với bạn?"
+            },
+            "within": { "bookId": 43, "chapter": 1, "verses": [35, 42] }
+          }
+        }
+      ]
+    }
+  ]
+}
