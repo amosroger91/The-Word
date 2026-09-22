@@ -28,6 +28,7 @@ export function useSpeech(adapter: SpeechAdapter, options: SpeakOptions, onCompl
   const [speakingVerse, setSpeakingVerse] = useState<number | null>(null);
   const [error, setError] = useState('');
   const [autoplayBlocked, setAutoplayBlocked] = useState(false);
+  const stateRef = useRef<SpeechState>('idle');
   const requestRef = useRef(0);
   const queueRef = useRef<SpeechChunk[]>([]);
   const indexRef = useRef(0);
@@ -57,10 +58,19 @@ export function useSpeech(adapter: SpeechAdapter, options: SpeakOptions, onCompl
         const outcome = await adapter.speak(chunk.text, optionsRef.current);
         if (requestId !== requestRef.current) return;
         // A stopped chunk means pause-by-restart or stop; the queue position is left untouched.
-        if (outcome === 'stopped') return;
+        if (outcome === 'stopped') {
+          if (stateRef.current === 'speaking') {
+            stateRef.current = 'paused';
+            setState('paused');
+            setError('Reading was interrupted. Press Resume to continue from this verse.');
+          }
+          return;
+        }
         indexRef.current += 1;
+        if (stateRef.current === 'paused') return;
       }
       setSpeakingVerse(null);
+      stateRef.current = 'idle';
       setState('idle');
       onCompleteRef.current?.();
     } catch (e) {
@@ -70,19 +80,21 @@ export function useSpeech(adapter: SpeechAdapter, options: SpeakOptions, onCompl
       if (isAutoplayBlocked(e)) {
         setAutoplayBlocked(true);
         setError('');
-        setSpeakingVerse(null);
-        setState('idle');
+        stateRef.current = 'paused';
+        setState('paused');
         return;
       }
       // Chrome Android rejects play() when a pause() races the start of playback.
       // The adapter retries; if one still escapes, do not show it as a hard failure.
       if (isPlayInterrupted(e)) {
-        setError('');
+        setError('Reading was interrupted. Press Resume to continue from this verse.');
+        stateRef.current = 'paused';
+        setState('paused');
         return;
       }
       setError(e instanceof Error ? e.message : 'Speech failed.');
-      setSpeakingVerse(null);
-      setState('idle');
+      stateRef.current = 'paused';
+      setState('paused');
     }
   }, [adapter]);
 
@@ -91,21 +103,29 @@ export function useSpeech(adapter: SpeechAdapter, options: SpeakOptions, onCompl
     const requestId = requestRef.current + 1;
     requestRef.current = requestId;
     adapter.stop();
+    adapter.unlock?.();
     queueRef.current = chunks;
     indexRef.current = 0;
     setError('');
     setAutoplayBlocked(false);
+    stateRef.current = 'speaking';
     setState('speaking');
     void run(requestId);
   }, [adapter, run]);
 
   const pause = useCallback(() => {
-    if (!adapter.pause()) adapter.stop();
+    stateRef.current = 'paused';
+    if (!adapter.pause()) { requestRef.current += 1; adapter.stop(); }
     setState('paused');
   }, [adapter]);
 
   const resume = useCallback(() => {
+    if (stateRef.current !== 'paused') return;
+    stateRef.current = 'speaking';
+    setError('');
+    setAutoplayBlocked(false);
     setState('speaking');
+    adapter.unlock?.();
     if (adapter.resume()) return;
     const requestId = requestRef.current + 1;
     requestRef.current = requestId;
@@ -118,6 +138,7 @@ export function useSpeech(adapter: SpeechAdapter, options: SpeakOptions, onCompl
     queueRef.current = [];
     indexRef.current = 0;
     setSpeakingVerse(null);
+    stateRef.current = 'idle';
     setState('idle');
   }, [adapter]);
 

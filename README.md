@@ -16,10 +16,14 @@ Features (at a glance)
 
 - Offline-capable local Scripture (multiple public-domain translations)
 - Fast local search, topics, bookmarks, and cross-references
-- Read-aloud with speed and volume controls, per-device voice selection
+- Read-aloud with speed and volume controls, per-device voice selection, and continuous reading from any verse
 - Shared group reading with optional live audio/video (peer-to-peer mesh)
 - Create and share verse images (custom background, font, translation)
 - Local-first preferences and progress tracking (no account required)
+
+To start mid-chapter, select a verse and choose **Read from here** in the selected-verse toolbar. It reads from that verse onward and continues through subsequent chapters. With multiple verses selected, it starts at the first selected verse. **Read selection** remains available for reading only the selected verses. In Group Study, the host's start point is shared; participants can use their own controls after choosing **Browse independently**.
+
+Narration runs in a dedicated local worker. Voice generation is serialized with warmup and retries the same verse once with a fresh worker on failure. Interrupted playback keeps its verse and offers **Resume**; group listeners can use **Enable narration** to retry. The app does not silently skip an unread verse. Initial voice downloads still need a network connection.
 
 Repository layout
 
@@ -69,6 +73,8 @@ Run web tests (from the repo root):
 ```bash
 npm --prefix apps/web run test
 ```
+
+The narration regression suite covers engine hangs, interrupted playback, pause/stop races, chapter following, and timer/blob cleanup over 200 simulated verses. To check real Piper audio against a running web build, set `APP_URL` to its address and run `node apps/web/scripts/e2e-speech.mjs`. It exercises desktop/mobile verse actions, mid-reading jumps, chapter rollover, consecutive narration, and recovery from an unexpected browser pause.
 
 Developer notes
 

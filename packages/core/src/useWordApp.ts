@@ -305,7 +305,9 @@ export function useWordApp({ storage, speech, clipboard, voices }: Platform, ini
   ), [chapter, chapterLoading]);
 
   const speakChapter = useCallback(() => {
-    if (!chapter) return;
+    if (!chapterIs(bookId, chapterNumber) || !chapter) return;
+    setPendingAutoSpeak(false);
+    setPendingSpeak(null);
     // Reading a whole chapter turns on continuous mode so it rolls into the next one.
     autoAdvanceRef.current = true;
     player.speak(chapter.verses.map((verse, index) => ({
@@ -313,9 +315,12 @@ export function useWordApp({ storage, speech, clipboard, voices }: Platform, ini
       // The reference is announced once, ahead of the first verse.
       text: index === 0 ? `${chapterReference}. ${verse.text}` : verse.text,
     })));
-  }, [chapter, chapterReference, player]);
+  }, [chapterIs, bookId, chapterNumber, chapter, chapterReference, player]);
 
   const speakChapterAt = useCallback((targetBook: number, targetChapter: number, focusVerse?: number) => {
+    player.stop();
+    setPendingAutoSpeak(false);
+    setPendingSpeak(null);
     autoAdvanceRef.current = true;
     setBookId(targetBook);
     setChapterNumber(targetChapter);
@@ -333,6 +338,9 @@ export function useWordApp({ storage, speech, clipboard, voices }: Platform, ini
 
   // Continuous read-aloud from this verse to the end of the chapter, then onward.
   const speakFromVerse = useCallback((targetBook: number, targetChapter: number, verseNumber: number) => {
+    player.stop();
+    setPendingAutoSpeak(false);
+    setPendingSpeak(null);
     autoAdvanceRef.current = true;
     setBookId(targetBook);
     setChapterNumber(targetChapter);
@@ -353,6 +361,8 @@ export function useWordApp({ storage, speech, clipboard, voices }: Platform, ini
 
   const speakSelection = useCallback(() => {
     if (!chapter) return;
+    setPendingAutoSpeak(false);
+    setPendingSpeak(null);
     // A selection is a one-off; do not roll into the next chapter.
     autoAdvanceRef.current = false;
     const chosen = chapter.verses.filter((verse) => selectedVerses.has(verse.ref.verse));
@@ -366,6 +376,8 @@ export function useWordApp({ storage, speech, clipboard, voices }: Platform, ini
   // current verse). Not continuous — it reads just that verse, no auto-advance.
   const speakVerse = useCallback((verseNumber: number) => {
     if (!chapter) return;
+    setPendingAutoSpeak(false);
+    setPendingSpeak(null);
     autoAdvanceRef.current = false;
     const target = chapter.verses.find((verse) => verse.ref.verse === verseNumber);
     if (!target) return;

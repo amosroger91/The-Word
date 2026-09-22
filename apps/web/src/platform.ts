@@ -1,4 +1,4 @@
-import { PiperWebEngine, OnnxWebRuntime, PhonemizeWebRuntime, HuggingFaceVoiceProvider } from 'piper-tts-web';
+import { createPiperSynthesizer } from './piperSpeech';
 import type { ClipboardAdapter, KeyValueStore, SpeakOptions, SpeechAdapter } from '@the-word/core';
 
 export const webStorage: KeyValueStore = {
@@ -27,7 +27,7 @@ const SILENT_WAV = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAI
 
 // Piper runs locally: each verse is synthesised to a wav blob and played through an Audio element.
 export function createWebSpeech(): SpeechAdapter {
-  let engine: InstanceType<typeof PiperWebEngine> | null = null;
+  const synthesizer = createPiperSynthesizer();
   // One persistent element so a Join-click unlock() covers later verse playback
   // (Safari in particular will not autoplay a brand-new Audio() after the gesture).
   const audio = new Audio();
@@ -43,25 +43,8 @@ export function createWebSpeech(): SpeechAdapter {
   // because the element itself always exists.
   let hasVerse = false;
   let pausedByUser = false;
-
-  // import.meta.env.BASE_URL always ends in '/'. It is '/' for local/root deploys
-  // and the repository subpath (e.g. '/The-Word/') on GitHub Pages, so the
-  // self-hosted Piper WASM runtime resolves correctly under either.
-  const base = import.meta.env.BASE_URL;
-
-  function ensureEngine() {
-    engine ??= new PiperWebEngine({
-      onnxRuntime: new OnnxWebRuntime({ basePath: `${base}onnx/`, numThreads: 1 }),
-      phonemizeRuntime: new PhonemizeWebRuntime({ basePath: `${base}piper/` }),
-      // Voice models are NOT bundled (they are tens of MB each); fetch the chosen
-      // one on demand from the Piper voices repo on Hugging Face. The default
-      // baseUrl is that repo, so leave it unset. The coi-serviceworker stamps
-      // Cross-Origin-Resource-Policy onto the response, which (with Hugging Face's
-      // CORS) satisfies the page's cross-origin isolation.
-      voiceProvider: new HuggingFaceVoiceProvider(),
-    });
-    return engine;
-  }
+  let cancelPlayback: (() => void) | null = null;
+  let resumePlayback: (() => void) | null = null;
 
   function revokeUrl() {
     if (objectUrl) {
@@ -84,10 +67,11 @@ export function createWebSpeech(): SpeechAdapter {
   }
 
   function clearMedia() {
-    // Pause first so an in-flight speak() can see generation change via onpause
-    // and resolve 'stopped', then detach so removing src does not surface as an error.
-    audio.pause();
+    // pause() emits no event when already paused. Settle explicitly so stop and
+    // verse changes also release a paused or still-loading playback promise.
+    cancelPlayback?.();
     detachHandlers();
+    audio.pause();
     audio.removeAttribute('src');
     revokeUrl();
     hasVerse = false;
@@ -97,14 +81,10 @@ export function createWebSpeech(): SpeechAdapter {
   return {
     async speak(text: string, options: SpeakOptions) {
       const started = generation;
-      const response = await Promise.race([
-        ensureEngine().generate(text, options.voice, 0),
-        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Timeout: generate() did not resolve within 60s.')), 60000)),
-      ]);
-      if (started !== generation) return 'stopped';
-      if (!response?.file?.size) throw new Error('Piper returned an empty audio file.');
+      const file = await synthesizer.synthesize(text, options.voice, () => started === generation);
+      if (!file || started !== generation) return 'stopped';
       revokeUrl();
-      objectUrl = URL.createObjectURL(response.file);
+      objectUrl = URL.createObjectURL(file);
       audio.src = objectUrl;
       audio.playbackRate = rate;
       audio.volume = volume;
@@ -114,19 +94,31 @@ export function createWebSpeech(): SpeechAdapter {
         return await new Promise<'ended' | 'stopped'>((resolve, reject) => {
           let settled = false;
           let readyTimer = 0;
+          let retryTimer = 0;
+          let watchdog = 0;
+          let lastTime = audio.currentTime;
+          let lastProgress = Date.now();
+          let recoveries = 0;
           const stale = () => started !== generation;
-          const finish = (result: 'ended' | 'stopped') => {
+          const finish = (result: 'ended' | 'stopped', error?: unknown) => {
             if (settled) return;
             settled = true;
             window.clearTimeout(readyTimer);
+            window.clearTimeout(retryTimer);
+            window.clearInterval(watchdog);
             detachHandlers();
-            resolve(result);
+            cancelPlayback = null;
+            resumePlayback = null;
+            hasVerse = false;
+            if (error) { audio.pause(); reject(error); }
+            else resolve(result);
           };
 
+          cancelPlayback = () => finish('stopped');
           audio.onended = () => finish(stale() ? 'stopped' : 'ended');
           audio.onerror = () => {
-            if (stale() || pausedByUser) finish('stopped');
-            else reject(new Error('Piper could not play this verse.'));
+            if (stale()) finish('stopped');
+            else finish('stopped', new Error('This verse could not play. Press Resume to retry it.'));
           };
           // stop() bumps generation then pauses; a user pause does not, so the
           // verse stays pending for resume(). Android Chrome also pauses internally
@@ -135,26 +127,41 @@ export function createWebSpeech(): SpeechAdapter {
 
           const attemptPlay = (tries: number) => {
             if (settled) return;
-            if (stale() || pausedByUser) { finish('stopped'); return; }
+            if (stale()) { finish('stopped'); return; }
+            if (pausedByUser) return;
             const p = audio.play();
             if (!p) return;
             void p.catch((err) => {
               if (settled) return;
-              if (stale() || pausedByUser) { finish('stopped'); return; }
+              if (stale()) { finish('stopped'); return; }
+              if (pausedByUser) return;
               // Chrome Android: "The play() request was interrupted by a call to pause()"
               // when src is still buffering, unlock() pauses silence, or the next verse
-              // replaces src. Retry a couple of times; otherwise keep waiting for ended.
+              // replaces src. Retry twice, then expose a resumable failure.
               if (isPlayInterrupted(err)) {
-                if (tries > 0) window.setTimeout(() => attemptPlay(tries - 1), 60);
-                else finish('stopped');
+                if (tries > 0) retryTimer = window.setTimeout(() => attemptPlay(tries - 1), 60);
+                else finish('stopped', new Error('Playback was interrupted. Press Resume to retry this verse.'));
                 return;
               }
-              settled = true;
-              window.clearTimeout(readyTimer);
-              detachHandlers();
-              reject(err);
+              finish('stopped', err);
             });
           };
+
+          resumePlayback = () => { lastProgress = Date.now(); attemptPlay(2); };
+          // Recover a lost pause/end event without confusing a long verse or an
+          // intentional pause with a stall. Only a lack of time progress counts.
+          watchdog = window.setInterval(() => {
+            if (stale()) { finish('stopped'); return; }
+            if (pausedByUser) { lastProgress = Date.now(); return; }
+            if (audio.ended) { finish('ended'); return; }
+            if (audio.currentTime !== lastTime) {
+              lastTime = audio.currentTime; lastProgress = Date.now(); recoveries = 0;
+            } else if (Date.now() - lastProgress >= 15_000) {
+              lastProgress = Date.now();
+              if (recoveries++ < 2) attemptPlay(2);
+              else finish('stopped', new Error('Playback stopped responding. Press Resume to continue from this verse.'));
+            }
+          }, 1000);
 
           if (audio.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) {
             attemptPlay(2);
@@ -172,6 +179,7 @@ export function createWebSpeech(): SpeechAdapter {
         if (started === generation) {
           detachHandlers();
           hasVerse = false;
+          revokeUrl();
         }
       }
     },
@@ -182,12 +190,9 @@ export function createWebSpeech(): SpeechAdapter {
       return true;
     },
     resume() {
-      if (!hasVerse) return false;
+      if (!hasVerse || !resumePlayback) return false;
       pausedByUser = false;
-      void audio.play().catch((err) => {
-        if (isPlayInterrupted(err)) return;
-        console.warn('resume play failed', err);
-      });
+      resumePlayback();
       return true;
     },
     stop() {
@@ -201,9 +206,13 @@ export function createWebSpeech(): SpeechAdapter {
       if (!voice || warmedVoice === voice) return;
       warmedVoice = voice;
       window.dispatchEvent(new CustomEvent('word-voice-state', { detail: { voice, state: 'preparing' } }));
-      void ensureEngine().generate('Amen.', voice, 0).then(() => {
-        window.dispatchEvent(new CustomEvent('word-voice-state', { detail: { voice, state: 'ready' } }));
-      }).catch(() => { warmedVoice = null; window.dispatchEvent(new CustomEvent('word-voice-state', { detail: { voice, state: 'unavailable' } })); });
+      void synthesizer.synthesize('Amen.', voice, () => warmedVoice === voice).then((file) => {
+        if (file && warmedVoice === voice) window.dispatchEvent(new CustomEvent('word-voice-state', { detail: { voice, state: 'ready' } }));
+      }).catch(() => {
+        if (warmedVoice !== voice) return;
+        warmedVoice = null;
+        window.dispatchEvent(new CustomEvent('word-voice-state', { detail: { voice, state: 'unavailable' } }));
+      });
     },
     // Play silence on the persistent element during a user gesture so later
     // verse playback (after TTS generation) is allowed without another tap.
@@ -214,7 +223,7 @@ export function createWebSpeech(): SpeechAdapter {
       audio.volume = 0;
       audio.src = SILENT_WAV;
       // Do not pause() after this play() — on Chrome Android that rejects an
-      // overlapping verse play() with "interrupted by a call to pause()".
+              // overlapping verse play() with "interrupted by a call to pause()".
       // speak() replaces src when the verse is ready; volume is restored there.
       void audio.play().catch(() => {
         if (started === generation && !hasVerse) audio.volume = prev;
@@ -231,8 +240,8 @@ export function createWebSpeech(): SpeechAdapter {
     dispose() {
       generation += 1;
       clearMedia();
-      engine?.destroy();
-      engine = null;
+      warmedVoice = null;
+      synthesizer.dispose();
     },
   };
 }

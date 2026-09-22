@@ -429,7 +429,7 @@ export const strings: Record<Language, Strings> = {
     dailyVerseUnavailable: "Today's verse could not be loaded.",
     loadingVerse: "Loading today's verse…",
     tryAgain: 'Try again',
-    readFromHere: 'Listen from here',
+    readFromHere: 'Read from here',
     readTheChapter: 'Listen to the chapter',
     crossReferences: 'Cross references',
     closeCrossReferences: 'Close cross references',

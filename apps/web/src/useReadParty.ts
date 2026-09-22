@@ -369,13 +369,13 @@ export function useReadParty(app: WordApp) {
     room?.transferHost(id);
   }, [room]);
 
-  // If join-click unlock wasn't enough, drop armed so the fallback button appears.
+  // A new playback error exposes the fallback button once. Re-arming must be
+  // allowed to start a fresh verse before the previous error has been cleared.
   useEffect(() => {
-    if (!isHost && app.autoplayBlocked && armed) {
-      spokenVerseRef.current = null;
+    if (!isHost && (app.autoplayBlocked || app.speechError) && armed) {
       setArmed(false);
     }
-  }, [app.autoplayBlocked, isHost, armed]);
+  }, [app.autoplayBlocked, app.speechError, isHost]);
 
   // A live mic never silences Scripture. Read-aloud is not streamed — each device
   // speaks the verse with its own Piper voice — and the host's own playback is
@@ -418,14 +418,16 @@ export function useReadParty(app: WordApp) {
     // 3. action === 'playing': speak the host's current verse (audio needs arming).
     if (narrationMuted) { if (app.speechState !== 'idle') app.stopSpeech(); spokenVerseRef.current = null; return; }
     if (!armed || app.chapterLoading || !app.chapter || rs.verse == null) return;
+    const loaded = app.chapter.verses[0]?.ref;
+    if (!loaded || loaded.bookId !== rs.bookId || loaded.chapter !== rs.chapter) return;
     if (rs.verse !== spokenVerseRef.current) {
       // Host moved to a new verse — jump our local reading to it.
       spokenVerseRef.current = rs.verse;
       app.speakVerse(rs.verse);
-    } else if (app.speechState === 'paused') {
+    } else if (app.speechState === 'paused' && !app.speechError && !app.autoplayBlocked) {
       app.resumeSpeech();
     }
-  }, [room, isHost, following, armed, narrationMuted, status, remoteReading, app.bookId, app.chapterNumber, app.chapterLoading, app.chapter, app.speechState]);
+  }, [room, isHost, following, armed, narrationMuted, status, remoteReading, app.bookId, app.chapterNumber, app.chapterLoading, app.chapter, app.speechState, app.speechError, app.autoplayBlocked]);
 
   // A participant who is following and hasn't armed audio, while the host is playing.
   const needsArm = Boolean(room) && !isHost && following && !narrationMuted && !armed && remoteReading?.action === 'playing';

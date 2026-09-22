@@ -12,7 +12,7 @@ function harness(){
     useCallback(fn,deps){const index=cursor++;if(!slots[index]||changed(slots[index].deps,deps))slots[index]={value:fn,deps};return slots[index].value;},
     useEffect(fn,deps){const index=cursor++;if(!slots[index]||changed(slots[index].deps,deps)){effects.push(()=>{slots[index]?.cleanup?.();slots[index]={deps,cleanup:fn()};});}}
   };
-  const app={bookId:43,chapterNumber:3,translationId:'kjv',chapter:{verses:[]},chapterLoading:false,speechState:'idle',speakingVerse:null,autoplayBlocked:false,
+  const app={bookId:43,chapterNumber:3,translationId:'kjv',chapter:{verses:[{ref:{bookId:43,chapter:3,verse:1}}]},chapterLoading:false,speechState:'idle',speakingVerse:null,autoplayBlocked:false,speechError:'',
     goTo(b,c){app.bookId=b;app.chapterNumber=c;dirty=true;},goToVerse(b,c,v){app.goTo(b,c);app.focusedVerse=v;},
     stopSpeech(){app.speechState='idle';app.speakingVerse=null;dirty=true;},pauseSpeech(){app.speechState='paused';dirty=true;},resumeSpeech(){app.speechState='speaking';dirty=true;},speakVerse(v){spoken.push(v);app.speechState='speaking';app.speakingVerse=v;dirty=true;}};
   const room={leave(){},refreshMedia(){},updateIdentity(){},sendChat(){},transferHost(){},setReadingState(s){sent.push(s);handlers.onReading(s);}};
@@ -49,5 +49,23 @@ test('joining auto-follows; heartbeat does not restart audio; mute keeps highlig
   h.current.browseIndependently();h.app.goTo(1,1);h.flush();h.receive({...reading,verse:18,ts:4});assert.equal(h.app.bookId,1);assert.equal(h.current.following,false);
   h.current.returnToHost();h.flush();assert.equal(h.app.bookId,43);assert.equal(h.app.chapterNumber,3);assert.equal(h.spoken.at(-1),18);
   h.receive({...reading,action:'live',ts:5});assert.equal(h.app.speechState,'idle');
+ }finally{h.dispose();}
+});
+test('following waits for the new chapter instead of reading the previous chapter at rollover',()=>{
+ const h=harness();try{
+  h.join(false);h.receive(reading);
+  h.receive({...reading,chapter:4,verse:1});
+  assert.deepEqual(h.spoken,[16]);
+  h.app.chapter={verses:[{ref:{bookId:43,chapter:4,verse:1}}]};h.flush();
+  assert.deepEqual(h.spoken,[16,1]);
+ }finally{h.dispose();}
+});
+test('a participant playback failure offers re-arming instead of an endless resume loop',()=>{
+ const h=harness();try{
+  h.join(false);h.receive(reading);
+  h.app.speechState='paused';h.app.speechError='Playback interrupted';h.flush();
+  assert.equal(h.current.needsArm,true);assert.equal(h.app.speechState,'paused');
+  h.receive({...reading,ts:2});assert.deepEqual(h.spoken,[16]);
+  h.current.arm();h.flush();assert.deepEqual(h.spoken,[16,16]);assert.equal(h.current.needsArm,false);
  }finally{h.dispose();}
 });

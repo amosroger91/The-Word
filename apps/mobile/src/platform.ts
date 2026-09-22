@@ -73,12 +73,12 @@ export function createNativeSpeech(): SpeechAdapter {
     },
     pause() {
       // expo-speech can only truly pause on iOS; Android restarts the verse on resume.
-      if (RNPlatform.OS !== 'ios') return false;
+      if (!settle || RNPlatform.OS !== 'ios') return false;
       void Speech.pause();
       return true;
     },
     resume() {
-      if (RNPlatform.OS !== 'ios') return false;
+      if (!settle || RNPlatform.OS !== 'ios') return false;
       void Speech.resume();
       return true;
     },
