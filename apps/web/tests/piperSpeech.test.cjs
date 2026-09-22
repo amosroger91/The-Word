@@ -45,6 +45,28 @@ test('repeated engine failures reject rather than leaving a permanently busy voi
   assert.equal(h.timers.size,0);assert.ok(h.workers.every(w=>w.terminated));
   const next=h.synth.synthesize('retry later','voice');await tick();h.workers[2].reply();assert.ok(await next);h.synth.dispose();
 });
+test('cancel kills the in-flight worker so the next verse is not stuck behind it',async()=>{
+  const h=setup();
+  const stalled=h.synth.synthesize('old','voice');
+  const queued=h.synth.synthesize('queued','voice');
+  await tick();
+  h.synth.cancel();
+  assert.equal(h.workers[0].terminated,true);
+  assert.equal(await stalled,null);
+  assert.equal(await queued,null);
+  assert.equal(h.workers.length,1);
+  assert.equal(h.timers.size,0);
+  const next=h.synth.synthesize('new','voice');
+  await tick();
+  assert.equal(h.workers.length,2);
+  assert.equal(h.workers[1].messages[0].text,'new');
+  assert.equal([...h.timers.values()][0].ms,180000);
+  h.workers[1].reply();
+  assert.ok(await next);
+  h.synth.cancel();
+  assert.equal(h.workers[1].terminated,false);
+  h.synth.dispose();
+});
 test('dispose settles pending and queued work without starting another worker',async()=>{
   const h=setup();const first=h.synth.synthesize('a','voice'),next=h.synth.synthesize('b','voice');await tick();h.synth.dispose();
   assert.equal(await first,null);assert.equal(await next,null);assert.equal(h.workers.length,1);assert.equal(h.timers.size,0);

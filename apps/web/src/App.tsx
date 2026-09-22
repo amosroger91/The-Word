@@ -451,7 +451,7 @@ function App() {
       onClose={()=>setNoteVerse(null)}
     />}
     {selectedVerses.size>0&&<div className="workspace-selection" aria-label="Selected verse actions"><strong>{selectedReference}</strong><div>
-      {(!participant||!party.following)&&<button className="primary" title={`Read from ${bookName} ${chapterNumber}:${currentVerse} onward${party.isHost?' to the group':''}`} onClick={()=>{app.unlockSpeech();app.speakFromVerse(app.bookId,chapterNumber,currentVerse);}}>{label.readFromHere}</button>}
+      {(!participant||!party.following)&&<button className="primary" title={`Read from ${bookName} ${chapterNumber}:${currentVerse} onward${party.isHost?' to the group':''}`} onClick={()=>{app.speakFromVerse(app.bookId,chapterNumber,currentVerse);}}>{label.readFromHere}</button>}
       <button onClick={app.copySelection}>Copy</button><button onClick={()=>{void (async()=>{
       const verse=currentVerse;
       const url=verseShareUrl(app.bookId,chapterNumber,verse);

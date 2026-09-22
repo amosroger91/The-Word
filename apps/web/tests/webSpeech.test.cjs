@@ -17,7 +17,7 @@ function setup(){
   }
   const exports={};
   vm.runInNewContext(ts.transpileModule(fs.readFileSync(require('node:path').join(__dirname,'../src/platform.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText,{
-    exports,require:()=>({createPiperSynthesizer:()=>({synthesize:async()=>({size:32}),dispose(){}})}),
+    exports,require:()=>({createPiperSynthesizer:()=>({synthesize:async()=>({size:32}),cancel(){},dispose(){}})}),
     Audio,HTMLMediaElement:{HAVE_FUTURE_DATA:3},Error,Date:{now:()=>now},
     URL:{createObjectURL(){const u=`blob:${++id}`;urls.add(u);return u;},revokeObjectURL(u){urls.delete(u);}},
     window:{setTimeout(fn){timers.set(++id,fn);return id;},clearTimeout(id){timers.delete(id);},setInterval(fn){intervals.set(++id,fn);return id;},clearInterval(id){intervals.delete(id);}},
@@ -53,6 +53,17 @@ test('a rejected resume is reported instead of only logging to the console',asyn
   const h=setup();const done=h.adapter.speak('Verse',options);const rejected=assert.rejects(done,/blocked/);await tick();
   h.adapter.pause();const error=new Error('blocked');error.name='NotAllowedError';h.audio.failures.push(error);
   assert.equal(h.adapter.resume(),true);await rejected;assert.equal(h.intervals.size,0);
+});
+test('a silent unlock survives the handoff stop and a real stop pauses it',async()=>{
+  const h=setup();
+  h.adapter.unlock();
+  assert.equal(h.audio.plays,1);
+  assert.equal(h.audio.paused,false);
+  h.adapter.stop({preserveUnlock:true});
+  assert.equal(h.audio.paused,false);
+  assert.equal(h.audio.plays,1);
+  h.adapter.stop();
+  assert.equal(h.audio.paused,true);
 });
 test('exhausted interrupted-play retries reject and clean up rather than silently stopping',async()=>{
   const h=setup();const error=new Error('interrupted');error.name='AbortError';h.audio.failures.push(error,error,error);

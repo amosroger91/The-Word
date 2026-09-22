@@ -21,7 +21,9 @@ export interface SpeechAdapter {
   // Returns false when the platform cannot truly pause; the queue then restarts the current verse on resume.
   pause(): boolean;
   resume(): boolean;
-  stop(): void;
+  // preserveUnlock: a silent gesture play() is already running. Do not pause()
+  // it — Chrome Android rejects that play, and a later verse is outside the click.
+  stop(options?: { preserveUnlock?: boolean }): void;
   setRate(rate: number): void;
   setVolume(volume: number): void;
   // Optional: warm the engine and fetch the given voice ahead of time so the

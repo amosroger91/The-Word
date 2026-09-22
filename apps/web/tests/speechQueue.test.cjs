@@ -1,16 +1,24 @@
 const test=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
+const path=require('node:path');
 const vm=require('node:vm');
 const ts=require('typescript');
 const {hooks}=require('./helpers/hooks.cjs');
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
 const chunks=[{verse:16,text:'First verse'},{verse:17,text:'Second verse'}];
+const compileOpts={compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}};
+function loadModule(file){
+  const exported={};
+  vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),compileOpts).outputText,{exports:exported});
+  return exported;
+}
+const i18n=loadModule(path.join(__dirname,'../../../packages/core/src/i18n.ts'));
 function setup(){
   const pending=[],exports={};let completions=0;
   const adapter={speak(text){return new Promise((resolve,reject)=>pending.push({text,resolve,reject}));},stop(){},dispose(){},pause(){return false;},resume(){return false;},setRate(){},setVolume(){}};
   const runner=hooks(()=>exports.useSpeech(adapter,{voice:'test',rate:1,volume:1,language:'en'},()=>completions++));
-  vm.runInNewContext(ts.transpileModule(fs.readFileSync(require('node:path').join(__dirname,'../../../packages/core/src/useSpeech.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText,{exports,require:()=>runner.react,Error});
+  vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(__dirname,'../../../packages/core/src/useSpeech.ts'),'utf8'),compileOpts).outputText,{exports,require:(id)=>id==='./i18n'?i18n:runner.react,Error});
   return {runner,adapter,pending,get current(){return runner.flush();},get completions(){return completions;}};
 }
 test('an unexpected stopped result becomes resumable and never skips the verse',async()=>{
@@ -37,6 +45,26 @@ test('pausing during synthesis invalidates the old request, including a late suc
     h.current.speak(chunks);h.current.pause();h.pending[0].resolve('ended');await tick();
     assert.equal(h.current.state,'paused');assert.equal(h.pending.length,1);assert.equal(h.completions,0);
     h.current.resume();assert.equal(h.pending[1].text,'First verse');
+  }finally{h.runner.dispose();}
+});
+test('stop clears the Resume banner and the autoplay gate',async()=>{
+  const h=setup();try{
+    h.current.speak(chunks);
+    const blocked=new Error('not allowed');blocked.name='NotAllowedError';
+    h.pending[0].reject(blocked);await tick();
+    assert.equal(h.current.autoplayBlocked,true);
+    h.current.stop();
+    assert.equal(h.current.state,'idle');
+    assert.equal(h.current.error,'');
+    assert.equal(h.current.autoplayBlocked,false);
+    h.current.speak(chunks);
+    const stalled=new Error('slow');stalled.code='speechStalled';
+    h.pending[1].reject(stalled);await tick();
+    assert.equal(h.current.error,i18n.strings.en.speechStalled);
+    h.current.stop();
+    assert.equal(h.current.state,'idle');
+    assert.equal(h.current.error,'');
+    assert.equal(h.current.speakingVerse,null);
   }finally{h.runner.dispose();}
 });
 test('stop during synthesis does not resurrect playback or advance the chapter',async()=>{

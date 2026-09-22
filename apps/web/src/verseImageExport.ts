@@ -1,4 +1,4 @@
-import { loadVerseImage, paintVerseImage, verseImageSize, type VerseImageInput } from '@the-word/core';
+import { loadVerseImage, loadVerseImageFonts, paintVerseImage, verseImageSize, type VerseImageInput } from '@the-word/core';
 
 function saveCanvas(canvas: HTMLCanvasElement, filename: string) {
   return new Promise<void>((resolve) => {
@@ -31,6 +31,7 @@ export async function downloadVerseImage(input: VerseImageInput, backgroundSrc: 
   canvas.height = verseImageSize.height;
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
+  await loadVerseImageFonts(input.fontStack);
   let image: HTMLImageElement | null = null;
   try {
     image = await loadVerseImage(backgroundSrc);

@@ -1,16 +1,19 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { WebView } from 'react-native-webview';
 import {
   backgroundById,
   backgroundForSeed,
   draftForBackground,
-  overlayFor,
   paletteFor,
   verseBackgrounds,
+  verseImageFont,
   verseImageFontRange,
+  verseImageHtml,
   verseTextColors,
   type Strings,
   type VerseImageDraft,
+  type VerseImageStyle,
 } from '@the-word/core';
 import { verseBackgroundModules, backgroundDataUrl } from './backgrounds';
 import type { VerseImageRequest } from './VerseImageShare';
@@ -42,13 +45,42 @@ export function VerseImageEditor({
   const styles = useMemo(() => createStyles(palette), [palette]);
   const [draft, setDraft] = useState<VerseImageDraft>(() => draftForBackground(backgroundForSeed(job.seed || job.reference)));
   const [saving, setSaving] = useState(false);
+  const [dataUrl, setDataUrl] = useState<string | null>(null);
   const background = backgroundById(draft.backgroundId);
   const source = verseBackgroundModules[background.file];
+
+  useEffect(() => {
+    let live = true;
+    setDataUrl(null);
+    void backgroundDataUrl(background.file).then((url) => { if (live) setDataUrl(url); }).catch(() => { if (live) setDataUrl(null); });
+    return () => { live = false; };
+  }, [background.file]);
+
+  const previewHtml = useMemo(() => dataUrl ? verseImageHtml({
+    reference: job.reference,
+    text: job.text,
+    translation: job.translation,
+    background: '#111111',
+    textColor: draft.textColor,
+    accent: '#947849',
+    fontStack: verseImageFont(fontStack),
+    fontSize: draft.fontSize,
+    overlayOpacity: draft.overlayOpacity,
+    imageDataUrl: dataUrl,
+    style: draft.style,
+    brand: label.imageBrand,
+    edition: label.imageEdition,
+    tooLong: label.imageTooLong,
+  }, true) : '', [dataUrl, draft, fontStack, job, label.imageBrand, label.imageEdition, label.imageTooLong]);
+
+  function pickStyle(style: VerseImageStyle) {
+    setDraft((current) => ({ ...current, style, textColor: style === 'paper' ? '#26332d' : '#fff9ed', overlayOpacity: style === 'paper' ? 0.08 : 0.34 }));
+  }
 
   async function save() {
     setSaving(true);
     try {
-      const imageDataUrl = await backgroundDataUrl(background.file);
+      const imageDataUrl = dataUrl ?? await backgroundDataUrl(background.file);
       onSave({
         reference: job.reference,
         text: job.text,
@@ -56,10 +88,14 @@ export function VerseImageEditor({
         background: '#111111',
         textColor: draft.textColor,
         accent: '#947849',
-        fontStack,
+        fontStack: verseImageFont(fontStack),
         fontSize: draft.fontSize,
         overlayOpacity: draft.overlayOpacity,
         imageDataUrl,
+        style: draft.style,
+        brand: label.imageBrand,
+        edition: label.imageEdition,
+        tooLong: label.imageTooLong,
         filename: job.filename,
       });
     } finally {
@@ -75,21 +111,21 @@ export function VerseImageEditor({
           <Pressable onPress={onClose} hitSlop={12} accessibilityLabel={label.closeEditor}><Text style={styles.close}>×</Text></Pressable>
         </View>
         <ScrollView contentContainerStyle={styles.body}>
-          <View style={styles.preview}>
-            <Image source={source} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
-            {draft.overlayOpacity > 0 ? <View style={[StyleSheet.absoluteFillObject, { backgroundColor: `rgba(0,0,0,${draft.overlayOpacity})` }]} /> : null}
-            <View style={styles.previewCopy}>
-              <Text style={[styles.previewRef, { color: draft.textColor, fontFamily: fontStack === 'serif' ? undefined : undefined }]}>{job.reference}</Text>
-              <Text style={[styles.previewText, { color: draft.textColor, fontSize: Math.round(draft.fontSize * 0.42), lineHeight: Math.round(draft.fontSize * 0.58) }]}>{job.text}</Text>
-              <Text style={[styles.previewFoot, { color: draft.textColor }]}>The Word · {job.translation}</Text>
-            </View>
+          <View style={styles.previewFrame}>
+            {previewHtml
+              ? <WebView originWhitelist={['*']} source={{ html: previewHtml, baseUrl: 'https://localhost' }} style={styles.previewWeb} scrollEnabled={false} />
+              : <Image source={source} style={StyleSheet.absoluteFillObject} resizeMode="cover" />}
+          </View>
+          <View style={styles.stylesRow}>
+            <Pressable onPress={() => pickStyle('paper')} style={[styles.styleButton, draft.style === 'paper' && styles.styleButtonActive]}><Text style={styles.styleText}>{label.imagePaper}</Text></Pressable>
+            <Pressable onPress={() => pickStyle('photograph')} style={[styles.styleButton, draft.style === 'photograph' && styles.styleButtonActive]}><Text style={styles.styleText}>{label.imagePhotograph}</Text></Pressable>
           </View>
           <Text style={styles.label}>{label.background}</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.thumbs}>
             {verseBackgrounds.map((item) => (
               <Pressable
                 key={item.id}
-                onPress={() => setDraft((current) => ({ ...current, backgroundId: item.id, overlayOpacity: overlayFor(item.kind) }))}
+                onPress={() => setDraft((current) => ({ ...current, backgroundId: item.id }))}
                 style={[styles.thumb, item.id === draft.backgroundId && styles.thumbActive]}
               >
                 <Image source={verseBackgroundModules[item.file]} style={styles.thumbImage} />
@@ -97,6 +133,7 @@ export function VerseImageEditor({
               </Pressable>
             ))}
           </ScrollView>
+          <Text style={styles.hint}>{label.imageAutoFit}</Text>
           <Text style={styles.label}>{label.textSize} · {draft.fontSize}px</Text>
           <View style={styles.stepper}>
             <Pressable onPress={() => setDraft((current) => ({ ...current, fontSize: Math.max(verseImageFontRange.min, current.fontSize - 2) }))}><Text style={styles.step}>−</Text></Pressable>
@@ -129,11 +166,13 @@ function createStyles(palette: ReturnType<typeof paletteFor>) {
     title: { color: palette.text, fontSize: 22 },
     close: { color: palette.text, fontSize: 28, lineHeight: 30 },
     body: { paddingHorizontal: 18, paddingBottom: 40, gap: 12 },
-    preview: { height: 360, borderRadius: 16, overflow: 'hidden', justifyContent: 'center' },
-    previewCopy: { paddingHorizontal: 22, alignItems: 'center', gap: 12 },
-    previewRef: { fontSize: 16, fontWeight: '700', textAlign: 'center' },
-    previewText: { textAlign: 'center', fontStyle: 'italic' },
-    previewFoot: { fontSize: 12, opacity: 0.85, marginTop: 8 },
+    previewFrame: { width: '100%', aspectRatio: 1080 / 1350, borderRadius: 16, overflow: 'hidden', backgroundColor: '#f6f1e7' },
+    previewWeb: { flex: 1, backgroundColor: 'transparent' },
+    stylesRow: { flexDirection: 'row', gap: 8 },
+    styleButton: { flex: 1, borderWidth: 1, borderColor: palette.border, borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
+    styleButtonActive: { borderColor: palette.accent },
+    styleText: { color: palette.text, fontSize: 15 },
+    hint: { color: palette.muted, fontSize: 12, lineHeight: 18 },
     label: { color: palette.muted, fontSize: 11, fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase' },
     thumbs: { gap: 8, paddingVertical: 4 },
     thumb: { width: 72, borderRadius: 8, overflow: 'hidden', borderWidth: 2, borderColor: 'transparent' },

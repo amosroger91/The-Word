@@ -8,6 +8,7 @@ import {
   useDailyVerse,
   useLocalVerse,
   verseImageFilename,
+  verseImageFont,
   verseImageFontRange,
   type WordApp,
 } from '@the-word/core';
@@ -101,7 +102,6 @@ export function Landing({
 
   const enter = useCallback((speak: 'from' | 'chapter' | 'none') => {
     if (!parsed) return;
-    if (speak !== 'none') app.unlockSpeech();
     if (speak === 'from') app.speakFromVerse(parsed.bookId, parsed.chapter, parsed.verse);
     // No focus verse: the chapter is read from verse 1, so the page should sit
     // at the top rather than jumping to the day's verse and back.
@@ -111,8 +111,8 @@ export function Landing({
     onEnterReader();
   }, [app, onEnterReader, parsed]);
 
-  // The day's verse exports straight to a PNG of the card on screen — same
-  // background, same overlay — instead of opening the image editor.
+  // The day's verse downloads the share card for this same photograph,
+  // without opening the editor.
   const saveImage = useCallback(async () => {
     if (!displayText || exporting) return;
     setExporting(true);
@@ -123,11 +123,15 @@ export function Landing({
           text: displayText,
           translation: translationName || 'KJV',
           background: '#111111',
-          textColor: '#ffffff',
-          accent: '#947849',
-          fontStack: app.font.stack,
+          textColor: '#fff9ed',
+          accent: '#d8bc87',
+          style: 'photograph',
+          fontStack: verseImageFont(app.font.stack),
           fontSize: verseImageFontRange.defaultSize,
-          overlayOpacity: artOverlay,
+          overlayOpacity: art.kind === 'black' ? 0.22 : 0.34,
+          brand: label.imageBrand,
+          edition: label.imageEdition,
+          tooLong: label.imageTooLong,
         },
         artUrl,
         verseImageFilename(bookName || 'verse', parsed?.chapter ?? 1),
@@ -136,7 +140,7 @@ export function Landing({
     } finally {
       setExporting(false);
     }
-  }, [app.font.stack, artOverlay, artUrl, bookName, displayReference, displayText, exporting, onShareImage, parsed, translationName]);
+  }, [app.font.stack, art.kind, artUrl, bookName, displayReference, displayText, exporting, label.imageBrand, label.imageEdition, label.imageTooLong, onShareImage, parsed, translationName]);
 
   return (
     <div className="landing">

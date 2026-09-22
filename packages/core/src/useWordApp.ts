@@ -333,8 +333,11 @@ export function useWordApp({ storage, speech, clipboard, voices }: Platform, ini
       })));
       return;
     }
+    // Playback waits for the chapter. Unlock after stop(), still in this click —
+    // a pause() after the silent play() is what Chrome Android rejects.
+    speech.unlock?.();
     setPendingSpeak({ kind: 'chapter', bookId: targetBook, chapter: targetChapter, verse: focusVerse ?? 1 });
-  }, [chapterIs, chapter, player, label, bookName]);
+  }, [chapterIs, chapter, player, label, bookName, speech]);
 
   // Continuous read-aloud from this verse to the end of the chapter, then onward.
   const speakFromVerse = useCallback((targetBook: number, targetChapter: number, verseNumber: number) => {
@@ -356,8 +359,10 @@ export function useWordApp({ storage, speech, clipboard, voices }: Platform, ini
       })));
       return;
     }
+    // Same gesture rule as speakChapterAt: unlock only once stop() has paused.
+    speech.unlock?.();
     setPendingSpeak({ kind: 'from', bookId: targetBook, chapter: targetChapter, verse: verseNumber });
-  }, [chapterIs, chapter, player, label, bookName]);
+  }, [chapterIs, chapter, player, label, bookName, speech]);
 
   const speakSelection = useCallback(() => {
     if (!chapter) return;

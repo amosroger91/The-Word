@@ -23,7 +23,7 @@ export const verseBackgrounds: VerseBackground[] = [
 
 export const verseTextColors = ['#ffffff', '#f7f4ee', '#e7ddc9', '#947849', '#292720', '#111111'];
 
-export const verseImageFontRange = { min: 28, max: 72, defaultSize: 46 };
+export const verseImageFontRange = { min: 32, max: 88, defaultSize: 64 };
 export const defaultColorOverlay = 0.48;
 
 export function overlayFor(kind: VerseBackgroundKind) {
@@ -45,6 +45,7 @@ export function backgroundForSeed(seed: string) {
 }
 
 export interface VerseImageDraft {
+  style: 'paper' | 'photograph';
   backgroundId: string;
   overlayOpacity: number;
   fontSize: number;
@@ -53,9 +54,10 @@ export interface VerseImageDraft {
 
 export function draftForBackground(background: VerseBackground): VerseImageDraft {
   return {
+    style: 'paper',
     backgroundId: background.id,
-    overlayOpacity: overlayFor(background.kind),
+    overlayOpacity: 0.08,
     fontSize: verseImageFontRange.defaultSize,
-    textColor: '#ffffff',
+    textColor: '#26332d',
   };
 }

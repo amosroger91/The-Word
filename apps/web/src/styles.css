@@ -533,7 +533,7 @@ select, input { border: 1px solid #c9c1b3; border-radius: 8px; background: trans
 .image-editor-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .image-editor-header h2 { margin: 0; font-weight: 400; font-size: 22px; }
 .image-editor-header button { border: 0; background: transparent; color: inherit; font-size: 28px; line-height: 1; }
-.image-editor-preview { width: 100%; height: auto; max-height: 32vh; object-fit: contain; border-radius: 12px; background: #111; }
+.image-editor-preview { width: 100%; height: auto; max-height: 32vh; object-fit: contain; border-radius: 12px; background: #f4efe6; }
 .image-editor-controls { display: grid; gap: 12px; }
 .image-editor-thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 8px; }
 .image-editor-thumbs .thumb { position: relative; aspect-ratio: 3 / 4; border: 2px solid transparent; border-radius: 8px; background: #111 center / cover no-repeat; overflow: hidden; padding: 0; }
@@ -549,6 +549,17 @@ select, input { border: 1px solid #c9c1b3; border-radius: 8px; background: trans
 .image-editor-actions { display: flex; gap: 10px; }
 .image-editor-actions > button { flex: 1; }
 .image-editor-send { border: 1px solid #947849; border-radius: 10px; background: transparent; color: #947849; padding: 12px 16px; font-size: 16px; }
+.image-editor-artboard { position: relative; }
+.image-editor-loading { position: absolute; inset: 0; display: grid; place-items: center; background: #0003; color: #fff; border-radius: 12px; }
+.image-editor-caption { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; letter-spacing: .04em; opacity: .72; }
+.image-editor-error { margin: 0; color: #8c3a32; }
+.image-editor-styles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.image-editor-styles button { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 8px 12px; border: 1px solid var(--line, #d9d1c3); border-radius: 10px; background: transparent; color: inherit; }
+.image-editor-styles button.active { border-color: #947849; background: #94784918; }
+.image-style-sample { width: 28px; height: 36px; border-radius: 4px; border: 1px solid #0002; flex: 0 0 auto; }
+.image-style-sample.paper { background: linear-gradient(#f6f1e7 64%, #7f9488 64%); }
+.image-style-sample.photograph { background: linear-gradient(160deg, #314e49, #c5b28c); }
+.image-editor-hint { color: var(--muted, #6d675d); font-size: 12px; line-height: 1.4; }
 .reader-chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .reader-chip { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 6px 12px 6px 6px; border: 1px solid var(--line, #c9c1b3); border-radius: 999px; background: transparent; color: inherit; }
 .reader-chip.active { border-color: #947849; background: #e7ddc9; }

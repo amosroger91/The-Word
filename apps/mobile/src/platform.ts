@@ -66,7 +66,7 @@ export function createNativeSpeech(): SpeechAdapter {
           onStopped: () => finish('stopped'),
           onError: (error) => {
             settle = null;
-            reject(error instanceof Error ? error : new Error('The device could not read this verse.'));
+            reject(error instanceof Error ? error : Object.assign(new Error('The device could not read this verse.'), { code: 'speechDeviceFailed' }));
           },
         });
       });

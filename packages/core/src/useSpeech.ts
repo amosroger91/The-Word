@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { strings } from './i18n';
 import type { SpeakOptions, SpeechAdapter } from './platform';
 
 export interface SpeechChunk {
@@ -21,6 +22,28 @@ function isPlayInterrupted(error: unknown): boolean {
   if (!error || typeof error !== 'object') return false;
   const err = error as { name?: string; message?: string };
   return err.name === 'AbortError' || /interrupted by a call to pause/i.test(err.message ?? '');
+}
+
+function spokenError(error: unknown, language: SpeakOptions['language']): string {
+  const copy = strings[language];
+  const code = error && typeof error === 'object' && 'code' in error ? (error as { code?: unknown }).code : undefined;
+  switch (code) {
+    case 'speechInterrupted': return copy.speechInterrupted;
+    case 'speechCouldNotPlay': return copy.speechCouldNotPlay;
+    case 'speechPlaybackInterrupted': return copy.speechPlaybackInterrupted;
+    case 'speechStalled': return copy.speechStalled;
+    case 'speechVoiceTimeout': return copy.speechVoiceTimeout;
+    case 'speechVoiceEmpty': return copy.speechVoiceEmpty;
+    case 'speechVoiceStopped': return copy.speechVoiceStopped;
+    case 'speechVoiceUnreadable': return copy.speechVoiceUnreadable;
+    case 'speechVoiceStart': return copy.speechVoiceStart;
+    case 'speechFailed': return copy.speechFailed;
+    case 'speechDeviceFailed': return copy.speechDeviceFailed;
+    default:
+      if (isPlayInterrupted(error)) return copy.speechInterrupted;
+      if (error instanceof Error && error.message) return error.message;
+      return copy.speechFailed;
+  }
 }
 
 export function useSpeech(adapter: SpeechAdapter, options: SpeakOptions, onComplete?: () => void) {
@@ -62,7 +85,7 @@ export function useSpeech(adapter: SpeechAdapter, options: SpeakOptions, onCompl
           if (stateRef.current === 'speaking') {
             stateRef.current = 'paused';
             setState('paused');
-            setError('Reading was interrupted. Press Resume to continue from this verse.');
+            setError(strings[optionsRef.current.language].speechInterrupted);
           }
           return;
         }
@@ -84,15 +107,15 @@ export function useSpeech(adapter: SpeechAdapter, options: SpeakOptions, onCompl
         setState('paused');
         return;
       }
-      // Chrome Android rejects play() when a pause() races the start of playback.
-      // The adapter retries; if one still escapes, do not show it as a hard failure.
+      // pause() raced the gesture play() and the adapter's retries were used up.
+      // Leave this verse paused so Resume retries it, instead of advancing the chapter.
       if (isPlayInterrupted(e)) {
-        setError('Reading was interrupted. Press Resume to continue from this verse.');
+        setError(strings[optionsRef.current.language].speechInterrupted);
         stateRef.current = 'paused';
         setState('paused');
         return;
       }
-      setError(e instanceof Error ? e.message : 'Speech failed.');
+      setError(spokenError(e, optionsRef.current.language));
       stateRef.current = 'paused';
       setState('paused');
     }
@@ -102,7 +125,9 @@ export function useSpeech(adapter: SpeechAdapter, options: SpeakOptions, onCompl
     if (!chunks.length) return;
     const requestId = requestRef.current + 1;
     requestRef.current = requestId;
-    adapter.stop();
+    // Keep a silent unlock that already started in this click. Pausing it here
+    // is what makes Chrome Android reject the gesture play().
+    adapter.stop({ preserveUnlock: true });
     adapter.unlock?.();
     queueRef.current = chunks;
     indexRef.current = 0;
@@ -138,6 +163,8 @@ export function useSpeech(adapter: SpeechAdapter, options: SpeakOptions, onCompl
     queueRef.current = [];
     indexRef.current = 0;
     setSpeakingVerse(null);
+    setError('');
+    setAutoplayBlocked(false);
     stateRef.current = 'idle';
     setState('idle');
   }, [adapter]);

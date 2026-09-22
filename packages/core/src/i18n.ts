@@ -35,6 +35,17 @@ export interface Strings {
   readSelection: string;
   pause: string;
   resume: string;
+  speechInterrupted: string;
+  speechCouldNotPlay: string;
+  speechPlaybackInterrupted: string;
+  speechStalled: string;
+  speechVoiceTimeout: string;
+  speechVoiceEmpty: string;
+  speechVoiceStopped: string;
+  speechVoiceUnreadable: string;
+  speechVoiceStart: string;
+  speechFailed: string;
+  speechDeviceFailed: string;
   stop: string;
   readingAloud: string;
   paused: string;
@@ -54,6 +65,13 @@ export interface Strings {
   booksCovered: string;
   mostShared: string;
   image: string;
+  imageStyle: string;
+  imagePaper: string;
+  imagePhotograph: string;
+  imageAutoFit: string;
+  imageBrand: string;
+  imageEdition: string;
+  imageTooLong: string;
   exporting: string;
   clearSelection: string;
   loading: string;
@@ -330,9 +348,22 @@ export const strings: Record<Language, Strings> = {
     decreaseVolume: 'Decrease volume',
     increaseVolume: 'Increase volume',
     readAloud: 'Listen',
+    imageStyle: 'Image style', imagePaper: 'Paper', imagePhotograph: 'Photograph', imageAutoFit: 'Text adjusts to fit. Every word stays in the image.',
+    imageBrand: 'THE WORD', imageEdition: 'HOLY BIBLE', imageTooLong: 'This passage is too long for one image. Select fewer verses so the text stays readable.',
     readSelection: 'Listen to selection',
     pause: 'Pause',
     resume: 'Resume',
+    speechInterrupted: 'Reading was interrupted. Press Resume to continue from this verse.',
+    speechCouldNotPlay: 'This verse could not play. Press Resume to retry it.',
+    speechPlaybackInterrupted: 'Playback was interrupted. Press Resume to retry this verse.',
+    speechStalled: 'Playback stopped responding. Press Resume to continue from this verse.',
+    speechVoiceTimeout: 'The narration voice took too long to respond. Press Resume to retry this verse.',
+    speechVoiceEmpty: 'The narration voice returned no audio.',
+    speechVoiceStopped: 'The narration voice stopped responding.',
+    speechVoiceUnreadable: 'The narration voice returned unreadable audio.',
+    speechVoiceStart: 'Could not start narration.',
+    speechFailed: 'Speech failed.',
+    speechDeviceFailed: 'The device could not read this verse.',
     stop: 'Stop',
     readingAloud: 'Reading aloud',
     paused: 'Paused',
@@ -620,9 +651,22 @@ export const strings: Record<Language, Strings> = {
     decreaseVolume: 'Bajar el volumen',
     increaseVolume: 'Subir el volumen',
     readAloud: 'Escuchar',
+    imageStyle: 'Estilo de imagen', imagePaper: 'Papel', imagePhotograph: 'Fotografía', imageAutoFit: 'El texto se ajusta. Todas las palabras se conservan.',
+    imageBrand: 'LA PALABRA', imageEdition: 'SANTA BIBLIA', imageTooLong: 'Este pasaje es demasiado largo para una imagen. Elige menos versículos para que el texto se lea bien.',
     readSelection: 'Escuchar la selección',
     pause: 'Pausar',
     resume: 'Reanudar',
+    speechInterrupted: 'La lectura se interrumpió. Pulsa Reanudar para continuar desde este versículo.',
+    speechCouldNotPlay: 'No se pudo reproducir este versículo. Pulsa Reanudar para intentarlo de nuevo.',
+    speechPlaybackInterrupted: 'La reproducción se interrumpió. Pulsa Reanudar para reintentar este versículo.',
+    speechStalled: 'La reproducción dejó de responder. Pulsa Reanudar para continuar desde este versículo.',
+    speechVoiceTimeout: 'La voz tardó demasiado en responder. Pulsa Reanudar para reintentar este versículo.',
+    speechVoiceEmpty: 'La voz no devolvió audio.',
+    speechVoiceStopped: 'La voz dejó de responder.',
+    speechVoiceUnreadable: 'La voz devolvió un audio ilegible.',
+    speechVoiceStart: 'No se pudo iniciar la narración.',
+    speechFailed: 'Falló la lectura.',
+    speechDeviceFailed: 'El dispositivo no pudo leer este versículo.',
     stop: 'Detener',
     readingAloud: 'Leyendo en voz alta',
     paused: 'En pausa',
@@ -910,9 +954,22 @@ export const strings: Record<Language, Strings> = {
     decreaseVolume: 'Baisser le volume',
     increaseVolume: 'Augmenter le volume',
     readAloud: 'Écouter',
+    imageStyle: 'Style d’image', imagePaper: 'Papier', imagePhotograph: 'Photographie', imageAutoFit: 'Le texte s’adapte. Chaque mot est conservé.',
+    imageBrand: 'LA PAROLE', imageEdition: 'SAINTE BIBLE', imageTooLong: 'Ce passage est trop long pour une image. Sélectionnez moins de versets afin que le texte reste lisible.',
     readSelection: 'Écouter la sélection',
     pause: 'Pause',
     resume: 'Reprendre',
+    speechInterrupted: 'La lecture a été interrompue. Appuyez sur Reprendre pour continuer à partir de ce verset.',
+    speechCouldNotPlay: 'Ce verset n’a pas pu être lu. Appuyez sur Reprendre pour réessayer.',
+    speechPlaybackInterrupted: 'La lecture audio a été interrompue. Appuyez sur Reprendre pour réessayer ce verset.',
+    speechStalled: 'La lecture ne répond plus. Appuyez sur Reprendre pour continuer à partir de ce verset.',
+    speechVoiceTimeout: 'La voix a mis trop de temps à répondre. Appuyez sur Reprendre pour réessayer ce verset.',
+    speechVoiceEmpty: 'La voix n’a renvoyé aucun son.',
+    speechVoiceStopped: 'La voix ne répond plus.',
+    speechVoiceUnreadable: 'La voix a renvoyé un son illisible.',
+    speechVoiceStart: 'Impossible de lancer la narration.',
+    speechFailed: 'La lecture a échoué.',
+    speechDeviceFailed: 'L’appareil n’a pas pu lire ce verset.',
     stop: 'Arrêter',
     readingAloud: 'Lecture en cours',
     paused: 'En pause',
@@ -1200,9 +1257,22 @@ export const strings: Record<Language, Strings> = {
     decreaseVolume: '降低音量',
     increaseVolume: '提高音量',
     readAloud: '收听',
+    imageStyle: '图片样式', imagePaper: '纸张', imagePhotograph: '照片', imageAutoFit: '文字自动调整大小，保留每一个字。',
+    imageBrand: '圣言', imageEdition: '圣经', imageTooLong: '这段经文太长，放不进一张图片。请少选几节，让文字保持清晰。',
     readSelection: '收听所选',
     pause: '暂停',
     resume: '继续',
+    speechInterrupted: '朗读被打断。请按「继续」从这一节接着读。',
+    speechCouldNotPlay: '这一节无法播放。请按「继续」重试。',
+    speechPlaybackInterrupted: '播放被打断。请按「继续」重试这一节。',
+    speechStalled: '播放没有响应。请按「继续」从这一节接着读。',
+    speechVoiceTimeout: '朗读语音响应超时。请按「继续」重试这一节。',
+    speechVoiceEmpty: '朗读语音没有返回音频。',
+    speechVoiceStopped: '朗读语音停止了响应。',
+    speechVoiceUnreadable: '朗读语音返回了无法读取的音频。',
+    speechVoiceStart: '无法开始朗读。',
+    speechFailed: '朗读失败。',
+    speechDeviceFailed: '设备无法朗读这一节。',
     stop: '停止',
     readingAloud: '正在朗读',
     paused: '已暂停',
@@ -1490,9 +1560,22 @@ export const strings: Record<Language, Strings> = {
     decreaseVolume: 'Giảm âm lượng',
     increaseVolume: 'Tăng âm lượng',
     readAloud: 'Nghe',
+    imageStyle: 'Kiểu ảnh', imagePaper: 'Giấy', imagePhotograph: 'Ảnh', imageAutoFit: 'Chữ tự điều chỉnh để vừa ảnh. Mọi từ đều được giữ nguyên.',
+    imageBrand: 'LỜI CHÚA', imageEdition: 'KINH THÁNH', imageTooLong: 'Đoạn này quá dài cho một ảnh. Hãy chọn ít câu hơn để chữ vẫn dễ đọc.',
     readSelection: 'Nghe phần đã chọn',
     pause: 'Tạm dừng',
     resume: 'Tiếp tục',
+    speechInterrupted: 'Phần đọc bị gián đoạn. Nhấn Tiếp tục để đọc tiếp từ câu này.',
+    speechCouldNotPlay: 'Không phát được câu này. Nhấn Tiếp tục để thử lại.',
+    speechPlaybackInterrupted: 'Phát âm bị gián đoạn. Nhấn Tiếp tục để thử lại câu này.',
+    speechStalled: 'Phát âm không còn phản hồi. Nhấn Tiếp tục để đọc tiếp từ câu này.',
+    speechVoiceTimeout: 'Giọng đọc phản hồi quá lâu. Nhấn Tiếp tục để thử lại câu này.',
+    speechVoiceEmpty: 'Giọng đọc không trả về âm thanh.',
+    speechVoiceStopped: 'Giọng đọc đã ngừng phản hồi.',
+    speechVoiceUnreadable: 'Giọng đọc trả về âm thanh không đọc được.',
+    speechVoiceStart: 'Không thể bắt đầu đọc.',
+    speechFailed: 'Không đọc được.',
+    speechDeviceFailed: 'Thiết bị không đọc được câu này.',
     stop: 'Dừng',
     readingAloud: 'Đang đọc',
     paused: 'Đã tạm dừng',

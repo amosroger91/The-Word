@@ -52,7 +52,6 @@ export function Landing({
 
   function enter(speak: 'from' | 'chapter' | 'none') {
     if (!parsed) return;
-    if (speak !== 'none') app.unlockSpeech();
     if (speak === 'from') app.speakFromVerse(parsed.bookId, parsed.chapter, parsed.verse);
     else if (speak === 'chapter') app.speakChapterAt(parsed.bookId, parsed.chapter, parsed.verse);
     else app.goToVerse(parsed.bookId, parsed.chapter, parsed.verse);

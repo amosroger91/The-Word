@@ -45,6 +45,14 @@ export function createWebSpeech(): SpeechAdapter {
   let pausedByUser = false;
   let cancelPlayback: (() => void) | null = null;
   let resumePlayback: (() => void) | null = null;
+  // True while the silent gesture clip is looping. A later speak() must not pause it.
+  let gestureUnlock = false;
+
+  function speechFailure(code: string, message: string) {
+    const error = new Error(message);
+    (error as Error & { code: string }).code = code;
+    return error;
+  }
 
   function revokeUrl() {
     if (objectUrl) {
@@ -83,8 +91,14 @@ export function createWebSpeech(): SpeechAdapter {
       const started = generation;
       const file = await synthesizer.synthesize(text, options.voice, () => started === generation);
       if (!file || started !== generation) return 'stopped';
+      // Stop cancels an in-flight warm-up. A finished verse means this voice is ready.
+      if (warmedVoice === options.voice) {
+        window.dispatchEvent(new CustomEvent('word-voice-state', { detail: { voice: options.voice, state: 'ready' } }));
+      }
       revokeUrl();
       objectUrl = URL.createObjectURL(file);
+      audio.loop = false;
+      gestureUnlock = false;
       audio.src = objectUrl;
       audio.playbackRate = rate;
       audio.volume = volume;
@@ -118,7 +132,7 @@ export function createWebSpeech(): SpeechAdapter {
           audio.onended = () => finish(stale() ? 'stopped' : 'ended');
           audio.onerror = () => {
             if (stale()) finish('stopped');
-            else finish('stopped', new Error('This verse could not play. Press Resume to retry it.'));
+            else finish('stopped', speechFailure('speechCouldNotPlay', 'This verse could not play. Press Resume to retry it.'));
           };
           // stop() bumps generation then pauses; a user pause does not, so the
           // verse stays pending for resume(). Android Chrome also pauses internally
@@ -140,7 +154,7 @@ export function createWebSpeech(): SpeechAdapter {
               // replaces src. Retry twice, then expose a resumable failure.
               if (isPlayInterrupted(err)) {
                 if (tries > 0) retryTimer = window.setTimeout(() => attemptPlay(tries - 1), 60);
-                else finish('stopped', new Error('Playback was interrupted. Press Resume to retry this verse.'));
+                else finish('stopped', speechFailure('speechPlaybackInterrupted', 'Playback was interrupted. Press Resume to retry this verse.'));
                 return;
               }
               finish('stopped', err);
@@ -159,7 +173,7 @@ export function createWebSpeech(): SpeechAdapter {
             } else if (Date.now() - lastProgress >= 15_000) {
               lastProgress = Date.now();
               if (recoveries++ < 2) attemptPlay(2);
-              else finish('stopped', new Error('Playback stopped responding. Press Resume to continue from this verse.'));
+              else finish('stopped', speechFailure('speechStalled', 'Playback stopped responding. Press Resume to continue from this verse.'));
             }
           }, 1000);
 
@@ -195,8 +209,18 @@ export function createWebSpeech(): SpeechAdapter {
       resumePlayback();
       return true;
     },
-    stop() {
+    stop(options?: { preserveUnlock?: boolean }) {
       generation += 1;
+      synthesizer.cancel();
+      // The chapter was not loaded in the click, so a silent play() is holding
+      // the gesture open. Pausing it here drops Chrome Android autoplay.
+      if (options?.preserveUnlock && gestureUnlock && !hasVerse) {
+        cancelPlayback?.();
+        detachHandlers();
+        return;
+      }
+      gestureUnlock = false;
+      audio.loop = false;
       clearMedia();
     },
     // Fetch the voice model + initialise the WASM engine ahead of the first play,
@@ -217,16 +241,24 @@ export function createWebSpeech(): SpeechAdapter {
     // Play silence on the persistent element during a user gesture so later
     // verse playback (after TTS generation) is allowed without another tap.
     unlock() {
-      if (hasVerse) return;
+      if (hasVerse || gestureUnlock) return;
       const started = generation;
       const prev = audio.volume;
+      gestureUnlock = true;
       audio.volume = 0;
+      // Loop until the verse replaces src. The clip is tiny; if it ends first,
+      // the element pauses and the later play() is outside the gesture.
+      audio.loop = true;
       audio.src = SILENT_WAV;
       // Do not pause() after this play() — on Chrome Android that rejects an
-              // overlapping verse play() with "interrupted by a call to pause()".
+      // overlapping verse play() with "interrupted by a call to pause()".
       // speak() replaces src when the verse is ready; volume is restored there.
       void audio.play().catch(() => {
-        if (started === generation && !hasVerse) audio.volume = prev;
+        if (started === generation && !hasVerse) {
+          gestureUnlock = false;
+          audio.loop = false;
+          audio.volume = prev;
+        }
       });
     },
     setRate(next: number) {
@@ -239,6 +271,8 @@ export function createWebSpeech(): SpeechAdapter {
     },
     dispose() {
       generation += 1;
+      gestureUnlock = false;
+      audio.loop = false;
       clearMedia();
       warmedVoice = null;
       synthesizer.dispose();

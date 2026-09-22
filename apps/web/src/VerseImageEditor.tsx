@@ -3,15 +3,17 @@ import {
   backgroundById,
   backgroundForSeed,
   draftForBackground,
-  overlayFor,
   loadVerseImage,
+  loadVerseImageFonts,
   paintVerseImage,
+  verseImageFont,
   verseBackgrounds,
   verseImageFontRange,
   verseImageSize,
   verseTextColors,
   type Strings,
   type VerseImageDraft,
+  type VerseImageStyle,
 } from '@the-word/core';
 
 export interface VerseImageJob {
@@ -42,8 +44,11 @@ export function VerseImageEditor({
   const base = import.meta.env.BASE_URL;
   const [draft, setDraft] = useState<VerseImageDraft>(() => draftForBackground(backgroundForSeed(job.seed || job.reference)));
   const [saving, setSaving] = useState(false);
+  const [ready, setReady] = useState(false);
+  const [error, setError] = useState('');
+  const [fittedSize, setFittedSize] = useState(draft.fontSize);
   const previewRef = useRef<HTMLCanvasElement>(null);
-  const imageRef = useRef<HTMLImageElement | null>(null);
+  const imageRef = useRef<{ src: string; image: HTMLImageElement | null } | null>(null);
   const background = backgroundById(draft.backgroundId);
   const src = `${base}backgrounds/${background.file}`;
 
@@ -54,44 +59,42 @@ export function VerseImageEditor({
     background: '#111111',
     textColor: draft.textColor,
     accent: '#947849',
-    fontStack,
+    style: draft.style,
+    fontStack: verseImageFont(fontStack),
     fontSize: draft.fontSize,
     overlayOpacity: draft.overlayOpacity,
-  }), [draft.fontSize, draft.overlayOpacity, draft.textColor, fontStack, job]);
-  const inputRef = useRef(input);
-  inputRef.current = input;
-
-  function paint() {
-    const canvas = previewRef.current;
-    const ctx = canvas?.getContext('2d');
-    if (!canvas || !ctx) return;
-    canvas.width = verseImageSize.width;
-    canvas.height = verseImageSize.height;
-    paintVerseImage(ctx, inputRef.current, imageRef.current);
-  }
+    brand: label.imageBrand,
+    edition: label.imageEdition,
+    tooLong: label.imageTooLong,
+  }), [draft.fontSize, draft.overlayOpacity, draft.textColor, draft.style, fontStack, job, label.imageBrand, label.imageEdition, label.imageTooLong]);
 
   useEffect(() => {
     let active = true;
-    imageRef.current = null;
-    void loadVerseImage(src).then((image) => {
+    setReady(false); setError('');
+    const backgroundImage = imageRef.current?.src === src ? Promise.resolve(imageRef.current.image) : loadVerseImage(src).catch(() => null);
+    void Promise.all([backgroundImage, loadVerseImageFonts(input.fontStack)]).then(([image]) => {
       if (!active) return;
-      imageRef.current = image;
-      paint();
-    }).catch(() => {
-      if (active) paint();
+      imageRef.current = { src, image };
+      const canvas = previewRef.current;
+      const ctx = canvas?.getContext('2d');
+      if (!canvas || !ctx) throw new Error('Image preview is unavailable.');
+      canvas.width = verseImageSize.width; canvas.height = verseImageSize.height;
+      const layout = paintVerseImage(ctx, input, image);
+      setFittedSize(layout.fontSize); setReady(true);
+    }).catch((cause) => {
+      if (active) setError(cause instanceof Error ? cause.message : 'Could not prepare this image.');
     });
     return () => { active = false; };
-  }, [src]);
+  }, [src, input]);
 
-  useEffect(() => { paint(); }, [input]);
+  function pickStyle(style: VerseImageStyle) {
+    setReady(false);
+    setDraft(current => ({ ...current, style, textColor: style === 'paper' ? '#26332d' : '#fff9ed', overlayOpacity: style === 'paper' ? 0.08 : 0.34 }));
+  }
 
   function pickBackground(id: string) {
-    const next = backgroundById(id);
-    setDraft((current) => ({
-      ...current,
-      backgroundId: next.id,
-      overlayOpacity: overlayFor(next.kind),
-    }));
+    setReady(false);
+    setDraft((current) => ({ ...current, backgroundId: id }));
   }
 
   // Web Share Level 2 (files) is not everywhere — probe once so the button only
@@ -107,45 +110,43 @@ export function VerseImageEditor({
 
   async function shareImage() {
     const canvas = previewRef.current;
-    if (!canvas) return;
+    if (!canvas || !ready || saving) return;
     setSaving(true);
-    if (!imageRef.current) {
-      try { imageRef.current = await loadVerseImage(src); paint(); } catch { /* keep fallback fill */ }
-    } else paint();
-    const blob = await new Promise<Blob | null>((resolve) => { canvas.toBlob(resolve, 'image/png'); });
-    if (!blob) { setSaving(false); void save(); return; }
     try {
+      const blob = await new Promise<Blob | null>((resolve) => { canvas.toBlob(resolve, 'image/png'); });
+      if (!blob) throw new Error('Could not prepare the PNG. Try Save image.');
       await navigator.share({
         files: [new File([blob], job.filename, { type: 'image/png' })],
         title: job.reference,
         text: `${job.reference} (${job.translation})`,
       });
     } catch (error) {
-      setSaving(false);
       // Backing out of the share sheet is not a failure, and records nothing.
       if ((error as { name?: string }).name === 'AbortError') return;
-      void save();
+      setError('Sharing is unavailable. Use Save image to download your artwork.');
       return;
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
     onShared?.();
     onClose();
   }
 
   async function save() {
     const canvas = previewRef.current;
-    if (!canvas) return;
+    if (!canvas || !ready || saving) return;
     setSaving(true);
-    if (!imageRef.current) {
-      try { imageRef.current = await loadVerseImage(src); paint(); } catch { /* keep fallback fill */ }
-    } else paint();
-    const link = document.createElement('a');
-    link.download = job.filename;
-    link.href = canvas.toDataURL('image/png');
-    link.click();
-    setSaving(false);
-    onSaved?.();
-    onClose();
+    try {
+      const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'));
+      if (!blob) throw new Error('Could not prepare the PNG. Please try again.');
+      const href = URL.createObjectURL(blob);
+      const link = document.createElement('a'); link.download = job.filename; link.href = href;
+      document.body.appendChild(link); link.click(); link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(href), 60_000);
+      onSaved?.(); onClose();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not save the image.');
+    } finally { setSaving(false); }
   }
 
   return (
@@ -155,8 +156,17 @@ export function VerseImageEditor({
           <h2>{label.createImage}</h2>
           <button type="button" onClick={onClose} aria-label={label.closeEditor}>×</button>
         </div>
-        <canvas ref={previewRef} className="image-editor-preview" width={verseImageSize.width} height={verseImageSize.height} />
+        <div className="image-editor-artboard" aria-busy={!ready&&!error}>
+          <canvas ref={previewRef} className="image-editor-preview" width={verseImageSize.width} height={verseImageSize.height} aria-label={`${job.reference} — ${job.text}`} role="img" />
+          {!ready&&!error&&<span className="image-editor-loading" role="status">{label.loading}</span>}
+        </div>
+        <div className="image-editor-caption"><span>{job.reference}</span><span>1080 × 1350 · PNG</span></div>
+        {error&&<p className="image-editor-error" role="alert">{error}</p>}
         <div className="image-editor-controls">
+          <div className="image-editor-styles" role="group" aria-label={label.imageStyle}>
+            <button className={draft.style==='paper'?'active':''} aria-pressed={draft.style==='paper'} onClick={()=>pickStyle('paper')}><span className="image-style-sample paper"/>{label.imagePaper}</button>
+            <button className={draft.style==='photograph'?'active':''} aria-pressed={draft.style==='photograph'} onClick={()=>pickStyle('photograph')}><span className="image-style-sample photograph"/>{label.imagePhotograph}</button>
+          </div>
           <span className="section-label">{label.background}</span>
           <div className="image-editor-thumbs">
             {verseBackgrounds.map((item) => (
@@ -165,6 +175,8 @@ export function VerseImageEditor({
                 type="button"
                 className={item.id === draft.backgroundId ? 'thumb active' : 'thumb'}
                 onClick={() => pickBackground(item.id)}
+                aria-pressed={item.id === draft.backgroundId}
+                disabled={saving}
                 title={item.name}
                 style={{ backgroundImage: `url(${base}backgrounds/${item.file})` }}
               >
@@ -173,14 +185,15 @@ export function VerseImageEditor({
             ))}
           </div>
           <label className="image-editor-field">
-            <span className="section-label">{label.textSize} · {draft.fontSize}px</span>
-            <input type="range" min={verseImageFontRange.min} max={verseImageFontRange.max} value={draft.fontSize} onChange={(event) => setDraft((current) => ({ ...current, fontSize: Number(event.target.value) }))} />
+            <span className="section-label">{label.textSize} · {fittedSize}px</span>
+            <input aria-label={label.textSize} type="range" min={verseImageFontRange.min} max={verseImageFontRange.max} value={draft.fontSize} onChange={(event) => setDraft((current) => ({ ...current, fontSize: Number(event.target.value) }))} />
+            <small className="image-editor-hint">{label.imageAutoFit}</small>
           </label>
           <div className="image-editor-field">
             <span className="section-label">{label.textColor}</span>
             <div className="image-editor-colors">
               {verseTextColors.map((color) => (
-                <button key={color} type="button" className={draft.textColor === color ? 'swatch active' : 'swatch'} style={{ background: color }} onClick={() => setDraft((current) => ({ ...current, textColor: color }))} aria-label={color} />
+                <button key={color} type="button" className={draft.textColor === color ? 'swatch active' : 'swatch'} style={{ background: color }} onClick={() => setDraft((current) => ({ ...current, textColor: color }))} aria-label={color} aria-pressed={draft.textColor === color} />
               ))}
               <input type="color" value={draft.textColor} onChange={(event) => setDraft((current) => ({ ...current, textColor: event.target.value }))} aria-label={label.textColor} />
             </div>
@@ -190,8 +203,8 @@ export function VerseImageEditor({
             <input type="range" min={0} max={80} value={Math.round(draft.overlayOpacity * 100)} onChange={(event) => setDraft((current) => ({ ...current, overlayOpacity: Number(event.target.value) / 100 }))} />
           </label>
           <div className="image-editor-actions">
-            {canShareFiles && <button type="button" className="image-editor-send" onClick={() => { void shareImage(); }} disabled={saving}>{label.sendImage}</button>}
-            <button type="button" className="image-editor-save" onClick={() => { void save(); }} disabled={saving}>{saving ? label.exporting : label.saveImage}</button>
+            {canShareFiles && <button type="button" className="image-editor-send" onClick={() => { void shareImage(); }} disabled={saving||!ready}>{label.sendImage}</button>}
+            <button type="button" className="image-editor-save" onClick={() => { void save(); }} disabled={saving||!ready}>{saving ? label.exporting : label.saveImage}</button>
           </div>
         </div>
       </div>
