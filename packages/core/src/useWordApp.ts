@@ -530,6 +530,8 @@ export function useWordApp({ storage, speech, clipboard, voices }: Platform, ini
     crossRefs,
     speechState: player.state,
     speakingVerse: player.speakingVerse,
+    speechFinished: player.finished,
+    speechSession: player.session,
     speechError: player.error,
     autoplayBlocked: player.autoplayBlocked,
     speechVoice,

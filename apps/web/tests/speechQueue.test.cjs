@@ -73,6 +73,19 @@ test('stop during synthesis does not resurrect playback or advance the chapter',
     assert.equal(h.current.state,'idle');assert.equal(h.current.speakingVerse,null);assert.equal(h.pending.length,1);assert.equal(h.completions,0);
   }finally{h.runner.dispose();}
 });
+
+test('only a naturally drained queue marks speech finished; replay gets a fresh session',async()=>{
+  const h=setup();try{
+    h.current.speak(chunks);const first=h.current.session;
+    assert.equal(h.current.finished,false);
+    h.pending[0].resolve('ended');await tick();assert.equal(h.current.finished,false);
+    h.pending[1].resolve('ended');await tick();assert.equal(h.current.finished,true);
+    h.current.stop();assert.equal(h.current.finished,false);
+    h.current.speak(chunks);assert.notEqual(h.current.session,first);
+    h.current.pause();assert.equal(h.current.finished,false);
+    h.current.resume();h.current.stop();assert.equal(h.current.finished,false);
+  }finally{h.runner.dispose();}
+});
 test('iOS restarts the retained verse after a speech failure instead of resuming a missing utterance',async()=>{
   let callbacks;const exports={};
   const speech={speak(text,options){callbacks=options;},pause(){},resume(){},stop(){}};

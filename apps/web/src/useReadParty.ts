@@ -5,6 +5,7 @@
 //    reads with its own Scripture and Piper voice.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { WordApp } from '@the-word/core';
+import { FollowReadingQueue } from './followReadingQueue';
 import { joinParty, type PartyAnswer, type PartyChatMessage, type PartyMember, type PartyQuestion, type PartyRoom, type ReadingState, type SharedAnswers } from './readParty';
 import { compressAvatar, loadIdentity, saveIdentity } from './identity';
 import { getCameraStream, getLocalStream, getScreenStream, getSystemAudioVolume, getVoiceFilter, setMedia, setSystemAudioVolume as applySystemAudioVolume, setVoiceFilter as applyVoiceFilter, startScreenShare, startSystemAudio, stopLocal, stopScreenShare, stopSystemAudio, unlockRemoteAudio, setDevices } from './media';
@@ -65,9 +66,7 @@ export function useReadParty(app: WordApp) {
   const [avatar, setAvatarValue] = useState<string | null>(identityRef.current.avatar);
   // The last reading state the HOST broadcast, so we don't re-send identical updates.
   const lastSentRef = useRef<string>('');
-  // Last verse this device actually started speaking, so we don't re-trigger the
-  // same verse on every heartbeat (which would stutter). Reset when position resets.
-  const spokenVerseRef = useRef<number | null>(null);
+  const followQueue = useRef(new FollowReadingQueue());
 
   const startParty = useCallback((joinCode: string, opts?: { armed?: boolean; findable?: boolean; create?: boolean }) => {
     if (roomRef.current) return;
@@ -78,7 +77,7 @@ export function useReadParty(app: WordApp) {
     appRef.current.stopSpeech(); setShared(null); setPresenting(false); setNarrationMuted(false);
     setError(''); setMessages([]); setMembers([]); setRemoteReading(null);
     setArmed(Boolean(opts?.armed)); setFollowing(true); lastSentRef.current = '';
-    spokenVerseRef.current = null;
+    followQueue.current.reset();
     setRemoteStreams({}); setMediaError(''); setCapped(false); setFocusVerseState(null);
     setFindable(Boolean(opts?.findable));
     const r = joinParty({
@@ -99,7 +98,9 @@ export function useReadParty(app: WordApp) {
         },
         onAnswerList: (list) => setAnswerList(list),
         onSharedAnswers: (shared) => setSharedAnswers(shared),
-        onReading: (state) => { setRemoteReading(state); setShared(state); },
+        // Capture every message before React batches renders, including short
+        // verses that arrive together while a slower device is still speaking.
+        onReading: (state) => { followQueue.current.receive(state); setRemoteReading(state); setShared(state); },
         onError: (c) => setError(c),
         onRemoteStream: (id, stream) => setRemoteStreams((prev) => ({ ...prev, [id]: stream })),
         onRemoteEnd: (id) => setRemoteStreams((prev) => {
@@ -119,6 +120,7 @@ export function useReadParty(app: WordApp) {
   const leaveParty = useCallback(() => {
     appRef.current.stopSpeech();
     room?.leave();
+    followQueue.current.reset();
     roomRef.current = null;
     capturePending.current = false;
     setMediaBusy(false);
@@ -139,7 +141,8 @@ export function useReadParty(app: WordApp) {
     room.sendChat(text); return true;
   }, [room, status]);
   const arm = useCallback(() => {
-    spokenVerseRef.current = null;
+    // Retry the interrupted verse and retain everything queued behind it.
+    if (appRef.current.speechState === 'paused') appRef.current.resumeSpeech();
     setArmed(true);
   }, []);
 
@@ -313,7 +316,7 @@ export function useReadParty(app: WordApp) {
   useEffect(() => {
     if (hadHost.current !== isHost) {
       roleChanged.current = true;
-      appRef.current.stopSpeech(); spokenVerseRef.current = null; lastSentRef.current = '';
+      appRef.current.stopSpeech(); followQueue.current.reset(); lastSentRef.current = '';
       setPresenting(false);
     }
     hadHost.current = isHost;
@@ -329,16 +332,17 @@ export function useReadParty(app: WordApp) {
     const state: ReadingState = playing ? {
       bookId: app.bookId, chapter: app.chapterNumber, translationId: app.translationId,
       verse: app.speakingVerse, action: actionFor(app.speechState),
+      playbackId: app.speechSession, finished: false,
       highlights: old?.bookId === app.bookId && old.chapter === app.chapterNumber ? old.highlights : [], ts: Date.now(),
-    } : old ? { ...old, action: 'live', ts: Date.now() } : {
+    } : old ? { ...old, action: 'live', finished: app.speechFinished, ts: Date.now() } : {
       bookId: app.bookId, chapter: app.chapterNumber, translationId: app.translationId,
       verse: null, highlights: [], action: 'live', ts: Date.now(),
     };
-    const key = JSON.stringify([state.bookId,state.chapter,state.verse,state.action,state.highlights,state.translationId]);
+    const key = JSON.stringify([state.bookId,state.chapter,state.verse,state.action,state.highlights,state.translationId,state.finished,state.playbackId]);
     if (key === lastSentRef.current) return;
     lastSentRef.current = key;
     setShared(state); room.setReadingState(state);
-  }, [room,isHost,app.bookId,app.chapterNumber,app.translationId,app.speechState,app.speakingVerse]);
+  }, [room,isHost,app.bookId,app.chapterNumber,app.translationId,app.speechState,app.speakingVerse,app.speechFinished,app.speechSession]);
 
   useEffect(() => {
     if (!room || !isHost) return;
@@ -352,17 +356,18 @@ export function useReadParty(app: WordApp) {
     appRef.current.stopSpeech();
     if (!isHost) setFollowing(false);
     setPresenting(false);
-    spokenVerseRef.current = null;
+    followQueue.current.reset();
   }, [isHost]);
   const returnToHost = useCallback(() => {
     const current = sharedRef.current;
     if (!current) return;
-    setFollowing(true); spokenVerseRef.current = null;
+    appRef.current.stopSpeech();
+    setFollowing(true); followQueue.current.reset();
     appRef.current.goToVerse(current.bookId,current.chapter,current.verse || 1);
   }, []);
   const toggleNarration = useCallback(() => {
     setNarrationMuted(value => !value);
-    appRef.current.stopSpeech(); spokenVerseRef.current = null;
+    appRef.current.stopSpeech(); followQueue.current.reset();
   }, []);
   const transferHost = useCallback((id: string) => {
     appRef.current.stopSpeech();
@@ -383,54 +388,65 @@ export function useReadParty(app: WordApp) {
   // a live floor left the room watching a highlight in silence. When the host
   // presses Listen, everyone reads along aloud, mics open or not.
 
-  // PARTICIPANT: apply the host's shared reading state to this device — follow the
-  // host's passage AND current verse, reading each verse with the local TTS.
+  // PARTICIPANT: synchronize at verse boundaries. Never cancel a slightly
+  // slower listener just because the host started the next verse or chapter.
   useEffect(() => {
-    if (!room || isHost || !remoteReading || !following) return;
+    const queue = followQueue.current;
+    if (!room || isHost || !following) { queue.reset(); return; }
     if (status !== 'connected' && status !== 'hosting') {
       if (app.speechState !== 'idle') appRef.current.stopSpeech();
-      spokenVerseRef.current = null; return;
+      queue.reset(); return;
     }
     const rs = remoteReading;
-    // 1. Follow the host to the passage first; re-runs once the new chapter loads.
-    if (app.bookId !== rs.bookId || app.chapterNumber !== rs.chapter) {
-      app.goTo(rs.bookId, rs.chapter);
-      spokenVerseRef.current = null;
-      return;
-    }
-    // 2. Match the host's playback command.
-    if (rs.action === 'idle') {
+    if (!rs) {
+      queue.reset();
       if (app.speechState !== 'idle') app.stopSpeech();
-      spokenVerseRef.current = null;
       return;
     }
-    // 'live' means the host is talking rather than reading: place everyone on the
-    // verse, but do not put words in their ears.
-    if (rs.action === 'live') {
+    // Explicit Stop/Discuss, mute and leaving follow mode remain immediate.
+    if (narrationMuted || rs.action === 'idle' || (rs.action === 'live' && !rs.finished)) {
+      queue.reset();
       if (app.speechState !== 'idle') app.stopSpeech();
-      spokenVerseRef.current = null;
+      if (app.bookId !== rs.bookId || app.chapterNumber !== rs.chapter) app.goTo(rs.bookId, rs.chapter);
       return;
     }
+    // A Stop followed by Play can arrive in a single render. Honor the Stop
+    // before starting the new queue even though the latest action is playing.
+    if (queue.interrupted) {
+      queue.interrupted = false;
+      if (app.speechState !== 'idle') { app.stopSpeech(); return; }
+    }
+    queue.receive(rs); // Also seeds the latest position after unmute/return.
     if (rs.action === 'paused') {
       if (app.speechState === 'speaking') app.pauseSpeech();
       return;
     }
-    // 3. action === 'playing': speak the host's current verse (audio needs arming).
-    if (narrationMuted) { if (app.speechState !== 'idle') app.stopSpeech(); spokenVerseRef.current = null; return; }
-    if (!armed || app.chapterLoading || !app.chapter || rs.verse == null) return;
-    const loaded = app.chapter.verses[0]?.ref;
-    if (!loaded || loaded.bookId !== rs.bookId || loaded.chapter !== rs.chapter) return;
-    if (rs.verse !== spokenVerseRef.current) {
-      // Host moved to a new verse — jump our local reading to it.
-      spokenVerseRef.current = rs.verse;
-      app.speakVerse(rs.verse);
-    } else if (app.speechState === 'paused' && !app.speechError && !app.autoplayBlocked) {
-      app.resumeSpeech();
+    if (!armed) return;
+    if (queue.active) {
+      if (app.speechState === 'paused') {
+        if (!app.speechError && !app.autoplayBlocked) app.resumeSpeech();
+        return;
+      }
+      if (app.speechState === 'speaking') return;
+      queue.active = null; // The local adapter finished the entire verse.
     }
+    const next = queue.pending[0];
+    const target = next ?? rs;
+    // Chapter navigation waits too: changing passages can stop local audio.
+    if (app.bookId !== target.bookId || app.chapterNumber !== target.chapter) {
+      app.goTo(target.bookId, target.chapter);
+      return;
+    }
+    if (!next || app.chapterLoading || !app.chapter) return;
+    const loaded = app.chapter.verses[0]?.ref;
+    if (!loaded || loaded.bookId !== next.bookId || loaded.chapter !== next.chapter) return;
+    queue.active = queue.pending.shift()!;
+    app.speakVerse(next.verse!);
   }, [room, isHost, following, armed, narrationMuted, status, remoteReading, app.bookId, app.chapterNumber, app.chapterLoading, app.chapter, app.speechState, app.speechError, app.autoplayBlocked]);
 
   // A participant who is following and hasn't armed audio, while the host is playing.
-  const needsArm = Boolean(room) && !isHost && following && !narrationMuted && !armed && remoteReading?.action === 'playing';
+  const needsArm = Boolean(room) && !isHost && following && !narrationMuted && !armed &&
+    (remoteReading?.action === 'playing' || Boolean(remoteReading?.finished && (followQueue.current.active || followQueue.current.pending.length)));
   // The verse the host is currently on, for visual "here's where the host is"
   // highlighting even before (or without) local audio.
   const hostVerse = (Boolean(room) && !isHost && following && remoteReading && remoteReading.action !== 'idle') ? (remoteReading.verse ?? null) : null;

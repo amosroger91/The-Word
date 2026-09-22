@@ -121,7 +121,9 @@ export function Landing({
         {
           reference: displayReference,
           text: displayText,
-          translation: translationName || 'KJV',
+          // The feed may appear before the selected local translation loads.
+          // Never label that fallback wording as KJV (or another local edition).
+          translation: local.text ? translationName : '',
           background: '#111111',
           textColor: '#fff9ed',
           accent: '#d8bc87',
@@ -140,7 +142,7 @@ export function Landing({
     } finally {
       setExporting(false);
     }
-  }, [app.font.stack, art.kind, artUrl, bookName, displayReference, displayText, exporting, label.imageBrand, label.imageEdition, label.imageTooLong, onShareImage, parsed, translationName]);
+  }, [app.font.stack, art.kind, artUrl, bookName, displayReference, displayText, exporting, label.imageBrand, label.imageEdition, label.imageTooLong, local.text, onShareImage, parsed, translationName]);
 
   return (
     <div className="landing">

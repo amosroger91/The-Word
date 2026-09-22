@@ -57,6 +57,10 @@ export interface ReadingState {
   highlights?: number[];
   revision?: number;
   translationId?: string;
+  /** Natural completion lets listeners finish their queue; Stop clears it. */
+  finished?: boolean;
+  /** Distinguishes replaying the same verse from an ordinary heartbeat. */
+  playbackId?: number;
 }
 
 export interface PartyHandlers {
@@ -261,7 +265,7 @@ export function joinParty({ code, identity, handlers = {}, create = true }: {
   function transfer(memberId: string) {
     if (!members.some(m => m.id === memberId)) return;
     presenterId = memberId;
-    if (readingState) publishReading({ ...readingState, action: 'live' });
+    if (readingState) publishReading({ ...readingState, action: 'live', finished: false });
     emitRoster(); broadcast({ t: 'roster', d: members.slice() });
     deliverAnswerList();
   }
@@ -466,7 +470,7 @@ export function joinParty({ code, identity, handlers = {}, create = true }: {
     joined = true;
     presenterId = me.id;
     revision = readingState?.revision || 0;
-    if (readingState) readingState = { ...readingState, action: 'live', revision: ++revision };
+    if (readingState) readingState = { ...readingState, action: 'live', finished: false, revision: ++revision };
     members = [selfMember()];
     status('hosting');
     h.onSelf?.({ host: true });

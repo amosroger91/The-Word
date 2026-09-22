@@ -17,6 +17,14 @@ Report: long group readings stopped while the host's page remained visible. Ther
 - Gate group narration on the loaded chapter's actual reference. Listener failures expose Enable narration instead of repeatedly auto-resuming.
 - Add the existing continuous-from-verse operation to the selected-verse toolbar as Read from here.
 
+## Participant verse cutoffs
+
+The participant bridge previously called `speakVerse` for each new host position, cancelling any unfinished local verse. It also treated natural completion as Stop and navigated chapters before the local audio finished. This deterministically clipped listeners who were slightly behind the host, even with a visible page and a healthy connection.
+
+Host positions now enter a per-listener queue directly in the network callback, before React can batch multiple messages. Heartbeats are deduplicated; a playback session identifier distinguishes an intentional replay. The listener advances only after the local speech adapter finishes, and waits for the matching chapter data before starting a queued verse. Natural host completion drains the queue, while explicit Stop/Discuss, mute, disconnect, and leaving follow mode discard it. Pause retains the current verse and backlog. Retrying a narration error resumes the retained verse rather than jumping to the host's latest position.
+
+This favors complete Scripture over exact wall-clock alignment. Slower synthesis, a different voice, or a different playback speed can leave a listener behind. Late joiners start at the current host verse; reconnecting and explicitly returning to the host also resynchronize there. It is not a transcript/replay of events missed while disconnected. Host and participants must reload to use the completion metadata; older hosts still send the legacy stop command when a selection ends.
+
 ## Verification and limits
 
 The automated suite includes worker hangs/rejections, serialized warmup, stale work, resumable errors, playback stalls, missing end events, paused stops, chapter rollover in group following, and 200 simulated verses without leftover timers or blobs. `apps/web/scripts/e2e-speech.mjs` uses real Chromium playback and real Piper synthesis on a static build served at the GitHub Pages subpath.

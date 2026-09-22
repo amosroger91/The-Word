@@ -25,6 +25,8 @@ To start mid-chapter, select a verse and choose **Read from here** in the select
 
 Narration runs in a dedicated local worker. Voice generation is serialized with warmup and retries the same verse once with a fresh worker on failure. Interrupted playback keeps its verse and offers **Resume**; group listeners can use **Enable narration** to retry. The app does not silently skip an unread verse. Initial voice downloads still need a network connection.
 
+Group narration synchronizes at verse boundaries: participants finish every queued verse before advancing, including across chapters and after the host finishes a selection. A slower device may trail the host; updates never seek past words or cut off a verse to catch up. Host Pause/Stop, muting, and leaving follow mode remain immediate. Everyone should reload after an update so the host and participants share the latest playback protocol.
+
 Repository layout
 
 - `apps/web` — Vite + React web client (demo hosted at the link above)
@@ -75,6 +77,8 @@ npm --prefix apps/web run test
 ```
 
 The narration regression suite covers engine hangs, interrupted playback, pause/stop races, chapter following, and timer/blob cleanup over 200 simulated verses. To check real Piper audio against a running web build, set `APP_URL` to its address and run `node apps/web/scripts/e2e-speech.mjs`. It exercises desktop/mobile verse actions, mid-reading jumps, chapter rollover, consecutive narration, and recovery from an unexpected browser pause.
+
+`node apps/web/scripts/e2e-party-boundaries.mjs` connects two real WebRTC peers and deliberately slows the participant's Piper narration. It checks that each participant clip reaches its actual audio end even after the host has finished the selection. Set `APP_URL` when the static build is served somewhere other than `http://localhost:5187/The-Word/`.
 
 Developer notes
 

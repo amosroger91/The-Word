@@ -51,6 +51,9 @@ export function useSpeech(adapter: SpeechAdapter, options: SpeakOptions, onCompl
   const [speakingVerse, setSpeakingVerse] = useState<number | null>(null);
   const [error, setError] = useState('');
   const [autoplayBlocked, setAutoplayBlocked] = useState(false);
+  // Natural completion must not be confused with an explicit group Stop.
+  const [finished, setFinished] = useState(false);
+  const [session, setSession] = useState(0);
   const stateRef = useRef<SpeechState>('idle');
   const requestRef = useRef(0);
   const queueRef = useRef<SpeechChunk[]>([]);
@@ -93,6 +96,7 @@ export function useSpeech(adapter: SpeechAdapter, options: SpeakOptions, onCompl
         if (stateRef.current === 'paused') return;
       }
       setSpeakingVerse(null);
+      setFinished(true);
       stateRef.current = 'idle';
       setState('idle');
       onCompleteRef.current?.();
@@ -131,6 +135,8 @@ export function useSpeech(adapter: SpeechAdapter, options: SpeakOptions, onCompl
     adapter.unlock?.();
     queueRef.current = chunks;
     indexRef.current = 0;
+    setFinished(false);
+    setSession(requestId);
     setError('');
     setAutoplayBlocked(false);
     stateRef.current = 'speaking';
@@ -162,6 +168,7 @@ export function useSpeech(adapter: SpeechAdapter, options: SpeakOptions, onCompl
     adapter.stop();
     queueRef.current = [];
     indexRef.current = 0;
+    setFinished(false);
     setSpeakingVerse(null);
     setError('');
     setAutoplayBlocked(false);
@@ -169,5 +176,5 @@ export function useSpeech(adapter: SpeechAdapter, options: SpeakOptions, onCompl
     setState('idle');
   }, [adapter]);
 
-  return { state, speakingVerse, error, setError, autoplayBlocked, speak, pause, resume, stop };
+  return { state, speakingVerse, finished, session, error, setError, autoplayBlocked, speak, pause, resume, stop };
 }
