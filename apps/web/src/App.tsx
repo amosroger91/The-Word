@@ -417,7 +417,7 @@ function App() {
     {view==='home'&&tools.focused==='settings'&&preferences}
     {party.active&&<div className="home-session"><button onClick={openReader}>Return to study · {stageReference}</button>{dock}</div>}
   </div>
-  <div hidden={view!=='reader'} className={`study-workspace ${tools.focused?'has-tools':''} ${party.active?'group-reading':''} ${library?'has-library':''} ${tools.focused&&pageTools.includes(tools.focused)?'page-tool':''}`} data-mobile-view={mobileView}>
+  <div hidden={view!=='reader'} className={`study-workspace ${party.active||partyOpen?'group-scrollbars':''} ${tools.focused?'has-tools':''} ${party.active?'group-reading':''} ${library?'has-library':''} ${tools.focused&&pageTools.includes(tools.focused)?'page-tool':''}`} data-mobile-view={mobileView}>
     <header className="workspace-header"><button className="workspace-brand" onClick={openHome} aria-label={label.home}><BookBibleIcon/><span>The Word</span></button>
       <div className="passage-picker"><button onClick={()=>openLibrary('books')}>{bookName} {chapterNumber} <span>⌄</span></button><span>{app.translations.find(t=>t.id===app.translationId)?.shortName}</span></div>
       <nav aria-label="Reader tools">

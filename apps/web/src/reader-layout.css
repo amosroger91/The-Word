@@ -156,12 +156,12 @@
 }
 
 /* Group mode keeps native wheel, touch and keyboard scrolling without chrome. */
-.study-workspace.group-reading,
-.study-workspace.group-reading * {
+.study-workspace.group-scrollbars,
+.study-workspace.group-scrollbars * {
   scrollbar-width:none !important;
 }
-.study-workspace.group-reading::-webkit-scrollbar,
-.study-workspace.group-reading *::-webkit-scrollbar {
+.study-workspace.group-scrollbars::-webkit-scrollbar,
+.study-workspace.group-scrollbars *::-webkit-scrollbar {
   display:none !important;
   width:0;
   height:0;
