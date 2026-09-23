@@ -38,9 +38,6 @@
 .workspace-body { display:grid; grid-template-columns:minmax(0,1fr); flex:1; min-height:0; overflow:hidden; }
 .has-library .workspace-body { grid-template-columns:260px minmax(0,1fr); }
 .has-tools .workspace-body { grid-template-columns:minmax(0,1fr) 350px; }
-.has-library.has-tools .workspace-body { grid-template-columns:250px minmax(0,1fr) 350px; }
-.has-tools.wide-tools .workspace-body { grid-template-columns:minmax(0,1fr) minmax(420px,48%); }
-.has-library.has-tools.wide-tools .workspace-body { grid-template-columns:230px minmax(0,1fr) minmax(420px,42%); }
 .reader-column { overflow-y:auto; min-width:0; padding:40px max(30px,calc((100% - 750px)/2)) 48px; scroll-behavior:smooth; overscroll-behavior:contain; }
 .has-tools .reader-column,.has-library .reader-column { padding:30px 34px 44px; }
 .reader-heading { max-width:750px; margin:0 auto 30px; }
@@ -79,15 +76,7 @@
 .tool-dock { display:flex; flex-direction:column; min-width:0; min-height:0; border-left:1px solid var(--ws-line); background:var(--ws-surface); font:13px/1.6 system-ui,sans-serif; }
 .dock-heading { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; }
 .dock-heading button { border:0; padding:4px 8px; font-size:11px; min-height:28px; }
-.pane-resize { padding:0 16px 8px; display:flex; gap:12px; align-items:center; font:10px system-ui,sans-serif; text-transform:none; letter-spacing:0; }
-.pane-resize input { width:100%; height:12px; padding:0; accent-color:var(--ws-accent); }
-.tool-grid { display:grid; flex:1; min-height:0; }
-.tool-tabs { display:flex; gap:2px; overflow-x:auto; border-block:1px solid var(--ws-line); background:var(--ws-soft); padding:4px 8px; }
-.tool-tabs button { white-space:nowrap; border:0; font-size:11px; min-height:32px; }
-.tool-tabs [aria-selected='true'] { background:var(--ws-surface); color:var(--ws-accent); box-shadow:0 1px 3px #0001; }
 .tool-pane { min-height:0; display:flex; flex-direction:column; overflow:hidden; }
-.pane-actions { display:flex; justify-content:flex-end; gap:4px; padding:4px 10px; border-bottom:1px solid var(--ws-line); }
-.pane-actions button { font-size:10px; padding:2px 6px; min-height:26px; border:0; color:var(--ws-muted); }
 .pane-content { overflow-y:auto; flex:1; min-height:0; padding:20px; overscroll-behavior:contain; }
 .pane-content h2 { font:400 27px/1.2 Georgia,serif; margin:8px 0 16px; letter-spacing:-.02em; }
 .pane-content h3 { font-size:12px; margin-top:24px; }
@@ -223,17 +212,13 @@
 @media(max-width:1190px) {
   .workspace-header { gap:16px; padding:12px 18px; }
   .workspace-header nav button span { display:none; }
-  .has-library.has-tools .workspace-body { grid-template-columns:220px minmax(0,1fr) 310px; }
   .has-tools .workspace-body { grid-template-columns:minmax(0,1fr) 330px; }
-  .has-library.has-tools.wide-tools .workspace-body { grid-template-columns:190px minmax(0,1fr) 370px; }
   .reader-column,.has-tools .reader-column,.has-library .reader-column { padding:26px 24px; }
   .session-dock { gap:10px; padding:10px 16px; }
   .device-controls button span,.room-controls button span { display:none; }
   .reminder-banner { margin:20px; flex-wrap:wrap; gap:16px; }
 }
 @media(max-width:950px) {
-  .has-library.has-tools .workspace-body,.has-library.has-tools.wide-tools .workspace-body { grid-template-columns:220px minmax(0,1fr); }
-  .has-library.has-tools .tool-dock { display:none; }
   .has-tools .workspace-body,.has-tools.wide-tools .workspace-body { grid-template-columns:minmax(0,1fr) 320px; }
   .transport-status .workspace-eyebrow { max-width:150px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .session-dock { flex-wrap:wrap; }
@@ -291,15 +276,8 @@
 }
 @media(prefers-reduced-motion:reduce) { .study-workspace * { scroll-behavior:auto !important; transition:none !important; animation:none !important; } }
 
-.mobile-tool-tabs { display:none; }
 @media(max-width:700px) {
-  .mobile-tool-tabs { display:flex; flex-shrink:0; gap:4px; padding:6px 12px; overflow-x:auto; border-block:1px solid var(--ws-line); }
-  .mobile-tool-tabs button { white-space:nowrap; font-size:11px; }
-  .mobile-tool-tabs [aria-pressed='true'] { background:var(--ws-soft); color:var(--ws-accent); }
-  .tool-grid { grid-template-rows:minmax(0,1fr) !important; }
-  .tool-tabs,.pane-resize { display:none; }
   .tool-pane { grid-row:1 !important; }
-  .tool-pane:not(.mobile-active) { display:none; }
 }
 
 .study-workspace { --background:#f7f4ee; }

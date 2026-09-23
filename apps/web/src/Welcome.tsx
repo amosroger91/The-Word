@@ -5,8 +5,8 @@ import type { DailyReminder } from './dailyReminder';
 function readFlag(key: string) { try { return localStorage.getItem(key) === 'done'; } catch { return false; } }
 function remember(key: string) { try { localStorage.setItem(key, 'done'); } catch { /* session still works */ } }
 export function useWelcome() {
-  const [open, setOpen] = useState(() => !readFlag('word.profilePrompt'));
-  return { open, close: () => { remember('word.profilePrompt'); setOpen(false); } };
+  const [open, setOpen] = useState(false);
+  return { open, show: () => { if (!readFlag('word.profilePrompt')) setOpen(true); }, close: () => { remember('word.profilePrompt'); setOpen(false); } };
 }
 export function Welcome({ party, onClose }: { party: ReadParty; onClose: () => void }) {
   const [name, setName] = useState(party.name);
