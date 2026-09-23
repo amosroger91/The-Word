@@ -1,6 +1,15 @@
 import { verseImageFontFace } from './verseImageFonts';
 
 export const verseImageSize = { width: 1080, height: 1350 };
+export const verseImageFormats = [
+  { id: 'share', width: 1080, height: 1350 },
+  { id: 'phone', width: 2160, height: 3840 },
+  { id: 'desktop', width: 3840, height: 2160 },
+] as const;
+export type VerseImageFormat = (typeof verseImageFormats)[number]['id'];
+export function verseImageFormat(id?: string) {
+  return verseImageFormats.find((item) => item.id === id) ?? verseImageFormats[0];
+}
 export const verseImageFontStack = 'Literata, Georgia, serif';
 export type VerseImageStyle = 'paper' | 'photograph';
 
@@ -19,10 +28,17 @@ export interface VerseImageInput {
   brand?: string;
   edition?: string;
   tooLong?: string;
+  width?: number;
+  height?: number;
 }
 
 export function verseImageFilename(bookName: string, chapter: number) {
   return `the-word-${bookName.replace(/\s+/g, '-').toLowerCase() || 'verse'}-${chapter}.png`;
+}
+
+export function verseImageDownloadName(filename: string, format: VerseImageFormat = 'share') {
+  if (format === 'share') return filename;
+  return `${filename.replace(/\.png$/i, '')}-${format}-4k.png`;
 }
 
 // Keep accessibility font choices; use the bundled book face for the default.
@@ -33,7 +49,16 @@ export function verseImageFont(readerFont: string) {
 // Self-contained: this same painter is serialized into the native WebView, so
 // preview and export cannot drift into separate designs. No module references.
 export function paintVerseImage(ctx: CanvasRenderingContext2D, input: VerseImageInput, image?: CanvasImageSource | null) {
-  const width = 1080, height = 1350;
+  const surface = ctx.canvas as { width?: number; height?: number } | undefined;
+  const width = (surface && surface.width) || input.width || 1080;
+  const height = (surface && surface.height) || input.height || 1350;
+  // The share card is the 1080×1350 design. Taller and wider formats scale that
+  // design; a landscape wallpaper uses its own full-bleed composition.
+  const landscape = width > height;
+  const scale = landscape ? height / 1350 : width / 1080;
+  const offsetY = landscape ? 0 : (height - 1350 * scale) / 2;
+  const px = (value: number) => value * scale;
+  const py = (value: number) => value * scale + offsetY;
   const photo = input.style === 'photograph';
   const color = input.textColor || (photo ? '#fff9ed' : '#26332d');
   const hex = color.replace('#', '');
@@ -43,7 +68,9 @@ export function paintVerseImage(ctx: CanvasRenderingContext2D, input: VerseImage
   const accent = lightInk ? '#d8bc87' : '#856b40';
   const font = input.fontStack || 'Georgia, serif';
   const sans = 'Lexend, Arial, sans-serif';
-  const inset = 108, textWidth = width - inset * 2;
+  const inset = landscape ? Math.round(height * 0.08) : px(108);
+  const textWidth = landscape ? Math.round(width * (photo ? 0.5 : 0.4)) : width - inset * 2;
+  const textX = landscape && photo ? (width - textWidth) / 2 : inset;
 
   function tracked(text: string, x: number, y: number, size: number, spacing: number) {
     ctx.font = `400 ${size}px ${sans}`;
@@ -107,21 +134,24 @@ export function paintVerseImage(ctx: CanvasRenderingContext2D, input: VerseImage
     return lines;
   }
 
-  const top = photo ? 282 : 228, bottom = photo ? 1050 : 850;
-  const referenceSpace = 100;
-  let bodySize = Math.min(88, Math.max(32, Number(input.fontSize) || 64));
+  const top = landscape ? Math.round(height * 0.22) : py(photo ? 282 : 228);
+  const bottom = landscape ? Math.round(height * 0.78) : py(photo ? 1050 : 850);
+  const referenceSpace = px(100);
+  const minBody = Math.max(32, Math.round(32 * scale));
+  let bodySize = Math.min(Math.round(88 * scale), Math.max(minBody, Math.round((Number(input.fontSize) || 64) * scale)));
   let lines: string[] = [];
   let lineHeight = 0;
-  for (; bodySize >= 32; bodySize--) {
+  for (; bodySize >= minBody; bodySize--) {
     ctx.font = `400 ${bodySize}px ${font}`;
     lines = wrap(input.text, textWidth);
     lineHeight = Math.round(bodySize * 1.42);
     if (lines.length * lineHeight + referenceSpace <= bottom - top) break;
   }
-  if (bodySize < 32) throw new Error(input.tooLong || 'This passage is too long for one image. Select fewer verses so the text stays readable.');
+  if (bodySize < minBody) throw new Error(input.tooLong || 'This passage is too long for one image. Select fewer verses so the text stays readable.');
   // Balance ragged lines without adding another line or stranding a tiny tail.
   const lineCount = lines.length;
-  for (let candidate = textWidth - 12; candidate >= textWidth * 0.74; candidate -= 12) {
+  const step = Math.max(4, px(12));
+  for (let candidate = textWidth - step; candidate >= textWidth * 0.74; candidate -= step) {
     const balanced = wrap(input.text, candidate);
     if (balanced.length !== lineCount) break;
     lines = balanced;
@@ -132,6 +162,7 @@ export function paintVerseImage(ctx: CanvasRenderingContext2D, input: VerseImage
   ctx.save();
   ctx.clearRect(0, 0, width, height);
   ctx.fillStyle = paper; ctx.fillRect(0, 0, width, height);
+  const frame = px(52.5);
   if (photo) {
     drawPhoto(0, 0, width, height);
     const opacity = Math.min(0.72, Math.max(0, input.overlayOpacity ?? 0.34));
@@ -142,46 +173,69 @@ export function paintVerseImage(ctx: CanvasRenderingContext2D, input: VerseImage
     veil.addColorStop(0.7, `rgba(${tone},${Math.min(0.74, opacity * 0.62 + 0.16)})`);
     veil.addColorStop(1, `rgba(${tone},${Math.min(0.66, opacity * 0.48 + 0.08)})`);
     ctx.fillStyle = veil; ctx.fillRect(0, 0, width, height);
-    ctx.strokeStyle = lightInk ? '#ffffff35' : '#26332d35'; ctx.lineWidth = 1;
-    ctx.strokeRect(52.5, 52.5, width - 105, height - 105);
-  } else {
-    drawPhoto(72, 948, 936, 288, 16);
+    ctx.strokeStyle = lightInk ? '#ffffff35' : '#26332d35'; ctx.lineWidth = Math.max(1, px(1));
+    ctx.strokeRect(frame, frame, width - frame * 2, height - frame * 2);
+  } else if (landscape) {
+    const panelX = Math.round(width * 0.56);
+    const panelY = inset;
+    const panelW = width - panelX - inset;
+    const panelH = height - inset * 2;
+    const radius = px(16);
+    drawPhoto(panelX, panelY, panelW, panelH, radius);
     ctx.save();
-    ctx.strokeStyle = accent; ctx.globalAlpha = 0.45; ctx.lineWidth = 1.5;
-    rounded(72, 948, 936, 288, 16); ctx.stroke();
+    ctx.strokeStyle = accent; ctx.globalAlpha = 0.45; ctx.lineWidth = Math.max(1, px(1.5));
+    rounded(panelX, panelY, panelW, panelH, radius); ctx.stroke();
     ctx.restore();
     const wash = Math.min(0.55, Math.max(0, input.overlayOpacity ?? 0.08));
     if (wash > 0) {
-      ctx.save(); rounded(72, 948, 936, 288, 16); ctx.clip();
-      ctx.fillStyle = `rgba(17,32,26,${wash})`; ctx.fillRect(72, 948, 936, 288);
+      ctx.save(); rounded(panelX, panelY, panelW, panelH, radius); ctx.clip();
+      ctx.fillStyle = `rgba(17,32,26,${wash})`; ctx.fillRect(panelX, panelY, panelW, panelH);
+      ctx.restore();
+    }
+  } else {
+    const stripX = px(72), stripY = py(948), stripW = px(936), stripH = px(288), radius = px(16);
+    drawPhoto(stripX, stripY, stripW, stripH, radius);
+    ctx.save();
+    ctx.strokeStyle = accent; ctx.globalAlpha = 0.45; ctx.lineWidth = Math.max(1, px(1.5));
+    rounded(stripX, stripY, stripW, stripH, radius); ctx.stroke();
+    ctx.restore();
+    const wash = Math.min(0.55, Math.max(0, input.overlayOpacity ?? 0.08));
+    if (wash > 0) {
+      ctx.save(); rounded(stripX, stripY, stripW, stripH, radius); ctx.clip();
+      ctx.fillStyle = `rgba(17,32,26,${wash})`; ctx.fillRect(stripX, stripY, stripW, stripH);
       ctx.restore();
     }
   }
 
+  const brandY = landscape ? Math.round(height * 0.1) : py(120);
+  const footY = landscape ? Math.round(height * 0.9) : py(photo ? 1220 : 1301);
+  const markX = landscape ? width - inset - px(66) : px(935);
+  const markY = landscape ? brandY + px(14) : py(134);
   ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillStyle = color;
-  tracked(input.brand || 'THE WORD', inset, 120, 22, 4.8);
+  tracked(input.brand || 'THE WORD', textX, brandY, px(22), px(4.8));
   // Small vector book mark stays crisp at the full export resolution.
-  ctx.strokeStyle = accent; ctx.lineWidth = 1.8; ctx.beginPath();
-  ctx.moveTo(935, 134); ctx.lineTo(935, 107); ctx.quadraticCurveTo(919, 100, 902, 104);
-  ctx.lineTo(902, 130); ctx.quadraticCurveTo(919, 127, 935, 134);
-  ctx.quadraticCurveTo(951, 127, 968, 130); ctx.lineTo(968, 104); ctx.quadraticCurveTo(951, 100, 935, 107); ctx.stroke();
+  ctx.strokeStyle = accent; ctx.lineWidth = Math.max(1, px(1.8)); ctx.beginPath();
+  ctx.moveTo(markX, markY); ctx.lineTo(markX, markY - px(27)); ctx.quadraticCurveTo(markX - px(16), markY - px(34), markX - px(33), markY - px(30));
+  ctx.lineTo(markX - px(33), markY - px(4)); ctx.quadraticCurveTo(markX - px(16), markY - px(7), markX, markY);
+  ctx.quadraticCurveTo(markX + px(16), markY - px(7), markX + px(33), markY - px(4)); ctx.lineTo(markX + px(33), markY - px(30)); ctx.quadraticCurveTo(markX + px(16), markY - px(34), markX, markY - px(27)); ctx.stroke();
   ctx.font = `400 ${bodySize}px ${font}`; ctx.fillStyle = color;
   if (photo) {
     ctx.shadowColor = lightInk ? 'rgba(8,14,12,0.55)' : 'rgba(255,250,240,0.4)';
-    ctx.shadowBlur = 16; ctx.shadowOffsetY = 2;
+    ctx.shadowBlur = px(16); ctx.shadowOffsetY = px(2);
   }
-  lines.forEach((line, index) => ctx.fillText(line, inset, bodyTop + lineHeight * (index + 0.5)));
+  lines.forEach((line, index) => ctx.fillText(line, textX, bodyTop + lineHeight * (index + 0.5)));
   ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
-  const referenceY = bodyTop + blockHeight + 58;
-  ctx.fillStyle = accent; ctx.fillRect(inset, referenceY - 1, 44, 2);
-  let referenceSize = 27;
+  const referenceY = bodyTop + blockHeight + px(58);
+  ctx.fillStyle = accent; ctx.fillRect(textX, referenceY - px(1), px(44), Math.max(1, px(2)));
+  let referenceSize = px(27);
+  const referenceMax = textWidth - px(72);
   do { ctx.font = `400 ${referenceSize}px ${sans}`; referenceSize--; }
-  while (referenceSize > 18 && ctx.measureText(input.reference).width > textWidth - 72);
-  ctx.fillStyle = color; ctx.fillText(input.reference, inset + 72, referenceY, textWidth - 72);
+  while (referenceSize > px(18) && ctx.measureText(input.reference).width > referenceMax);
+  ctx.fillStyle = color; ctx.fillText(input.reference, textX + px(72), referenceY, referenceMax);
   ctx.globalAlpha = photo ? 0.82 : 0.7;
-  tracked(input.edition || 'HOLY BIBLE', inset, photo ? 1220 : 1301, 17, 2.8);
-  ctx.font = `400 18px ${sans}`; ctx.textAlign = 'right';
-  ctx.fillText(input.translation, width - inset, photo ? 1220 : 1301, 520);
+  tracked(input.edition || 'HOLY BIBLE', textX, footY, px(17), px(2.8));
+  ctx.font = `400 ${px(18)}px ${sans}`; ctx.textAlign = 'right';
+  ctx.fillText(input.translation, landscape && !photo ? Math.round(width * 0.52) : width - inset, footY, px(520));
   ctx.restore();
   return { fontSize: bodySize, lines, bodyTop, bodyBottom: bodyTop + blockHeight, referenceY };
 }
@@ -204,10 +258,12 @@ export async function loadVerseImageFonts(fontStack: string) {
 export function verseImageHtml(input: VerseImageInput, preview = false) {
   const payload = JSON.stringify(input).replace(/</g, '\\u003c');
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${verseImageFontFace}html,body{margin:0;background:transparent;overflow:hidden}canvas{display:block;width:100%;height:100vh}</style></head>
-<body><canvas id="c" width="1080" height="1350"></canvas>
+<body><canvas id="c" width="${input.width || 1080}" height="${input.height || 1350}"></canvas>
 <script>
 (async function () {
-  var input = ${payload}; var canvas = document.getElementById('c'); var paint = ${paintVerseImage.toString()};
+  var input = ${payload}; var canvas = document.getElementById('c');
+  canvas.width = input.width || 1080; canvas.height = input.height || 1350;
+  var paint = ${paintVerseImage.toString()};
   try {
     if (document.fonts) {
       await Promise.all([document.fonts.load('400 64px Literata'), document.fonts.load('400 22px Lexend'), document.fonts.ready]);

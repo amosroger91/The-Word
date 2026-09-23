@@ -50,6 +50,7 @@ export interface VerseImageDraft {
   overlayOpacity: number;
   fontSize: number;
   textColor: string;
+  format: 'share' | 'phone' | 'desktop';
 }
 
 export function draftForBackground(background: VerseBackground): VerseImageDraft {
@@ -59,5 +60,6 @@ export function draftForBackground(background: VerseBackground): VerseImageDraft
     overlayOpacity: 0.08,
     fontSize: verseImageFontRange.defaultSize,
     textColor: '#26332d',
+    format: 'share',
   };
 }

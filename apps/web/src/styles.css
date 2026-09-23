@@ -553,7 +553,11 @@ select, input { border: 1px solid #c9c1b3; border-radius: 8px; background: trans
 .image-editor-loading { position: absolute; inset: 0; display: grid; place-items: center; background: #0003; color: #fff; border-radius: 12px; }
 .image-editor-caption { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; letter-spacing: .04em; opacity: .72; }
 .image-editor-error { margin: 0; color: #8c3a32; }
-.image-editor-styles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.image-editor-styles, .image-editor-formats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.image-editor-formats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.image-editor-formats button { display: flex; align-items: flex-start; flex-direction: column; gap: 2px; min-height: 64px; padding: 8px 10px; border: 1px solid var(--line, #d9d1c3); border-radius: 10px; background: transparent; color: inherit; font-size: 13px; line-height: 1.25; text-align: left; }
+.image-editor-formats button.active { border-color: #947849; background: #94784918; }
+.image-editor-formats small { font-size: 11px; letter-spacing: .02em; opacity: .72; }
 .image-editor-styles button { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 8px 12px; border: 1px solid var(--line, #d9d1c3); border-radius: 10px; background: transparent; color: inherit; }
 .image-editor-styles button.active { border-color: #947849; background: #94784918; }
 .image-style-sample { width: 28px; height: 36px; border-radius: 4px; border: 1px solid #0002; flex: 0 0 auto; }

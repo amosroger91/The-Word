@@ -6,10 +6,12 @@ import {
   loadVerseImage,
   loadVerseImageFonts,
   paintVerseImage,
+  verseImageDownloadName,
   verseImageFont,
   verseBackgrounds,
   verseImageFontRange,
-  verseImageSize,
+  verseImageFormat,
+  verseImageFormats,
   verseTextColors,
   type Strings,
   type VerseImageDraft,
@@ -50,6 +52,7 @@ export function VerseImageEditor({
   const previewRef = useRef<HTMLCanvasElement>(null);
   const imageRef = useRef<{ src: string; image: HTMLImageElement | null } | null>(null);
   const background = backgroundById(draft.backgroundId);
+  const format = verseImageFormat(draft.format);
   const src = `${base}backgrounds/${background.file}`;
 
   const input = useMemo(() => ({
@@ -78,14 +81,14 @@ export function VerseImageEditor({
       const canvas = previewRef.current;
       const ctx = canvas?.getContext('2d');
       if (!canvas || !ctx) throw new Error('Image preview is unavailable.');
-      canvas.width = verseImageSize.width; canvas.height = verseImageSize.height;
+      canvas.width = format.width; canvas.height = format.height;
       const layout = paintVerseImage(ctx, input, image);
       setFittedSize(layout.fontSize); setReady(true);
     }).catch((cause) => {
       if (active) setError(cause instanceof Error ? cause.message : 'Could not prepare this image.');
     });
     return () => { active = false; };
-  }, [src, input]);
+  }, [src, input, format.width, format.height]);
 
   function pickStyle(style: VerseImageStyle) {
     setReady(false);
@@ -116,7 +119,7 @@ export function VerseImageEditor({
       const blob = await new Promise<Blob | null>((resolve) => { canvas.toBlob(resolve, 'image/png'); });
       if (!blob) throw new Error('Could not prepare the PNG. Try Save image.');
       await navigator.share({
-        files: [new File([blob], job.filename, { type: 'image/png' })],
+        files: [new File([blob], verseImageDownloadName(job.filename, format.id), { type: 'image/png' })],
         title: job.reference,
         text: `${job.reference} (${job.translation})`,
       });
@@ -140,7 +143,7 @@ export function VerseImageEditor({
       const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'));
       if (!blob) throw new Error('Could not prepare the PNG. Please try again.');
       const href = URL.createObjectURL(blob);
-      const link = document.createElement('a'); link.download = job.filename; link.href = href;
+      const link = document.createElement('a'); link.download = verseImageDownloadName(job.filename, format.id); link.href = href;
       document.body.appendChild(link); link.click(); link.remove();
       window.setTimeout(() => URL.revokeObjectURL(href), 60_000);
       onSaved?.(); onClose();
@@ -157,12 +160,20 @@ export function VerseImageEditor({
           <button type="button" onClick={onClose} aria-label={label.closeEditor}>×</button>
         </div>
         <div className="image-editor-artboard" aria-busy={!ready&&!error}>
-          <canvas ref={previewRef} className="image-editor-preview" width={verseImageSize.width} height={verseImageSize.height} aria-label={`${job.reference} — ${job.text}`} role="img" />
+          <canvas ref={previewRef} className="image-editor-preview" width={format.width} height={format.height} aria-label={`${job.reference} — ${job.text}`} role="img" />
           {!ready&&!error&&<span className="image-editor-loading" role="status">{label.loading}</span>}
         </div>
-        <div className="image-editor-caption"><span>{job.reference}</span><span>1080 × 1350 · PNG</span></div>
+        <div className="image-editor-caption"><span>{job.reference}</span><span>{format.width} × {format.height} · PNG</span></div>
         {error&&<p className="image-editor-error" role="alert">{error}</p>}
         <div className="image-editor-controls">
+          <div className="image-editor-formats" role="group" aria-label={label.imageFormat}>
+            {verseImageFormats.map((item) => (
+              <button key={item.id} type="button" className={format.id === item.id ? 'active' : ''} aria-pressed={format.id === item.id} onClick={() => setDraft((current) => ({ ...current, format: item.id }))} disabled={saving}>
+                {item.id === 'share' ? label.imageShare : item.id === 'phone' ? label.imagePhone : label.imageDesktop}
+                <small>{item.width} × {item.height}</small>
+              </button>
+            ))}
+          </div>
           <div className="image-editor-styles" role="group" aria-label={label.imageStyle}>
             <button className={draft.style==='paper'?'active':''} aria-pressed={draft.style==='paper'} onClick={()=>pickStyle('paper')}><span className="image-style-sample paper"/>{label.imagePaper}</button>
             <button className={draft.style==='photograph'?'active':''} aria-pressed={draft.style==='photograph'} onClick={()=>pickStyle('photograph')}><span className="image-style-sample photograph"/>{label.imagePhotograph}</button>

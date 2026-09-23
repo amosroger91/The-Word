@@ -7,8 +7,11 @@ import {
   draftForBackground,
   paletteFor,
   verseBackgrounds,
+  verseImageDownloadName,
   verseImageFont,
   verseImageFontRange,
+  verseImageFormat,
+  verseImageFormats,
   verseImageHtml,
   verseTextColors,
   type Strings,
@@ -47,6 +50,7 @@ export function VerseImageEditor({
   const [saving, setSaving] = useState(false);
   const [dataUrl, setDataUrl] = useState<string | null>(null);
   const background = backgroundById(draft.backgroundId);
+  const format = verseImageFormat(draft.format);
   const source = verseBackgroundModules[background.file];
 
   useEffect(() => {
@@ -71,7 +75,9 @@ export function VerseImageEditor({
     brand: label.imageBrand,
     edition: label.imageEdition,
     tooLong: label.imageTooLong,
-  }, true) : '', [dataUrl, draft, fontStack, job, label.imageBrand, label.imageEdition, label.imageTooLong]);
+    width: format.width,
+    height: format.height,
+  }, true) : '', [dataUrl, draft, fontStack, format.width, format.height, job, label.imageBrand, label.imageEdition, label.imageTooLong]);
 
   function pickStyle(style: VerseImageStyle) {
     setDraft((current) => ({ ...current, style, textColor: style === 'paper' ? '#26332d' : '#fff9ed', overlayOpacity: style === 'paper' ? 0.08 : 0.34 }));
@@ -96,7 +102,9 @@ export function VerseImageEditor({
         brand: label.imageBrand,
         edition: label.imageEdition,
         tooLong: label.imageTooLong,
-        filename: job.filename,
+        width: format.width,
+        height: format.height,
+        filename: verseImageDownloadName(job.filename, format.id),
       });
     } finally {
       setSaving(false);
@@ -111,10 +119,19 @@ export function VerseImageEditor({
           <Pressable onPress={onClose} hitSlop={12} accessibilityLabel={label.closeEditor}><Text style={styles.close}>×</Text></Pressable>
         </View>
         <ScrollView contentContainerStyle={styles.body}>
-          <View style={styles.previewFrame}>
+          <View style={[styles.previewFrame, { aspectRatio: format.width / format.height, maxHeight: format.id === 'phone' ? 420 : 320 }]}>
             {previewHtml
               ? <WebView originWhitelist={['*']} source={{ html: previewHtml, baseUrl: 'https://localhost' }} style={styles.previewWeb} scrollEnabled={false} />
               : <Image source={source} style={StyleSheet.absoluteFillObject} resizeMode="cover" />}
+          </View>
+          <Text style={styles.label}>{label.imageFormat}</Text>
+          <View style={styles.stylesRow}>
+            {verseImageFormats.map((item) => (
+              <Pressable key={item.id} onPress={() => setDraft((current) => ({ ...current, format: item.id }))} style={[styles.styleButton, format.id === item.id && styles.styleButtonActive]}>
+                <Text style={styles.styleText}>{item.id === 'share' ? label.imageShare : item.id === 'phone' ? label.imagePhone : label.imageDesktop}</Text>
+                <Text style={styles.hint}>{item.width} × {item.height}</Text>
+              </Pressable>
+            ))}
           </View>
           <View style={styles.stylesRow}>
             <Pressable onPress={() => pickStyle('paper')} style={[styles.styleButton, draft.style === 'paper' && styles.styleButtonActive]}><Text style={styles.styleText}>{label.imagePaper}</Text></Pressable>

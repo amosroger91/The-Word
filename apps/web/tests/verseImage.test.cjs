@@ -16,11 +16,12 @@ function load(file) {
   });
   return exported;
 }
-const { paintVerseImage } = load('verseImage.ts');
+const { paintVerseImage, verseImageFormats } = load('verseImage.ts');
 
-function context() {
+function context(size) {
   const texts = [];
   const target = {
+    canvas: size,
     font: '16px serif',
     measureText(text) {
       const size = Number(/(\d+(?:\.\d+)?)px/.exec(String(this.font))?.[1] || 16);
@@ -64,6 +65,19 @@ test('a passage that cannot stay readable is refused with the caller’s message
     () => paintVerseImage(ctx, { ...base, reference: 'Psalm 119', text: 'Blessed '.repeat(800), translation: 'KJV', textColor: '#26332d', style: 'paper', tooLong: 'too long' }, null),
     /too long/,
   );
+});
+
+test('4K phone and desktop wallpapers paint the verse at those sizes', () => {
+  const phone = verseImageFormats.find((item) => item.id === 'phone');
+  const desktop = verseImageFormats.find((item) => item.id === 'desktop');
+  assert.deepEqual([phone.width, phone.height], [2160, 3840]);
+  assert.deepEqual([desktop.width, desktop.height], [3840, 2160]);
+  for (const size of [phone, desktop]) {
+    const { ctx, texts } = context(size);
+    const layout = paintVerseImage(ctx, { ...base, reference: 'John 3:16', text: 'For God so loved the world.', translation: 'KJV', textColor: '#fff9ed', style: 'photograph', width: size.width, height: size.height }, null);
+    assert.ok(layout.fontSize > 64);
+    assert.ok(texts.some((line) => line.includes('loved')));
+  }
 });
 
 test('photograph and paper both paint a short verse', () => {

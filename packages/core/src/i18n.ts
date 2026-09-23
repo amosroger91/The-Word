@@ -69,6 +69,10 @@ export interface Strings {
   imagePaper: string;
   imagePhotograph: string;
   imageAutoFit: string;
+  imageFormat: string;
+  imageShare: string;
+  imagePhone: string;
+  imageDesktop: string;
   imageBrand: string;
   imageEdition: string;
   imageTooLong: string;
@@ -349,6 +353,7 @@ export const strings: Record<Language, Strings> = {
     increaseVolume: 'Increase volume',
     readAloud: 'Listen',
     imageStyle: 'Image style', imagePaper: 'Paper', imagePhotograph: 'Photograph', imageAutoFit: 'Text adjusts to fit. Every word stays in the image.',
+    imageFormat: 'Format', imageShare: 'Share card', imagePhone: 'Phone wallpaper', imageDesktop: 'Desktop wallpaper',
     imageBrand: 'THE WORD', imageEdition: 'HOLY BIBLE', imageTooLong: 'This passage is too long for one image. Select fewer verses so the text stays readable.',
     readSelection: 'Listen to selection',
     pause: 'Pause',
@@ -652,6 +657,7 @@ export const strings: Record<Language, Strings> = {
     increaseVolume: 'Subir el volumen',
     readAloud: 'Escuchar',
     imageStyle: 'Estilo de imagen', imagePaper: 'Papel', imagePhotograph: 'Fotografía', imageAutoFit: 'El texto se ajusta. Todas las palabras se conservan.',
+    imageFormat: 'Formato', imageShare: 'Tarjeta', imagePhone: 'Fondo de teléfono', imageDesktop: 'Fondo de escritorio',
     imageBrand: 'LA PALABRA', imageEdition: 'SANTA BIBLIA', imageTooLong: 'Este pasaje es demasiado largo para una imagen. Elige menos versículos para que el texto se lea bien.',
     readSelection: 'Escuchar la selección',
     pause: 'Pausar',
@@ -955,6 +961,7 @@ export const strings: Record<Language, Strings> = {
     increaseVolume: 'Augmenter le volume',
     readAloud: 'Écouter',
     imageStyle: 'Style d’image', imagePaper: 'Papier', imagePhotograph: 'Photographie', imageAutoFit: 'Le texte s’adapte. Chaque mot est conservé.',
+    imageFormat: 'Format', imageShare: 'Carte', imagePhone: 'Fond téléphone', imageDesktop: 'Fond bureau',
     imageBrand: 'LA PAROLE', imageEdition: 'SAINTE BIBLE', imageTooLong: 'Ce passage est trop long pour une image. Sélectionnez moins de versets afin que le texte reste lisible.',
     readSelection: 'Écouter la sélection',
     pause: 'Pause',
@@ -1258,6 +1265,7 @@ export const strings: Record<Language, Strings> = {
     increaseVolume: '提高音量',
     readAloud: '收听',
     imageStyle: '图片样式', imagePaper: '纸张', imagePhotograph: '照片', imageAutoFit: '文字自动调整大小，保留每一个字。',
+    imageFormat: '尺寸', imageShare: '分享卡片', imagePhone: '手机壁纸', imageDesktop: '电脑壁纸',
     imageBrand: '圣言', imageEdition: '圣经', imageTooLong: '这段经文太长，放不进一张图片。请少选几节，让文字保持清晰。',
     readSelection: '收听所选',
     pause: '暂停',
@@ -1561,6 +1569,7 @@ export const strings: Record<Language, Strings> = {
     increaseVolume: 'Tăng âm lượng',
     readAloud: 'Nghe',
     imageStyle: 'Kiểu ảnh', imagePaper: 'Giấy', imagePhotograph: 'Ảnh', imageAutoFit: 'Chữ tự điều chỉnh để vừa ảnh. Mọi từ đều được giữ nguyên.',
+    imageFormat: 'Khổ', imageShare: 'Thẻ chia sẻ', imagePhone: 'Hình nền điện thoại', imageDesktop: 'Hình nền máy tính',
     imageBrand: 'LỜI CHÚA', imageEdition: 'KINH THÁNH', imageTooLong: 'Đoạn này quá dài cho một ảnh. Hãy chọn ít câu hơn để chữ vẫn dễ đọc.',
     readSelection: 'Nghe phần đã chọn',
     pause: 'Tạm dừng',

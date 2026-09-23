@@ -25,9 +25,10 @@ export function VerseImageShare({ request, onDone, onError }: Props) {
   useEffect(() => {
     handled.current = false;
     if (!request) return;
+    const pixels = (request.width || 1080) * (request.height || 1350);
     const timer = setTimeout(() => {
       if (!handled.current) onErrorRef.current('Timed out while rendering the verse image.');
-    }, 20000);
+    }, pixels > 1080 * 1350 ? 45000 : 20000);
     return () => clearTimeout(timer);
   }, [request]);
 
