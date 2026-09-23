@@ -71,9 +71,10 @@ export function Reader({ app, onHome }: { app: WordApp; onHome?: () => void }) {
 
   const speechButtons = (
     <>
-      {speechState === 'idle' && <Chip styles={styles} disabled={!chapter} onPress={app.speakChapter} text={label.readAloud} />}
+      {speechState === 'idle' && <Chip styles={styles} disabled={!chapter} onPress={app.listen} text={label.readAloud} />}
       {speechState === 'speaking' && <Chip styles={styles} onPress={app.pauseSpeech} text={label.pause} />}
       {speechState === 'paused' && <Chip styles={styles} onPress={app.resumeSpeech} text={label.resume} />}
+      {speechState === 'paused' && <Chip styles={styles} disabled={!chapter} onPress={app.listenFromBeginning} text={label.listenFromBeginning} />}
       {speechState !== 'idle' && <Chip styles={styles} onPress={app.stopSpeech} text={label.stop} />}
     </>
   );

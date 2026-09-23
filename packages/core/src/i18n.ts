@@ -47,6 +47,7 @@ export interface Strings {
   speechFailed: string;
   speechDeviceFailed: string;
   stop: string;
+  listenFromBeginning: string;
   readingAloud: string;
   paused: string;
   previous: string;
@@ -370,6 +371,7 @@ export const strings: Record<Language, Strings> = {
     speechFailed: 'Speech failed.',
     speechDeviceFailed: 'The device could not read this verse.',
     stop: 'Stop',
+    listenFromBeginning: 'Listen from the beginning',
     readingAloud: 'Reading aloud',
     paused: 'Paused',
     previous: 'Previous',
@@ -674,6 +676,7 @@ export const strings: Record<Language, Strings> = {
     speechFailed: 'Falló la lectura.',
     speechDeviceFailed: 'El dispositivo no pudo leer este versículo.',
     stop: 'Detener',
+    listenFromBeginning: 'Escuchar desde el principio',
     readingAloud: 'Leyendo en voz alta',
     paused: 'En pausa',
     previous: 'Anterior',
@@ -978,6 +981,7 @@ export const strings: Record<Language, Strings> = {
     speechFailed: 'La lecture a échoué.',
     speechDeviceFailed: 'L’appareil n’a pas pu lire ce verset.',
     stop: 'Arrêter',
+    listenFromBeginning: 'Écouter depuis le début',
     readingAloud: 'Lecture en cours',
     paused: 'En pause',
     previous: 'Précédent',
@@ -1282,6 +1286,7 @@ export const strings: Record<Language, Strings> = {
     speechFailed: '朗读失败。',
     speechDeviceFailed: '设备无法朗读这一节。',
     stop: '停止',
+    listenFromBeginning: '从头开始收听',
     readingAloud: '正在朗读',
     paused: '已暂停',
     previous: '上一章',
@@ -1586,6 +1591,7 @@ export const strings: Record<Language, Strings> = {
     speechFailed: 'Không đọc được.',
     speechDeviceFailed: 'Thiết bị không đọc được câu này.',
     stop: 'Dừng',
+    listenFromBeginning: 'Nghe từ đầu',
     readingAloud: 'Đang đọc',
     paused: 'Đã tạm dừng',
     previous: 'Trước',

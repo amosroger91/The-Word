@@ -115,10 +115,14 @@ export function useWordApp({ storage, speech, clipboard, voices }: Platform, ini
   // reading a selection. pendingAutoSpeak marks that we advanced and are waiting for
   // the new chapter's verses to load before speaking them.
   const autoAdvanceRef = useRef(false);
+  // The verse that was playing when Listen was stopped, so the next Listen
+  // continues there instead of restarting the chapter.
+  const resumeSpotRef = useRef<{ bookId: number; chapter: number; verse: number } | null>(null);
   const [pendingAutoSpeak, setPendingAutoSpeak] = useState(false);
   const [pendingSpeak, setPendingSpeak] = useState<{ kind: 'chapter' | 'from'; bookId: number; chapter: number; verse: number } | null>(null);
 
   const handleSpeechComplete = useCallback(() => {
+    if (resumeSpotRef.current?.bookId === bookId && resumeSpotRef.current.chapter === chapterNumber) resumeSpotRef.current = null;
     if (!autoAdvanceRef.current) return;
     const next = nextReadingPosition(bookId, chapterNumber, books);
     if (!next) { autoAdvanceRef.current = false; return; }
@@ -423,13 +427,32 @@ export function useWordApp({ storage, speech, clipboard, voices }: Platform, ini
     })));
   }, [pendingSpeak, chapterLoading, chapter, bookId, chapterNumber, player, chapterReference, label, bookName]);
 
-  // Stopping read-aloud also leaves continuous mode.
+  const listen = useCallback(() => {
+    const spot = resumeSpotRef.current;
+    if (spot && spot.bookId === bookId && spot.chapter === chapterNumber) {
+      speakFromVerse(spot.bookId, spot.chapter, spot.verse);
+      return;
+    }
+    speakChapter();
+  }, [bookId, chapterNumber, speakFromVerse, speakChapter]);
+
+  const listenFromBeginning = useCallback(() => {
+    resumeSpotRef.current = null;
+    speakChapter();
+  }, [speakChapter]);
+
+  // Stopping read-aloud also leaves continuous mode, but keeps the verse so
+  // Listen can continue from it.
   const stopSpeech = useCallback(() => {
+    const verse = player.speakingVerse;
+    if ((player.state === 'speaking' || player.state === 'paused') && verse && verse > 1) {
+      resumeSpotRef.current = { bookId, chapter: chapterNumber, verse };
+    }
     autoAdvanceRef.current = false;
     setPendingAutoSpeak(false);
     setPendingSpeak(null);
     player.stop();
-  }, [player]);
+  }, [player, bookId, chapterNumber]);
 
   const changeSpeechRate = useCallback((delta: number) => {
     setSpeechRate((rate) => clampRate(rate + delta));
@@ -546,6 +569,8 @@ export function useWordApp({ storage, speech, clipboard, voices }: Platform, ini
     speakChapter,
     speakChapterAt,
     speakFromVerse,
+    listen,
+    listenFromBeginning,
     speakSelection,
     speakVerse,
     pauseSpeech: player.pause,
