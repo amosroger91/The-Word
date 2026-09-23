@@ -52,6 +52,11 @@
 .study-workspace.group-reading .pane-content {
   overflow:visible;
 }
+.study-workspace.group-reading .party-messages {
+  max-height:none;
+  min-height:0;
+  overflow:visible;
+}
 .study-workspace.group-reading .reader-column { min-height:100%; }
 .study-workspace.group-reading .tool-dock {
   position:sticky;
@@ -149,3 +154,23 @@
   .study-workspace.group-reading .tool-dock { display:flex; width:100%; height:auto; }
   .study-workspace.group-reading .tool-dock { position:static; border-left:0; border-top:1px solid var(--ws-line); }
 }
+
+/* Group mode keeps native wheel, touch and keyboard scrolling without chrome. */
+.study-workspace.group-reading,
+.study-workspace.group-reading * {
+  scrollbar-width:none !important;
+}
+.study-workspace.group-reading::-webkit-scrollbar,
+.study-workspace.group-reading *::-webkit-scrollbar {
+  display:none !important;
+  width:0;
+  height:0;
+}
+@media(max-width:950px) {
+  .study-workspace.group-reading.has-library .workspace-body {
+    grid-template-columns:minmax(0,1fr) minmax(300px,36vw);
+  }
+  .study-workspace.group-reading .reader-column { display:block; }
+  .study-workspace.group-reading .library-pane { height:auto; overflow:visible; }
+}
+
