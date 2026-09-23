@@ -18,7 +18,10 @@
     "paths": {
       "@the-word/core": ["../../packages/core/src/index.ts"],
       "@the-word/bible": ["../../packages/bible/src/index.ts"],
-      "@the-word/shared": ["../../packages/shared/src/index.ts"]
+      "@the-word/shared": ["../../packages/shared/src/index.ts"],
+      "react": ["./node_modules/@types/react/index.d.ts"],
+      "react-dom": ["./node_modules/@types/react-dom/index.d.ts"],
+      "react/jsx-runtime": ["./node_modules/@types/react/jsx-runtime.d.ts"]
     }
   },
   "include": ["src"]
