@@ -24,3 +24,11 @@ Verification: desktop and active-room browser checks confirm the shared scrollba
 Rendered follow-up: hide scrollbar chrome throughout active group mode while retaining native scrolling; fix the mobile reader's horizontal flex layout and tablet library grid. Visually inspected 390x844 and 1000x900 screenshots, including scrolling to the mobile conversation controls.
 
 Pre-join correction: scrollbar hiding now applies when Group Study is open, even before a room is active. Verified rendered pre-join screenshots at 1000x800 and 390x844, with scrolling to Start/Join controls on mobile.
+
+## Shared scrollbar and close-control follow-up
+
+- [x] Apply hidden scrollbar chrome globally, including Study, Settings, library, dialogs, and reading, while preserving native scrolling.
+- [x] Replace both shared Back to reading controls with an accessible × and a 44px touch target.
+- [ ] Render desktop and mobile Study, verify scrolling and closing, and publish.
+
+Verification: rendered Study at 1400x650 and 390x600, scrolled to the import control, and used the × to return to Scripture. Also rendered Settings and Search on mobile. No scrollbar tracks were visible; close controls retain their localized accessible labels. Removed the redundant second library close button.

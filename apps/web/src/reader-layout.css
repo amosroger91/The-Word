@@ -12,39 +12,8 @@
   overflow:auto;
   align-items:start;
 }
-.study-workspace.group-reading .workspace-body,
-.study-workspace.group-reading .library-pane,
-.study-workspace.group-reading .meeting-rail {
-  scrollbar-width:thin;
-  scrollbar-color:var(--ws-line) transparent;
-}
 .study-workspace.group-reading.has-library .workspace-body {
   grid-template-columns:minmax(280px,340px) minmax(0,1fr) minmax(340px,380px);
-}
-.study-workspace.group-reading .workspace-body::-webkit-scrollbar,
-.study-workspace.group-reading .library-pane::-webkit-scrollbar,
-.study-workspace.group-reading .meeting-rail::-webkit-scrollbar {
-  width:10px;
-  height:10px;
-}
-.study-workspace.group-reading .workspace-body::-webkit-scrollbar-track,
-.study-workspace.group-reading .library-pane::-webkit-scrollbar-track,
-.study-workspace.group-reading .meeting-rail::-webkit-scrollbar-track {
-  background:transparent;
-}
-.study-workspace.group-reading .workspace-body::-webkit-scrollbar-thumb,
-.study-workspace.group-reading .library-pane::-webkit-scrollbar-thumb,
-.study-workspace.group-reading .meeting-rail::-webkit-scrollbar-thumb {
-  background:var(--ws-line);
-  border:3px solid transparent;
-  background-clip:padding-box;
-  border-radius:999px;
-}
-.study-workspace.group-reading .workspace-body::-webkit-scrollbar-thumb:hover,
-.study-workspace.group-reading .library-pane::-webkit-scrollbar-thumb:hover,
-.study-workspace.group-reading .meeting-rail::-webkit-scrollbar-thumb:hover {
-  background:var(--ws-muted);
-  border-width:2px;
 }
 .study-workspace.group-reading .reader-column,
 .study-workspace.group-reading .tool-dock,
@@ -137,31 +106,19 @@
   .study-workspace.group-reading .workspace-body {
     display:block;
     overflow:auto;
-    scrollbar-width:thin;
-  }
-  .study-workspace.group-reading .workspace-body::-webkit-scrollbar,
-  .study-workspace.group-reading .library-pane::-webkit-scrollbar,
-  .study-workspace.group-reading .meeting-rail::-webkit-scrollbar {
-    width:6px;
-    height:6px;
-  }
-  .study-workspace.group-reading .workspace-body::-webkit-scrollbar-thumb,
-  .study-workspace.group-reading .library-pane::-webkit-scrollbar-thumb,
-  .study-workspace.group-reading .meeting-rail::-webkit-scrollbar-thumb {
-    border-width:1px;
   }
   .study-workspace.group-reading .reader-column,
   .study-workspace.group-reading .tool-dock { display:flex; width:100%; height:auto; }
   .study-workspace.group-reading .tool-dock { position:static; border-left:0; border-top:1px solid var(--ws-line); }
 }
 
-/* Group mode keeps native wheel, touch and keyboard scrolling without chrome. */
-.study-workspace.group-scrollbars,
-.study-workspace.group-scrollbars * {
+/* Keep native wheel, touch and keyboard scrolling without scrollbar chrome in every view. */
+html,
+* {
   scrollbar-width:none !important;
 }
-.study-workspace.group-scrollbars::-webkit-scrollbar,
-.study-workspace.group-scrollbars *::-webkit-scrollbar {
+html::-webkit-scrollbar,
+*::-webkit-scrollbar {
   display:none !important;
   width:0;
   height:0;
@@ -174,3 +131,5 @@
   .study-workspace.group-reading .library-pane { height:auto; overflow:visible; }
 }
 
+
+.study-workspace button.pane-close, .study-workspace .dock-heading .pane-close { min-width:44px; min-height:44px; padding:4px; font:26px/1 system-ui,sans-serif; }
