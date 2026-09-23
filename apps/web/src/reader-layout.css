@@ -7,6 +7,28 @@
 .study-workspace .workspace-body { grid-template-columns:minmax(0,1fr); }
 .study-workspace.has-tools .workspace-body { grid-template-columns:minmax(0,1fr) 380px; }
 .study-workspace.has-library .workspace-body { grid-template-columns:340px minmax(0,1fr); }
+.study-workspace.group-reading .workspace-body {
+  grid-template-columns:minmax(0,1fr) minmax(340px,380px);
+  overflow:auto;
+  align-items:start;
+}
+.study-workspace.group-reading.has-library .workspace-body {
+  grid-template-columns:minmax(280px,340px) minmax(0,1fr) minmax(340px,380px);
+}
+.study-workspace.group-reading .reader-column,
+.study-workspace.group-reading .tool-dock,
+.study-workspace.group-reading .tool-pane,
+.study-workspace.group-reading .pane-content {
+  overflow:visible;
+}
+.study-workspace.group-reading .reader-column { min-height:100%; }
+.study-workspace.group-reading .tool-dock {
+  position:sticky;
+  top:0;
+  height:auto;
+  max-height:none;
+  align-self:start;
+}
 .study-workspace.page-tool .workspace-body { display:block; }
 .study-workspace.page-tool .reader-column { display:none; }
 .study-workspace.page-tool .tool-dock { height:100%; border:0; }
@@ -44,6 +66,18 @@
   .study-workspace[data-mobile-view='tools'] .tool-dock { display:flex; }
   .study-workspace .library-pane { border:0; padding-bottom:20px; }
   .study-workspace .pane-content { padding:20px; }
+  .study-workspace.group-reading .workspace-body {
+    display:grid;
+    grid-template-columns:minmax(0,1fr) minmax(300px,36vw);
+    overflow:auto;
+  }
+  .study-workspace.group-reading.has-library .library-pane { grid-column:1; grid-row:1; }
+  .study-workspace.group-reading.has-library .reader-column { grid-column:1; grid-row:2; }
+  .study-workspace.group-reading.has-library .tool-dock { grid-column:2; grid-row:1 / span 2; }
+  .study-workspace.group-reading .reader-column,
+  .study-workspace.group-reading .tool-dock { display:flex; width:auto; height:auto; }
+  .study-workspace.group-reading .tool-dock { position:sticky; }
+  .study-workspace.group-reading .tool-pane { display:flex; }
 }
 @media(max-width:700px) {
   .study-workspace .workspace-header { padding:8px 12px; gap:8px; }
@@ -64,4 +98,8 @@
   .study-workspace .transport-status .workspace-eyebrow { display:none; }
   .study-workspace .room-controls { max-width:none; }
   .study-workspace .session-heading { flex-wrap:wrap; }
+  .study-workspace.group-reading .workspace-body { display:block; overflow:auto; }
+  .study-workspace.group-reading .reader-column,
+  .study-workspace.group-reading .tool-dock { display:flex; width:100%; height:auto; }
+  .study-workspace.group-reading .tool-dock { position:static; border-left:0; border-top:1px solid var(--ws-line); }
 }

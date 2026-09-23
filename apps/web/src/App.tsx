@@ -107,6 +107,16 @@ function App() {
   const lastVerse = chapter?.verses.length ? chapter.verses[chapter.verses.length - 1].ref.verse : null;
 
   useEffect(() => { if (restorePrefill) { tools.open('settings'); setLibrary(null); setMobileView('tools'); } }, [restorePrefill]);
+  // A live room owns the supporting column. Keeping Group Study mounted and
+  // focused means the reader never has to switch into a separate meeting view
+  // or hunt for the room controls while following a host.
+  useEffect(() => {
+    if (party.active && view === 'reader') {
+      tools.open('group');
+      setLibrary(null);
+      setMobileView('tools');
+    }
+  }, [party.active, view, tools.focused]);
   // The optional breakdown formatter fetches itself once the page is quiet.
   // Scripture is already on screen by then and never waits for it.
   useEffect(() => { prepareModel(); }, []);
@@ -282,9 +292,24 @@ function App() {
   useEffect(()=>{ if(ledger.justEarned.length&&needsBackup()) setBackupAsk('badge'); },[ledger.justEarned]);
   useEffect(()=>{ if(study.circles.length&&needsBackup()) setBackupAsk((prev)=>prev==='none'?'circle':prev); },[study.circles.length]);
 
-  const openTool = (id:ToolId) => { tools.open(id); setLibrary(null); setMobileView('tools'); if(id==='group')welcome.show(); };
-  const returnToReading = () => { tools.dismiss(); setLibrary(null); setMobileView('reader'); requestAnimationFrame(()=>document.querySelector<HTMLButtonElement>('[data-read-nav]')?.focus()); };
-  const openLibrary = (next:'books'|'search'|'bookmarks') => { tools.dismiss(); setLibrary(next); setMobileView('library'); };
+  const openTool = (id:ToolId) => {
+    if (party.active && id !== 'group') return;
+    tools.open(id); setLibrary(null); setMobileView('tools'); if(id==='group')welcome.show();
+  };
+  const returnToReading = () => {
+    if (party.active && view === 'reader') {
+      tools.open('group'); setLibrary(null); setMobileView('tools');
+      return;
+    }
+    tools.dismiss(); setLibrary(null); setMobileView('reader'); requestAnimationFrame(()=>document.querySelector<HTMLButtonElement>('[data-read-nav]')?.focus());
+  };
+  const openLibrary = (next:'books'|'search'|'bookmarks') => {
+    if (party.active && view === 'reader') {
+      tools.open('group'); setLibrary(next); setMobileView('library');
+      return;
+    }
+    tools.dismiss(); setLibrary(next); setMobileView('library');
+  };
   const navigate = (bookId:number, nextChapter:number, verse=1) => {
     party.browseIndependently(); app.goToVerse(bookId,nextChapter,verse); returnToReading();
     const next = verseHash(bookId, nextChapter, verse);
@@ -392,7 +417,7 @@ function App() {
     {view==='home'&&tools.focused==='settings'&&preferences}
     {party.active&&<div className="home-session"><button onClick={openReader}>Return to study · {stageReference}</button>{dock}</div>}
   </div>
-  <div hidden={view!=='reader'} className={`study-workspace ${tools.focused?'has-tools':''} ${library?'has-library':''} ${tools.focused&&pageTools.includes(tools.focused)?'page-tool':''}`} data-mobile-view={mobileView}>
+  <div hidden={view!=='reader'} className={`study-workspace ${tools.focused?'has-tools':''} ${party.active?'group-reading':''} ${library?'has-library':''} ${tools.focused&&pageTools.includes(tools.focused)?'page-tool':''}`} data-mobile-view={mobileView}>
     <header className="workspace-header"><button className="workspace-brand" onClick={openHome} aria-label={label.home}><BookBibleIcon/><span>The Word</span></button>
       <div className="passage-picker"><button onClick={()=>openLibrary('books')}>{bookName} {chapterNumber} <span>⌄</span></button><span>{app.translations.find(t=>t.id===app.translationId)?.shortName}</span></div>
       <nav aria-label="Reader tools">
