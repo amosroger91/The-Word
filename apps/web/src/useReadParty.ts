@@ -12,6 +12,28 @@ import { getCameraStream, getLocalStream, getScreenStream, getSystemAudioVolume,
 
 function randomCode(): string { return Math.random().toString(36).slice(2, 7); }
 
+const MEMBER_KEY = 'word.partyMember';
+
+// One seat per tab. A refresh reuses this id so the room replaces the old
+// connection instead of adding another copy of the same person.
+let memoryMemberId = '';
+
+export function memberIdFor(accountId: string): string {
+  const prefix = `${accountId}-`;
+  const fresh = () => `${prefix}${Math.random().toString(36).slice(2, 10)}`;
+  try {
+    const existing = sessionStorage.getItem(MEMBER_KEY);
+    if (existing && existing.startsWith(prefix) && existing.length <= 120) return existing;
+    const created = fresh();
+    sessionStorage.setItem(MEMBER_KEY, created);
+    return created;
+  } catch {
+    // Sharing the bare account id across tabs makes those tabs kick each other.
+    if (!memoryMemberId.startsWith(prefix)) memoryMemberId = fresh();
+    return memoryMemberId;
+  }
+}
+
 function actionFor(speechState: WordApp['speechState']): ReadingState['action'] {
   return speechState === 'speaking' ? 'playing' : speechState === 'paused' ? 'paused' : 'idle';
 }
@@ -58,10 +80,11 @@ export function useReadParty(app: WordApp) {
   const sharedRef = useRef(shared); sharedRef.current = shared;
   const hadHost = useRef(false);
   const roleChanged = useRef(false);
+  const [roleEpoch, setRoleEpoch] = useState(0);
   const [findable, setFindable] = useState(false);
 
   const identityRef = useRef(loadIdentity());
-  const sessionIdRef = useRef(identityRef.current.id);
+  const sessionIdRef = useRef(memberIdFor(identityRef.current.id));
   const [name, setNameValue] = useState(identityRef.current.name);
   const [avatar, setAvatarValue] = useState<string | null>(identityRef.current.avatar);
   // The last reading state the HOST broadcast, so we don't re-send identical updates.
@@ -72,8 +95,6 @@ export function useReadParty(app: WordApp) {
     if (roomRef.current) return;
     const clean = joinCode.trim().toLowerCase();
     if (!clean) return;
-    // Account identity is stable; membership belongs to this tab's room session.
-    sessionIdRef.current = `${identityRef.current.id}-${Math.random().toString(36).slice(2, 10)}`;
     appRef.current.stopSpeech(); setShared(null); setPresenting(false); setNarrationMuted(false);
     setError(''); setMessages([]); setMembers([]); setRemoteReading(null);
     setArmed(Boolean(opts?.armed)); setFollowing(true); lastSentRef.current = '';
@@ -312,14 +333,24 @@ export function useReadParty(app: WordApp) {
     if (room && roomRef.current === room) { roomRef.current = null; stopLocal(); }
   }, [room]);
 
-  // Leadership changes stop old narration before the new host deliberately starts.
+  const isHostRef = useRef(isHost);
+  isHostRef.current = isHost;
+
+  // A broker blip can flip the host flag for a moment. Stopping immediately is
+  // what cut read-aloud off and left only "Read from here". A real handoff that
+  // sticks still stops the previous reader's narration.
   useEffect(() => {
-    if (hadHost.current !== isHost) {
+    if (hadHost.current === isHost) return;
+    const next = isHost;
+    const timer = setTimeout(() => {
+      if (isHostRef.current !== next || hadHost.current === next) return;
+      hadHost.current = next;
       roleChanged.current = true;
+      setRoleEpoch((value) => value + 1);
       appRef.current.stopSpeech(); followQueue.current.reset(); lastSentRef.current = '';
       setPresenting(false);
-    }
-    hadHost.current = isHost;
+    }, next ? 0 : 1200);
+    return () => clearTimeout(timer);
   }, [isHost]);
 
   // Idle navigation is private. Only explicit presentation or playback changes
@@ -392,7 +423,9 @@ export function useReadParty(app: WordApp) {
   // slower listener just because the host started the next verse or chapter.
   useEffect(() => {
     const queue = followQueue.current;
-    if (!room || isHost || !following) { queue.reset(); return; }
+    // hadHost stays true until a demotion has stuck, so a one-frame host flicker
+    // does not take this device through the follower path and stop its reading.
+    if (!room || isHost || hadHost.current || !following) { queue.reset(); return; }
     if (status !== 'connected' && status !== 'hosting') {
       if (app.speechState !== 'idle') appRef.current.stopSpeech();
       queue.reset(); return;
@@ -442,7 +475,7 @@ export function useReadParty(app: WordApp) {
     if (!loaded || loaded.bookId !== next.bookId || loaded.chapter !== next.chapter) return;
     queue.active = queue.pending.shift()!;
     app.speakVerse(next.verse!);
-  }, [room, isHost, following, armed, narrationMuted, status, remoteReading, app.bookId, app.chapterNumber, app.chapterLoading, app.chapter, app.speechState, app.speechError, app.autoplayBlocked]);
+  }, [room, isHost, roleEpoch, following, armed, narrationMuted, status, remoteReading, app.bookId, app.chapterNumber, app.chapterLoading, app.chapter, app.speechState, app.speechError, app.autoplayBlocked]);
 
   // A participant who is following and hasn't armed audio, while the host is playing.
   const needsArm = Boolean(room) && !isHost && following && !narrationMuted && !armed &&

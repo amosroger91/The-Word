@@ -29,6 +29,8 @@ Pre-join correction: scrollbar hiding now applies when Group Study is open, even
 
 - [x] Apply hidden scrollbar chrome globally, including Study, Settings, library, dialogs, and reading, while preserving native scrolling.
 - [x] Replace both shared Back to reading controls with an accessible × and a 44px touch target.
-- [ ] Render desktop and mobile Study, verify scrolling and closing, and publish.
+- [x] Render desktop and mobile Study, verify scrolling and closing, and publish.
 
 Verification: rendered Study at 1400x650 and 390x600, scrolled to the import control, and used the × to return to Scripture. Also rendered Settings and Search on mobile. No scrollbar tracks were visible; close controls retain their localized accessible labels. Removed the redundant second library close button.
+
+Published in PR #10 (da5bcb7). Verified the live Study page at 1400x650 and 390x600, including mobile scrolling. Deployment build, typecheck, and all 90 tests passed.

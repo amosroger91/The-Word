@@ -135,7 +135,15 @@ export function joinParty({ code, identity, handlers = {}, create = true }: {
   const chatLog: PartyChatMessage[] = [];
   let leaving = false;
   let joined = false;
+  let isHubEstablished = false;
   let reelectTimer: ReturnType<typeof setTimeout> | null = null;
+  let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  let sweepTimer: ReturnType<typeof setInterval> | null = null;
+  let pingTimer: ReturnType<typeof setInterval> | null = null;
+  let reconnectAttempt = 0;
+  let sweeping = false;
+  const dropping = new Set<string>();
+  const seenAt = new Map<string, number>();
   let me = identity;
   const mediaConns = new Map<string, MediaConnection>();
   let reconcileTimer: ReturnType<typeof setTimeout> | null = null;
@@ -160,6 +168,18 @@ export function joinParty({ code, identity, handlers = {}, create = true }: {
   const myPeerId = () => (peer && peer.id) || '';
   const capped = () => members.length > MESH_CAP;
 
+  function noteSeen(peerId: string) {
+    if (peerId) seenAt.set(peerId, Date.now());
+  }
+  // PeerJS keeps a data connection "open" after the other tab is gone until ICE
+  // gives up. A failed or long-disconnected channel is a ghost seat: it still
+  // receives roster and verse broadcasts, which is what lags the host.
+  function connectionDead(c: DataConnection): boolean {
+    const state = c.peerConnection?.connectionState;
+    if (state === 'failed' || state === 'closed') return true;
+    if (state === 'disconnected') return Date.now() - (seenAt.get(c.peer) ?? Date.now()) > 20000;
+    return false;
+  }
   function selfMember(): PartyMember {
     return { id: me.id, name: me.name, color: me.color, avatar: me.avatar || null, peerId: myPeerId(), host: me.id === presenterId, av: hasMedia(), mic: getState().audio, cam: getState().video, screen: getState().screen };
   }
@@ -176,6 +196,7 @@ export function joinParty({ code, identity, handlers = {}, create = true }: {
   }
 
   function broadcast(env: Envelope, exceptPeerId?: string) {
+    if (!sweeping) sweep();
     for (const [pid, c] of clientConns) {
       if (pid === exceptPeerId) continue;
       try { if (c.open) c.send(env); } catch { /* dropped connection */ }
@@ -304,14 +325,26 @@ export function joinParty({ code, identity, handlers = {}, create = true }: {
       });
     } else if (env.t === 'hello') {
       const m = (env.d || {}) as Partial<PartyMember>;
-      upsert({ id: m.id!, name: m.name || 'Reader', color: m.color || '#888', avatar: m.avatar || null, peerId: fromPeerId || '', av: Boolean(m.av), mic: Boolean(m.mic), cam: Boolean(m.cam), screen: Boolean(m.screen) });
-      const conn = fromPeerId ? clientConns.get(fromPeerId) : null;
+      const id = String(m.id || '').slice(0, 120);
+      // A refresh opens a new peer but keeps this tab's member id. Replacing the
+      // old channel here is what stops the same person appearing once per reload.
+      if (!id || !fromPeerId || id === me.id) return;
+      noteSeen(fromPeerId);
+      const previous = members.find((x) => x.id === id);
+      const replacedPeer = previous && previous.peerId !== fromPeerId ? previous.peerId : '';
+      upsert({ id, name: m.name || 'Reader', color: m.color || '#888', avatar: m.avatar || null, peerId: fromPeerId, av: Boolean(m.av), mic: Boolean(m.mic), cam: Boolean(m.cam), screen: Boolean(m.screen) });
+      const conn = clientConns.get(fromPeerId);
       if (conn) {
         try { conn.send({ t: 'welcome', d: { roster: members.slice(), chat: chatLog.slice(-CHAT_HISTORY), reading: readingState, question, answers: sharedAnswers } }); } catch { /* dropped */ }
       }
-      const sm = systemMessage(`${m.name || 'Someone'} joined the party`, 'joined', m.name || 'Someone');
-      recordChat(sm); broadcast({ t: 'chat', d: sm });
+      if (!previous) {
+        const sm = systemMessage(`${m.name || 'Someone'} joined the party`, 'joined', m.name || 'Someone');
+        recordChat(sm); broadcast({ t: 'chat', d: sm });
+      }
+      if (replacedPeer) retirePeer(replacedPeer, id);
       emitRoster(); broadcast({ t: 'roster', d: members.slice() });
+    } else if (env.t === 'ping') {
+      if (fromPeerId) noteSeen(fromPeerId);
     } else if (env.t === 'chat') {
       const member = members.find((x) => x.peerId === fromPeerId);
       const payload = (env.d || {}) as { text?: string };
@@ -448,6 +481,60 @@ export function joinParty({ code, identity, handlers = {}, create = true }: {
     });
   }
 
+  function retirePeer(peerId: string, memberId: string) {
+    const conn = clientConns.get(peerId);
+    clientConns.delete(peerId);
+    // The member record already points at the replacement peer. Closing the old
+    // channel must not announce a leave or delete that seat.
+    try { conn?.close(); } catch { /* already gone */ }
+    const call = mediaConns.get(peerId);
+    if (call) {
+      mediaConns.delete(peerId);
+      try { call.close(); } catch { /* already gone */ }
+    }
+    // The tile is keyed by member, not by the peer that just went away.
+    h.onRemoteEnd?.(memberId);
+  }
+
+  function dropClient(c: DataConnection) {
+    if (dropping.has(c.peer)) return;
+    const member = members.find((x) => x.peerId === c.peer);
+    if (!clientConns.has(c.peer) && !member) return;
+    dropping.add(c.peer);
+    try {
+      clientConns.delete(c.peer);
+      seenAt.delete(c.peer);
+      if (member) members = members.filter((x) => x.id !== member.id);
+      if (member) {
+        const sm = systemMessage(`${member.name} left the party`, 'left', member.name);
+        recordChat(sm); broadcast({ t: 'chat', d: sm });
+      }
+      if (member?.id === presenterId) transfer(me.id);
+      try { c.close(); } catch { /* already closed */ }
+      pruneStaleMedia();
+      emitRoster(); broadcast({ t: 'roster', d: members.slice() });
+    } finally {
+      dropping.delete(c.peer);
+    }
+  }
+
+  function sweep() {
+    if (sweeping || !isHub || leaving) return;
+    const dead = [...clientConns.values()].filter(connectionDead);
+    if (!dead.length) return;
+    sweeping = true;
+    try { for (const conn of dead) dropClient(conn); }
+    finally { sweeping = false; }
+  }
+
+  function watchConnectionHealth(c: DataConnection) {
+    const pc = c.peerConnection;
+    if (!pc?.addEventListener) return;
+    pc.addEventListener('connectionstatechange', () => {
+      if (!leaving && isHub && (pc.connectionState === 'failed' || pc.connectionState === 'closed')) dropClient(c);
+    });
+  }
+
   /* ---------------- connection lifecycle ---------------- */
   function wireClientConn(c: DataConnection) {
     hubConn = c;
@@ -457,16 +544,19 @@ export function joinParty({ code, identity, handlers = {}, create = true }: {
     });
     c.on('data', handleFromHub);
     const lost = () => {
-      if (leaving || hubConn !== c) return;
+      if (leaving || hubConn !== c || c.open) return;
       if (joined) reelect(); else { status('disconnected'); h.onError?.('room-unavailable'); }
     };
     c.on('close', lost);
-    c.on('error', lost);
+    // negotiation-failed and not-open-yet are not a dead room. Reelecting here
+    // is what made a guest race the host id and kick the group.
+    c.on('error', () => { if (!c.open) lost(); });
   }
 
   function startAsHub() {
     connectionReady();
     isHub = true;
+    isHubEstablished = true;
     joined = true;
     presenterId = me.id;
     revision = readingState?.revision || 0;
@@ -479,19 +569,13 @@ export function joinParty({ code, identity, handlers = {}, create = true }: {
     // A re-elected hub keeps everyone in sync by re-announcing the reading state.
     if (readingState) broadcast({ t: 'reading', d: readingState });
     peer!.on('connection', (c) => {
-      c.on('open', () => { clientConns.set(c.peer, c); });
-      c.on('data', (env) => handleAtHub(env as Envelope, c.peer));
-      c.on('close', () => {
-        clientConns.delete(c.peer);
-        const m = members.find((x) => x.peerId === c.peer);
-        members = members.filter((x) => x.peerId !== c.peer);
-        if (m) { const sm = systemMessage(`${m.name} left the party`, 'left', m.name); recordChat(sm); broadcast({ t: 'chat', d: sm }); }
-        if (m?.id === presenterId) transfer(me.id);
-        pruneStaleMedia();
-        emitRoster(); broadcast({ t: 'roster', d: members.slice() });
-      });
-      c.on('error', () => { /* ignore */ });
+      c.on('open', () => { clientConns.set(c.peer, c); noteSeen(c.peer); watchConnectionHealth(c); });
+      c.on('data', (env) => { noteSeen(c.peer); handleAtHub(env as Envelope, c.peer); });
+      c.on('close', () => dropClient(c));
+      c.on('error', () => { /* close follows when the channel is actually gone */ });
     });
+    if (sweepTimer) clearInterval(sweepTimer);
+    sweepTimer = setInterval(sweep, 5000);
     answerCalls();
   }
 
@@ -507,13 +591,40 @@ export function joinParty({ code, identity, handlers = {}, create = true }: {
     if (leaving) return;
     closeAllMedia();
     if (reelectTimer) clearTimeout(reelectTimer);
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    if (sweepTimer) clearInterval(sweepTimer);
+    if (pingTimer) clearInterval(pingTimer);
+    reconnectTimer = null;
+    sweepTimer = null;
+    pingTimer = null;
     const oldPeer = peer;
     peer = null; hubConn = null;
+    isHub = false;
+    isHubEstablished = false;
     clientConns.clear();
     try { oldPeer?.destroy(); } catch { /* ignore */ }
     status('reconnecting');
     // Jitter so clients don't stampede the hub id at once.
     reelectTimer = setTimeout(connect, 300 + Math.random() * 900);
+  }
+
+  function isSignalingBlip(type: string) {
+    return type === 'network' || type === 'socket-error' || type === 'socket-closed'
+      || type === 'disconnected' || type === 'server-error' || type === 'webrtc';
+  }
+
+  // unavailable-id during Peer.reconnect means the broker still remembers our
+  // hub id. Destroying here closes every guest and is the kick/rejoin storm.
+  function tolerateHubSignaling(attempt: Peer) {
+    if (reconnectTimer || leaving || peer !== attempt) return;
+    reconnectAttempt += 1;
+    if (reconnectAttempt >= 3) status('reconnecting');
+    const delay = Math.min(8000, 400 * 2 ** (reconnectAttempt - 1));
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = null;
+      if (leaving || peer !== attempt || attempt.destroyed) return;
+      try { attempt.reconnect(); } catch { /* not disconnected, or this peer has no broker session */ }
+    }, delay);
   }
 
   function connect() {
@@ -529,9 +640,14 @@ export function joinParty({ code, identity, handlers = {}, create = true }: {
       if (leaving || peer !== attempt) return;
       const type = e?.type || String(e);
       if (type === 'unavailable-id') {
+        if (isHubEstablished) { tolerateHubSignaling(attempt); return; }
         // Someone already hosts this party → join as a client.
         try { peer?.destroy(); } catch { /* ignore */ }
+        if (peer === attempt) peer = null;
         connectAsClient();
+      } else if (isSignalingBlip(type)) {
+        if (isHubEstablished && type !== 'webrtc') tolerateHubSignaling(attempt);
+        else if (!joined && type !== 'webrtc') h.onError?.(type);
       } else if (!leaving) {
         h.onError?.(type);
       }
@@ -545,16 +661,33 @@ export function joinParty({ code, identity, handlers = {}, create = true }: {
     keepSignalingAlive(attempt);
     peer.on('error', (error: { type?: string }) => {
       if (leaving || peer !== attempt) return;
-      if (error.type === 'peer-unavailable' && joined) reelect();
-      else { status('disconnected'); h.onError?.(error.type === 'peer-unavailable' ? 'room-unavailable' : error.type || 'connection-error'); }
+      const type = error.type || 'connection-error';
+      if (type === 'peer-unavailable' && joined) reelect();
+      else if (type === 'unavailable-id' && joined) tolerateHubSignaling(attempt);
+      else if (isSignalingBlip(type)) {
+        // The disconnected handler reconnects this same peer. A broker blip is
+        // not a failed join, and it must not surface as "you were kicked".
+        if (!joined) h.onError?.(type);
+      } else { status('disconnected'); h.onError?.(type === 'peer-unavailable' ? 'room-unavailable' : type); }
     });
+    if (pingTimer) clearInterval(pingTimer);
+    pingTimer = setInterval(() => {
+      if (leaving || peer !== attempt) return;
+      toHub({ t: 'ping' });
+    }, 8000);
   }
 
   function keepSignalingAlive(candidate: Peer) {
+    candidate.on('open', () => {
+      if (leaving || peer !== candidate) return;
+      reconnectAttempt = 0;
+      if (isHub) status('hosting');
+    });
     candidate.on('disconnected', () => {
       if (leaving || peer !== candidate || candidate.destroyed) return;
-      // Existing WebRTC streams can stay live while the signaling socket returns.
-      try { candidate.reconnect(); } catch { h.onError?.('signaling-disconnected'); }
+      // Existing WebRTC streams stay up across a broker blip. Reconnect with the
+      // same id; do not destroy the peer or every guest is kicked.
+      try { candidate.reconnect(); } catch { tolerateHubSignaling(candidate); }
     });
   }
 
@@ -605,6 +738,9 @@ export function joinParty({ code, identity, handlers = {}, create = true }: {
       connectionReady();
       closeAllMedia();
       if (reelectTimer) clearTimeout(reelectTimer);
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      if (sweepTimer) clearInterval(sweepTimer);
+      if (pingTimer) clearInterval(pingTimer);
       if (reconcileTimer) clearTimeout(reconcileTimer);
       try { for (const c of clientConns.values()) c.close(); } catch { /* ignore */ }
       clientConns.clear();

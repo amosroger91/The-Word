@@ -22,7 +22,7 @@ function harness(){
   vm.runInNewContext(ts.transpileModule(fs.readFileSync(require('node:path').join(__dirname,'../src/followReadingQueue.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText,{exports:queueExports});
   modules['./followReadingQueue']=queueExports;
   const exports={};const code=ts.transpileModule(fs.readFileSync(require('node:path').join(__dirname,'../src/useReadParty.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText;
-  vm.runInNewContext(code,{exports,require:id=>modules[id],setInterval,clearInterval,Date,Math});
+  vm.runInNewContext(code,{exports,require:id=>modules[id],setTimeout,clearTimeout,setInterval,clearInterval,Date,Math});
   function flush(){dirty=true;let n=0;while(dirty){if(++n>40)throw Error('Hook render loop');dirty=false;cursor=0;effects=[];result=exports.useReadParty({...app});effects.forEach(f=>f());}return result;}
   flush();
   return {app,sent,spoken,controls,flush,get current(){return result;},join(isHost){result.joinParty('test');flush();host=isHost;handlers.onStatus(isHost?'hosting':'connected');handlers.onRoster([],{host:isHost,capped:false});flush();},role(isHost){handlers.onRoster([],{host:isHost,capped:false});flush();},receive(state){handlers.onReading(state);return flush();},receiveBatch(states){states.forEach(s=>handlers.onReading(s));return flush();},finish(){app.speechState='idle';app.speakingVerse=null;app.speechFinished=true;return flush();},status(s){handlers.onStatus(s);return flush();},dispose(){slots.forEach(s=>s?.cleanup?.());}};
@@ -156,6 +156,42 @@ test('clearing the shared reading clears pending audio too',()=>{
   h.join(false);h.receive(reading);h.receive({...reading,verse:17});h.receive(null);
   assert.equal(h.app.speechState,'idle');h.finish();assert.deepEqual(h.spoken,[16]);
  }finally{h.dispose();}
+});
+
+const delay=(ms)=>new Promise((resolve)=>setTimeout(resolve,ms));
+
+test('a real host handoff stops narration only after the role stays changed',async()=>{
+  const h=harness();
+  try {
+    h.join(true);
+    await delay(50);
+    h.controls.length=0;
+    h.app.speechState='speaking';
+    h.app.speakingVerse=16;
+    h.role(false);
+    await delay(200);
+    assert.equal(h.controls.filter((item)=>item==='stop').length,0);
+    assert.equal(h.app.speechState,'speaking');
+    await delay(1200);
+    assert.equal(h.controls.filter((item)=>item==='stop').length,1);
+    assert.equal(h.app.speechState,'idle');
+  } finally { h.dispose(); }
+});
+
+test('a host blip shorter than the handoff wait does not stop narration',async()=>{
+  const h=harness();
+  try {
+    h.join(true);
+    await delay(50);
+    h.controls.length=0;
+    h.app.speechState='speaking';
+    h.role(false);
+    await delay(200);
+    h.role(true);
+    await delay(1400);
+    assert.equal(h.controls.filter((item)=>item==='stop').length,0);
+    assert.equal(h.app.speechState,'speaking');
+  } finally { h.dispose(); }
 });
 
 test('host broadcasts natural completion separately from Stop and identifies same-verse replays',()=>{

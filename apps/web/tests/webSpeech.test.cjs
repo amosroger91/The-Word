@@ -8,7 +8,7 @@ const options={voice:'voice',rate:1,volume:1,language:'en'};
 function setup(){
   const timers=new Map(),intervals=new Map(),urls=new Set();let id=0,now=0,audio;
   class Audio {
-    constructor(){audio=this;this.readyState=3;this.paused=true;this.currentTime=0;this.ended=false;this.failures=[];this.plays=0;}
+    constructor(){audio=this;this.readyState=3;this.paused=true;this.currentTime=0;this.duration=NaN;this.ended=false;this.failures=[];this.plays=0;}
     setAttribute(){} removeAttribute(){} load(){}
     play(){this.plays++;const err=this.failures.shift();if(err)return Promise.reject(err);this.paused=false;return Promise.resolve();}
     pause(){if(!this.paused){this.paused=true;this.onpause?.();}}
@@ -43,6 +43,11 @@ test('stop while already paused settles the verse without waiting for another pa
 test('a missing end event is recovered by checking the media element',async()=>{
   const h=setup();const done=h.adapter.speak('Verse',options);await tick();
   h.audio.ended=true;h.advance(1000);assert.equal(await done,'ended');h.adapter.dispose();
+});
+test('reaching the end of a verse without an ended event still completes it',async()=>{
+  const h=setup();const done=h.adapter.speak('Verse',options);await tick();
+  h.audio.currentTime=8;h.audio.duration=8;h.audio.ended=false;h.advance(1000);
+  assert.equal(await done,'ended');h.adapter.dispose();
 });
 test('a stalled audio element retries twice then surfaces a resumable error',async()=>{
   const h=setup();const done=h.adapter.speak('Verse',options);const rejected=assert.rejects(done,/Resume/);await tick();

@@ -51,6 +51,10 @@ export default {
     emptyOutDir: true,
   },
   server: {
+    fs: {
+      // Lazy-loaded Bible translation JSON lives in packages/, outside the app root.
+      allow: [fileURLToPath(new URL('../../..', import.meta.url))],
+    },
     headers: {
       'Cross-Origin-Opener-Policy': 'same-origin',
       'Cross-Origin-Embedder-Policy': 'require-corp',

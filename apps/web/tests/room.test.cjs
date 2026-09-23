@@ -8,7 +8,7 @@ const ts = require('typescript');
 function harness({media = false} = {}) {
   let sequence=0;
   class Connection extends EventEmitter {
-    constructor(peer) { super(); this.peer=peer; this.open=false; }
+    constructor(peer) { super(); this.peer=peer; this.open=false; this.peerConnection={connectionState:'connected'}; }
     send(data) { if(this.open) queueMicrotask(()=>this.other.emit('data',structuredClone(data))); }
     close() { if(!this.open)return; this.open=false; this.other.open=false; this.emit('close');this.other.emit('close'); }
   }
@@ -44,11 +44,12 @@ function harness({media = false} = {}) {
     }
     destroy(){this.dead=true;if(Peer.registry.get(this.id)===this)Peer.registry.delete(this.id);this.connections.forEach(c=>c.close());}
   }
+  let clock = 1_000_000;
   const source=fs.readFileSync(require('node:path').join(__dirname,'../src/readParty.ts'),'utf8');
   const js=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText;
   const exports={};
-  vm.runInNewContext(js,{exports,require:(id)=>id==='peerjs'?{Peer}:{getLocalStream:()=>media?{id:'test-stream'}:null,hasMedia:()=>media,getState:()=>({audio:media,video:false})},setTimeout,clearTimeout,Date,Math,Map,Set});
-  return {join:exports.joinParty,Peer};
+  vm.runInNewContext(js,{exports,require:(id)=>id==='peerjs'?{Peer}:{getLocalStream:()=>media?{id:'test-stream'}:null,hasMedia:()=>media,getState:()=>({audio:media,video:false})},setTimeout,clearTimeout,setInterval,clearInterval,Date:{now:()=>clock},Math,Map,Set});
+  return {join:exports.joinParty,Peer,advance(ms){clock+=ms;}};
 }
 const tick=()=>new Promise(resolve=>setTimeout(resolve,30));
 function person(id,states,rosters){return {code:'test-private',identity:{id,name:id,color:'#947849'},handlers:{onReading:s=>states.push(s),onRoster:r=>rosters.push(r)}};}
@@ -184,6 +185,86 @@ test('a late joiner receives the open question and the shared board', async () =
   }
 });
 
+test('a refreshed member replaces their old connection instead of taking a second seat', async () => {
+  const {join} = harness();
+  const hostStates = [], hostRoster = [], firstRoster = [], secondRoster = [];
+  const host = join(person('Anna', hostStates, hostRoster)); await tick();
+  const first = join(person('Ben', [], firstRoster)); await tick();
+  const refreshed = join(person('Ben', [], secondRoster)); await tick();
+  try {
+    assert.equal(host.size, 2);
+    assert.equal(hostRoster.at(-1).filter((member) => member.id === 'Ben').length, 1);
+    first.leave(); await tick();
+    assert.equal(host.size, 2, 'closing the replaced connection must not remove the person');
+    assert.equal(hostRoster.at(-1).some((member) => member.id === 'Ben' && member.peerId), true);
+    refreshed.leave(); await tick();
+    assert.equal(host.size, 1);
+  } finally { refreshed.leave(); first.leave(); host.leave(); }
+});
+
+test('a broker id collision does not destroy a live host or kick the room', async () => {
+  const {join, Peer} = harness();
+  const host = join(person('Anna', [], [])); await tick();
+  const guest = join(person('Ben', [], [])); await tick();
+  try {
+    const hub = [...Peer.registry.values()].find((peer) => String(peer.id).startsWith('tw-party'));
+    hub.reconnect = () => {};
+    hub.emit('error', {type: 'unavailable-id'});
+    hub.emit('error', {type: 'network'});
+    await tick();
+    assert.equal(host.isHost, true);
+    assert.equal(host.size, 2);
+    assert.equal(Peer.registry.get(hub.id), hub);
+    assert.equal(guest.isHost, false);
+  } finally { guest.leave(); host.leave(); }
+});
+
+test('a transient channel error does not reelect or drop the guest', async () => {
+  const {join, Peer} = harness();
+  const host = join(person('Anna', [], [])); await tick();
+  const guest = join(person('Ben', [], [])); await tick();
+  try {
+    const client = [...Peer.registry.values()].find((peer) => String(peer.id).startsWith('client'));
+    const link = client.connections[0];
+    assert.equal(link.open, true);
+    link.emit('error', {type: 'negotiation-failed'});
+    await tick();
+    assert.equal(host.size, 2);
+    assert.equal(guest.isHost, false);
+    assert.equal(Peer.registry.get(client.id), client);
+  } finally { guest.leave(); host.leave(); }
+});
+
+test('a guest cannot take the host seat by reusing the host id', async () => {
+  const {join, Peer} = harness();
+  const rosters = [];
+  const host = join(person('Anna', [], rosters)); await tick();
+  const guest = join(person('Ben', [], [])); await tick();
+  try {
+    const hub = [...Peer.registry.values()].find((peer) => String(peer.id).startsWith('tw-party'));
+    hub.connections.find((connection) => connection.open).emit('data', {t: 'hello', d: {id: 'Anna', name: 'Impostor', color: '#000'}});
+    await tick();
+    const roster = rosters.at(-1);
+    assert.equal(host.size, 2);
+    assert.equal(roster.find((member) => member.id === 'Anna').name, 'Anna');
+    assert.equal(roster.filter((member) => member.id === 'Ben').length, 1);
+  } finally { guest.leave(); host.leave(); }
+});
+
+test('a failed guest channel is removed so the host stops broadcasting to it', async () => {
+  const {join, Peer} = harness();
+  const host = join(person('Anna', [], [])); await tick();
+  const guest = join(person('Ben', [], [])); await tick();
+  try {
+    const hub = [...Peer.registry.values()].find((peer) => String(peer.id).startsWith('tw-party'));
+    const ghost = hub.connections.find((connection) => connection.peerConnection);
+    ghost.peerConnection.connectionState = 'failed';
+    host.setReadingState({bookId: 43, chapter: 3, verse: 16, action: 'playing', ts: 1});
+    await tick();
+    assert.equal(host.size, 1);
+  } finally { guest.leave(); host.leave(); }
+});
+
 test('closing the question clears it everywhere', async () => {
   const {join} = harness();
   const anna = asker('Anna'), ben = asker('Ben');
@@ -236,4 +317,97 @@ test('an invite to a missing room never claims its host ID',async()=>{
   const room=join({code:'missing',create:false,identity:{id:'guest',name:'Guest',color:'#888'},handlers:{onError:e=>errors.push(e)}});
   try {await tick();assert.equal(room.isHost,false);assert.equal(Peer.registry.has('tw-party-missing'),false);assert.ok(errors.includes('room-unavailable'));}
   finally{room.leave();}
+});
+
+function seat(id, name, rosters = []) {
+  return {code:'test-private', identity:{id, name, color:'#947849'}, handlers:{onRoster:r=>rosters.push(r)}};
+}
+
+test('two tabs stay two seats, and a refresh replaces only that tab', async () => {
+  const {join} = harness();
+  const rosters = [];
+  const host = join(seat('host', 'Host', rosters)); await tick();
+  const tab1 = join(seat('acct-tab1', 'Sam')); await tick();
+  const tab2 = join(seat('acct-tab2', 'Sam')); await tick();
+  try {
+    assert.equal(host.size, 3);
+    assert.equal(rosters.at(-1).filter((member) => member.name === 'Sam').length, 2);
+    const refreshed = join(seat('acct-tab1', 'Sam')); await tick();
+    try {
+      assert.equal(host.size, 3, 'refreshing one tab must not add a third Sam');
+      assert.equal(rosters.at(-1).filter((member) => member.id === 'acct-tab1').length, 1);
+      tab1.leave(); await tick();
+      assert.equal(host.size, 3, 'the replaced tab must not take the refreshed one with it');
+      assert.equal(rosters.at(-1).some((member) => member.id === 'acct-tab2'), true);
+    } finally { refreshed.leave(); }
+  } finally { tab2.leave(); tab1.leave(); host.leave(); }
+});
+
+test('a killed tab lingers while its channel still looks connected, then a rejoin replaces it', async () => {
+  const {join, Peer, advance} = harness();
+  const host = join(person('Anna', [], [])); await tick();
+  const guest = join(person('Ben', [], [])); await tick();
+  try {
+    const hub = [...Peer.registry.values()].find((peer) => String(peer.id).startsWith('tw-party'));
+    const link = hub.connections.find((connection) => connection.open);
+    advance(60_000);
+    host.setReadingState({bookId:43, chapter:3, verse:1, action:'playing', ts:1});
+    await tick();
+    assert.equal(host.size, 2, 'a channel that still says connected is kept');
+    link.emit('data', {t:'ping'});
+    link.peerConnection.connectionState = 'disconnected';
+    host.setReadingState({bookId:43, chapter:3, verse:2, action:'playing', ts:2});
+    await tick();
+    assert.equal(host.size, 2, 'a disconnect that just started is not dropped');
+    advance(21_000);
+    host.setReadingState({bookId:43, chapter:3, verse:3, action:'playing', ts:3});
+    await tick();
+    assert.equal(host.size, 1, 'a disconnect that never recovers is removed');
+  } finally { guest.leave(); host.leave(); }
+});
+
+test('rejoining the same seat replaces a channel that has not reported dead yet', async () => {
+  const {join} = harness();
+  const rosters = [];
+  const host = join(person('Anna', [], rosters)); await tick();
+  const original = join(person('Ben', [], [])); await tick();
+  const returned = join(person('Ben', [], [])); await tick();
+  try {
+    assert.equal(host.size, 2);
+    assert.equal(rosters.at(-1).filter((member) => member.id === 'Ben').length, 1);
+    original.leave(); await tick();
+    assert.equal(host.size, 2);
+  } finally { returned.leave(); original.leave(); host.leave(); }
+});
+
+test('a stolen host id keeps the current calls and does not step down', async () => {
+  const {join, Peer} = harness();
+  const statuses = [];
+  const host = join({code:'test-private', identity:{id:'Anna', name:'Anna', color:'#947849'}, handlers:{onStatus:s=>statuses.push(s)}});
+  await tick();
+  const guest = join(person('Ben', [], [])); await tick();
+  try {
+    const hub = [...Peer.registry.values()].find((peer) => String(peer.id).startsWith('tw-party'));
+    const guestLink = hub.connections.find((connection) => connection.open);
+    let reconnects = 0;
+    hub.reconnect = () => { reconnects += 1; hub.emit('error', {type:'unavailable-id'}); };
+    const usurper = {id:hub.id, connections:[]};
+    Peer.registry.set(hub.id, usurper);
+    hub.emit('error', {type:'unavailable-id'});
+    await tick();
+    assert.equal(guestLink.open, true);
+    assert.equal(host.isHost, true);
+    assert.equal(host.size, 2);
+    assert.equal(hub.dead, undefined);
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    assert.equal(reconnects, 1);
+    assert.equal(guestLink.open, true);
+    assert.equal(host.size, 2);
+    assert.equal(Peer.registry.get(hub.id), usurper);
+    await new Promise((resolve) => setTimeout(resolve, 900));
+    assert.equal(reconnects, 2);
+    assert.ok(statuses.includes('reconnecting'));
+    assert.equal(host.isHost, true);
+    assert.equal(guestLink.open, true, 'retrying the broker must not kick the guest');
+  } finally { guest.leave(); host.leave(); }
 });

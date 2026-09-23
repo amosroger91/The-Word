@@ -113,6 +113,9 @@ export function createWebSpeech(): SpeechAdapter {
           let lastTime = audio.currentTime;
           let lastProgress = Date.now();
           let recoveries = 0;
+          // A single sample sitting on a wrong duration must not skip the verse.
+          // Real playback has to have moved before the end of the file counts.
+          let heardProgress = audio.currentTime > 0.2;
           const stale = () => started !== generation;
           const finish = (result: 'ended' | 'stopped', error?: unknown) => {
             if (settled) return;
@@ -168,6 +171,14 @@ export function createWebSpeech(): SpeechAdapter {
             if (stale()) { finish('stopped'); return; }
             if (pausedByUser) { lastProgress = Date.now(); return; }
             if (audio.ended) { finish('ended'); return; }
+            if (audio.currentTime > lastTime + 0.01) heardProgress = true;
+            // Chrome sometimes never fires `ended` after a long run of blob
+            // playback. The verse did finish; advance instead of stalling the chapter.
+            const duration = audio.duration;
+            if (heardProgress && Number.isFinite(duration) && duration > 0.5 && audio.currentTime >= duration - 0.05) {
+              finish(stale() ? 'stopped' : 'ended');
+              return;
+            }
             if (audio.currentTime !== lastTime) {
               lastTime = audio.currentTime; lastProgress = Date.now(); recoveries = 0;
             } else if (Date.now() - lastProgress >= 15_000) {
