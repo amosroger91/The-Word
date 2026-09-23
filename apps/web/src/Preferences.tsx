@@ -3,6 +3,7 @@ import { readingFonts, type Language, type WordApp } from '@the-word/core';
 import { SearchableSelect } from './SearchableSelect';
 import { AccountSettings } from './AccountSettings';
 import type { DailyReminder } from './dailyReminder';
+import { readerCopy } from './readerCopy';
 import { ReaderSwitcher } from './ReaderSwitcher';
 import type { Reader, ReaderState } from './readers';
 
@@ -38,6 +39,8 @@ export function Preferences({
   onClose: () => void;
 }) {
   const { label } = app;
+  const ui = readerCopy[app.language];
+  const [section, setSection] = useState<'reading'|'audio'|'profile'|'backup'>(restorePrefill ? 'backup' : 'reading');
   const panelRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   // The field keeps its own text so a half-typed (or briefly empty) name still
@@ -83,7 +86,10 @@ export function Preferences({
           <button type="button" onClick={onClose} aria-label={label.closePreferences}>×</button>
         </div>
 
+        <nav className="settings-sections" aria-label={label.settings}>{(['reading','audio','profile','backup'] as const).map(id=><button key={id} aria-pressed={section===id} onClick={()=>setSection(id)}>{ui[id]}</button>)}</nav>
         <div className="prefs-body">
+          <section hidden={section!=='reading'} aria-label={ui.reading}>
+          <button onClick={app.toggleTheme}>{label.toggleTheme}</button>
           <div className="prefs-field">
             <span className="section-label">{label.interfaceLanguage}</span>
             <SearchableSelect
@@ -126,6 +132,7 @@ export function Preferences({
             </div>
           </div>
 
+          </section><section hidden={section!=='audio'} aria-label={ui.audio}>
           <div className="prefs-field">
             <span className="section-label">{label.voice}</span>
             <SearchableSelect
@@ -163,6 +170,7 @@ export function Preferences({
             />
           </div>
 
+          </section><section hidden={section!=='profile'} aria-label={ui.profile}>
           <ReaderSwitcher state={readers} active={activeReader} label={label} onChange={onReadersChange} />
 
           <div className="prefs-field">
@@ -239,7 +247,7 @@ export function Preferences({
             </div>
           </div>
 
-          <AccountSettings label={label} restorePrefill={restorePrefill} />
+          </section><section hidden={section!=='backup'} aria-label={ui.backup}><AccountSettings label={label} restorePrefill={restorePrefill} /></section>
         </div>
       </div>
     </div>

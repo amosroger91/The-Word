@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { localBible } from '@the-word/bible';
+import { localBible, loadBookCrossRefs, chapterCrossRefs } from '@the-word/bible';
 import { useWordApp, verseImageFilename, verseRuns, type WordApp } from '@the-word/core';
 import { SearchableSelect } from './SearchableSelect';
 import { BookBibleIcon, CamIcon, MicIcon, ScreenIcon, SpeakerIcon, VolumeHighIcon, VolumeLowIcon } from './icons';
 import { ScreenStage } from './ScreenStage';
 import { groupInviteUrl, parseGroupHash } from './groupLink';
 import { AnswerBoard, HostQuestionPanel, QuestionPrompt } from './GroupQuestion';
-import { ToolDock, useTools, type ToolId } from './ToolDock';
+import { ToolDock, useTools, toolNames, pageTools, type ToolId } from './ToolDock';
 import { PassageTools, snapshot, type PassageSnapshot } from './PassageTools';
 import { Welcome, useWelcome, ReminderBanner } from './Welcome';
 import { DeviceSettings } from './DeviceSettings';
@@ -36,6 +36,8 @@ import { StudyHub } from './StudyHub';
 import './styles.css';
 import './landing.css';
 import './workspace.css';
+import './reader-layout.css';
+import { readerCopy } from './readerCopy';
 
 function viewFromHash(): 'home' | 'reader' {
   return readerViewFromHash();
@@ -61,6 +63,7 @@ function App() {
     speechState, speakingVerse, speechError, speechRate, speechRateRange, speechVolume, speechVolumeRange, speechVoice,
   } = app;
 
+  const ui = readerCopy[language];
   const party = useReadParty(app);
   const ledger = useLedger();
   const study = useStudy(ledger.earned);
@@ -69,7 +72,9 @@ function App() {
   const reminder = useDailyReminder({ title: label.reminderTitle, body: label.reminderBody });
   const activeTopic = app.topics.find((topic) => topic.id === app.selectedTopic);
   const tools = useTools();
+  const studyRequest = useRef(0);
   const toolsRef = useRef(tools);
+  useEffect(()=>{studyRequest.current++;},[tools.focused,app.translationId]);
   toolsRef.current = tools;
   const restorePrefill = useMemo(() => takeRestoreToken() ?? '', []);
   const welcome = useWelcome();
@@ -79,7 +84,6 @@ function App() {
   const [createFindable, setCreateFindable] = useState(false);
   const [view, setView] = useState<'home'|'reader'>(viewFromHash);
   const [mobileView,setMobileView] = useState<'reader'|'library'|'tools'>('reader');
-  const [peopleMode,setPeopleMode] = useState<'compact'|'discussion'|'collapsed'>('compact');
   const [peopleVolume,setPeopleVolume] = useState(1);
   const [passage,setPassage] = useState<PassageSnapshot|null>(null);
   const [guidePassage,setGuidePassage] = useState<PassageSnapshot|null>(null);
@@ -93,13 +97,16 @@ function App() {
   // Ask for a backup the first time the account is worth keeping, not at first
   // launch when there is nothing invested. docs/study-plans-framework.md §14a.
   const [backupAsk,setBackupAsk] = useState<BackupTrigger>('none');
-  const partyOpen = tools.entries.some(e=>e.id==='group');
+  const partyOpen = tools.focused==='group';
   const { list: liveGroups, advertise: advertiseGroup, retract: retractGroup } = useStudyBoard(partyOpen || (party.active && party.findable && party.isHost));
+  const searchInput = useRef<HTMLInputElement>(null);
+  const libraryBack = useRef<HTMLButtonElement>(null);
+  useEffect(()=>{if(library) (library==='search'?searchInput.current:libraryBack.current)?.focus();},[library]);
   const verseRefs = useRef<Record<number, HTMLElement | null>>({});
   const [lastInView, setLastInView] = useState(false);
   const lastVerse = chapter?.verses.length ? chapter.verses[chapter.verses.length - 1].ref.verse : null;
 
-  useEffect(() => { if (restorePrefill) tools.open('settings'); }, [restorePrefill]);
+  useEffect(() => { if (restorePrefill) { tools.open('settings'); setLibrary(null); setMobileView('tools'); } }, [restorePrefill]);
   // The optional breakdown formatter fetches itself once the page is quiet.
   // Scripture is already on screen by then and never waits for it.
   useEffect(() => { prepareModel(); }, []);
@@ -112,7 +119,7 @@ function App() {
       const next = viewFromHash();
       setView(next);
       const deep = parseVerseHash(window.location.hash);
-      if (deep) app.goToVerse(deep.bookId, deep.chapter, deep.verse);
+      if (deep) { app.goToVerse(deep.bookId, deep.chapter, deep.verse); toolsRef.current.dismiss(); setLibrary(null); setMobileView('reader'); }
     };
     window.addEventListener('hashchange', onHash);
     const deep = parseVerseHash(window.location.hash);
@@ -275,15 +282,16 @@ function App() {
   useEffect(()=>{ if(ledger.justEarned.length&&needsBackup()) setBackupAsk('badge'); },[ledger.justEarned]);
   useEffect(()=>{ if(study.circles.length&&needsBackup()) setBackupAsk((prev)=>prev==='none'?'circle':prev); },[study.circles.length]);
 
-  const openTool = (id:ToolId) => { tools.open(id); if(window.innerWidth<=950)setLibrary(null); setMobileView('tools'); };
-  const openLibrary = (next:'books'|'search'|'bookmarks') => { setLibrary(next); setMobileView('library'); };
+  const openTool = (id:ToolId) => { tools.open(id); setLibrary(null); setMobileView('tools'); if(id==='group')welcome.show(); };
+  const returnToReading = () => { tools.dismiss(); setLibrary(null); setMobileView('reader'); requestAnimationFrame(()=>document.querySelector<HTMLButtonElement>('[data-read-nav]')?.focus()); };
+  const openLibrary = (next:'books'|'search'|'bookmarks') => { tools.dismiss(); setLibrary(next); setMobileView('library'); };
   const navigate = (bookId:number, nextChapter:number, verse=1) => {
-    party.browseIndependently(); app.goToVerse(bookId,nextChapter,verse); setMobileView('reader');
+    party.browseIndependently(); app.goToVerse(bookId,nextChapter,verse); returnToReading();
     const next = verseHash(bookId, nextChapter, verse);
     if (window.location.hash !== next) window.location.hash = next;
   };
   const currentVerse = app.selectedVerseNumbers[0] ?? party.stageVerse ?? app.focusedVerse ?? chapter?.verses[0]?.ref.verse ?? 1;
-  const inspect = (verse:number, id:'references'|'guide') => { if(id==='guide'){setFollowGuide(false);setGuidePassage(snapshot(app,verse));}else{setFollowTool(false);setPassage(snapshot(app,verse));}openTool(id); };
+  const inspect = (verse:number, id:'references'|'guide') => { const target=snapshot(app,verse); setFollowGuide(false); setFollowTool(false); setGuidePassage(target); setPassage(target); setBreakdownRef({bookId:app.bookId,chapter:chapterNumber,verse}); openTool(id); };
   useEffect(()=>{
     if (!chapterLoading && chapter) {
       if(followTool)setPassage(snapshot(app,party.stageVerse ?? speakingVerse ?? 1));
@@ -291,7 +299,7 @@ function App() {
     }
   },[followTool,followGuide,party.stageVerse,speakingVerse,app.bookId,chapterNumber,app.translationId,chapterLoading,chapter]);
   useEffect(()=>{setRemoteVolume(peopleVolume);},[peopleVolume]);
-  useEffect(()=>{if(!tools.entries.length && mobileView==='tools')setMobileView('reader');},[tools.entries.length,mobileView]);
+  useEffect(()=>{if(!tools.focused && mobileView==='tools')setMobileView('reader');},[tools.focused,mobileView]);
   useEffect(()=>{if(!library && mobileView==='library')setMobileView('reader');},[library,mobileView]);
   const stage = party.shared;
   const stageName = stage ? localBible.getBook(stage.bookId,app.translationId)?.name ?? 'Scripture' : bookName;
@@ -300,7 +308,7 @@ function App() {
   const hostName = party.members.find(m=>m.host)?.name ?? 'the host';
   const participant = party.active && !party.isHost;
   const speechControls = <>
-    {speechState==='idle' && <button className="primary" onClick={app.speakChapter} disabled={!chapter}>{party.isHost?'Read to group':label.readAloud}</button>}
+    {speechState==='idle' && <button className="primary" onClick={()=>selectedVerses.size ? app.speakFromVerse(app.bookId,chapterNumber,currentVerse) : app.speakChapter()} disabled={!chapter}>{selectedVerses.size?label.readFromHere:party.isHost?'Read to group':label.readAloud}</button>}
     {speechState==='speaking' && <button className="primary" onClick={app.pauseSpeech}>{party.isHost?'Pause group reading':label.pause}</button>}
     {speechState==='paused' && <button className="primary" onClick={app.resumeSpeech}>{party.isHost?'Resume group reading':label.resume}</button>}
     {speechState!=='idle' && <button onClick={app.stopSpeech}>{label.stop}</button>}
@@ -311,10 +319,50 @@ function App() {
     <label>Reading speed · {speechRate.toFixed(1)}×<input aria-label="Reading speed" type="range" min={speechRateRange.min} max={speechRateRange.max} step={speechRateRange.step} value={speechRate} disabled={participant && party.following} onChange={e=>app.changeSpeechRate(+e.target.value-speechRate)} /></label>
     <p>Group following tracks the host’s verse. Narration is generated on each device; voices may finish at different times.</p>
     <button onClick={()=>{app.unlockSpeech();unlockRemoteAudio();party.arm();}}>Enable sound on this device</button>
-    <button onClick={()=>openTool('settings')}>Choose a narration voice</button>
-    <DeviceSettings party={party}/>
+    <label>{label.voice}<SearchableSelect value={speechVoice} onChange={app.setSpeechVoice} label={label.voice} filterPlaceholder={label.filterPlaceholder} options={app.voiceOptions.map(voice=>({value:voice.id,label:voice.isDefault?label.defaultVoice:voice.name}))}/></label>
+    {selectedVerses.size>0&&(!participant||!party.following)&&<button onClick={app.speakSelection}>{label.readSelection}</button>}<DeviceSettings party={party}/>
   </div>;
-  const preferences = <Preferences embedded={view==='reader'} app={app} name={party.name} color={party.identity.color} avatar={party.avatar} reminder={reminder} readers={{readers:ledger.readers,activeId:ledger.activeReader.id}} activeReader={ledger.activeReader} onReadersChange={ledger.updateReaders} restorePrefill={restorePrefill} onNameChange={party.setName} onAvatarChange={file=>{void party.setAvatar(file);}} onClose={()=>tools.close('settings')} />;
+  const preferences = <Preferences embedded={view==='reader'} app={app} name={party.name} color={party.identity.color} avatar={party.avatar} reminder={reminder} readers={{readers:ledger.readers,activeId:ledger.activeReader.id}} activeReader={ledger.activeReader} onReadersChange={ledger.updateReaders} restorePrefill={restorePrefill} onNameChange={party.setName} onAvatarChange={file=>{void party.setAvatar(file);}} onClose={()=>{tools.close('settings');if(view==='reader')returnToReading();}} />;
+  const shareActions = <div className="share-actions"><h2>{selectedReference}</h2><blockquote>{selectedText}</blockquote>      <button onClick={app.copySelection}>{label.copy}</button><button onClick={()=>{void (async()=>{
+      const verse=currentVerse;
+      const url=verseShareUrl(app.bookId,chapterNumber,verse);
+      const reference=formatVerseReference(bookName,chapterNumber,app.selectedVerseNumbers);
+      const body=verseShareText({reference,text:selectedText,translation:app.translations.find(t=>t.id===app.translationId)?.shortName,url});
+      try {
+        // The block already ends with the link, so pass it as `text` rather than splitting
+        // text/url — targets that only read `url` would otherwise drop the passage itself.
+        if (navigator.share) await navigator.share({ title: reference, text: body });
+        else { await navigator.clipboard.writeText(body); setNotice(label.verseCopied); }
+        void ledger.recordShare('link', app.bookId, chapterNumber, verse);
+      } catch (error) {
+        if ((error as {name?:string}).name==='AbortError') return;
+        try { await navigator.clipboard.writeText(body); setNotice(label.verseCopied); void ledger.recordShare('link', app.bookId, chapterNumber, verse); }
+        catch { setNotice(body); }
+      }
+    })();}}>{label.sharePassage}</button><button onClick={()=>{setImageJob({reference:selectedReference,text:selectedText,translation:app.translations.find(t=>t.id===app.translationId)?.shortName??'KJV',filename:verseImageFilename(bookName,chapterNumber),seed:selectedReference});openTool('image');}}>{ui.image}</button></div>;
+  async function chooseStudyView(id:'guide'|'references'|'breakdown') {
+    const request = ++studyRequest.current;
+    let target = tools.focused==='guide' ? guidePassage : passage;
+    if (tools.focused==='breakdown' && breakdownRef) {
+      try {
+        const [text, refs] = await Promise.all([
+          localBible.getChapter(app.translationId,breakdownRef.bookId,breakdownRef.chapter),
+          loadBookCrossRefs(breakdownRef.bookId),
+        ]);
+        if(request!==studyRequest.current) return;
+        target = { ...breakdownRef, translationId:app.translationId,
+          reference:`${localBible.getBook(breakdownRef.bookId,app.translationId)?.name ?? ''} ${breakdownRef.chapter}:${breakdownRef.verse}`,
+          text:text?.verses.find(v=>v.ref.verse===breakdownRef.verse)?.text??'',
+          refs:chapterCrossRefs(refs,breakdownRef.chapter)[breakdownRef.verse]??[] };
+      } catch { if(request===studyRequest.current)setNotice(label.chapterMissingBody); return; }
+    }
+    if(target){
+      setPassage(target); setGuidePassage(target); setFollowTool(false); setFollowGuide(false);
+      setBreakdownRef({bookId:target.bookId,chapter:target.chapter,verse:target.verse});
+    }
+    openTool(id);
+  }
+  const studySections = <nav className="study-sections" aria-label={ui.more}>{(['guide','references','breakdown'] as const).map(id=><button key={id} aria-pressed={tools.focused===id} onClick={()=>{void chooseStudyView(id);}}>{id==='guide'?ui.context:id==='references'?ui.related:ui.explanation}</button>)}</nav>;
   const group = <div className="group-content">
     {!party.active ? <><span className="workspace-eyebrow">Read. Reflect. Together.</span><h2>A seat at the table.</h2><p>Share a passage, talk face to face, and follow the host’s reading.</p>
       <div className="join-profile">{party.avatar && <img src={party.avatar} alt="Your profile"/>}<div><strong>{party.name}</strong><small>Your microphone and camera start off.</small></div><button onClick={()=>openTool('settings')}>Edit profile</button></div>
@@ -325,10 +373,11 @@ function App() {
       <form className="join-form" onSubmit={e=>{e.preventDefault();speech.unlock?.();unlockRemoteAudio();party.joinParty(partyCode);}}><label>Have a room code?<input aria-label="Room code" value={partyCode} onChange={e=>setPartyCode(e.target.value)} placeholder="Enter code"/></label><button disabled={!partyCode.trim()}>Join group</button></form>
       <h3>Open study groups</h3>{liveGroups.length?liveGroups.map(item=><button className="party-live-item" key={item.code} onClick={()=>{speech.unlock?.();unlockRemoteAudio();party.joinParty(item.code);}}><strong>{item.hostName}</strong><span>{item.members} people · Join group</span></button>):<p className="muted">No public groups are live right now.</p>}
     </> : <><div className="group-summary"><span className="workspace-eyebrow">{party.isHost?'You are hosting':`Hosted by ${hostName}`}</span><h2>{stageReference}</h2><p>{partyStatusText(party.status,label)} · {party.members.length} people</p><button onClick={copyInvite}>Copy invite link</button><p>Room code: <strong>{party.code}</strong></p>{parseGroupHash(window.location.hash) && parseGroupHash(window.location.hash)!==party.code && <p role="status">This invitation is for room {partyCode}. Leave your current room before joining it.</p>}</div>
-      <details className="people-list"><summary>People & host controls ({party.members.length})</summary>{party.members.map(member=><div className="member-row" key={member.id}><span className="member-avatar" style={{background:member.color}}>{member.avatar?<img src={member.avatar} alt=""/>:member.name.slice(0,1)}</span><span>{member.name}{member.id===party.identity.id?' (you)':''}<small>{member.host?'Host':member.mic?'Microphone on':'Microphone off'}</small></span>{party.isHost && member.id!==party.identity.id && <button onClick={()=>party.transferHost(member.id)}>Make host</button>}</div>)}<p className="muted">Passing the host role pauses group narration. The new host chooses when to resume.</p></details>
+      <section className="people-list"><h3>People ({party.members.length})</h3>{party.members.map(member=><div className="member-row" key={member.id}><span className="member-avatar" style={{background:member.color}}>{member.avatar?<img src={member.avatar} alt=""/>:member.name.slice(0,1)}</span><span>{member.name}{member.id===party.identity.id?' (you)':''}<small>{member.host?'Host':member.mic?'Microphone on':'Microphone off'}</small></span>{party.isHost && member.id!==party.identity.id && <button onClick={()=>party.transferHost(member.id)}>Make host</button>}</div>)}<p className="muted">Passing the host role pauses group narration. The new host chooses when to resume.</p></section>
       {party.isHost&&<HostQuestionPanel question={party.question} answers={party.answerList} sharing={party.sharingAnswers} onAsk={party.askQuestion} onClose={party.closeQuestion} onShare={party.shareAnswers}/>}
       <div className="party-chat"><h3>Conversation</h3><div className="party-messages" role="log" aria-label="Group messages" aria-live="polite">{party.messages.map(msg=>msg.kind==='system'?<div className="party-msg system" key={msg.id}>{msg.event==='joined'?label.partyJoined(msg.name||''):msg.event==='left'?label.partyLeft(msg.name||''):msg.text}</div>:<div className="party-msg" key={msg.id}><strong>{msg.name}</strong><span>{msg.text}</span></div>)}</div><form onSubmit={e=>{e.preventDefault();if(partyChat.trim()){party.sendChat(partyChat);setPartyChat('');}}}><input aria-label="Message the group" placeholder="Share a thought…" maxLength={2000} value={partyChat} onChange={e=>setPartyChat(e.target.value)}/><button disabled={!partyChat.trim()}>Send</button></form></div>
     </>}
+    {party.active&&party.isHost&&selectedVerses.size>0&&<button onClick={()=>party.showGroup(app.selectedVerseNumbers)}>Show group · {selectedReference}</button>}
     {party.error && <p role="alert">Could not connect: {party.error}. Leave the room and try joining again.</p>}
   </div>;
   const dock = <footer className="session-dock" aria-label={party.active?'Meeting and reading controls':'Reading controls'}>
@@ -336,19 +385,25 @@ function App() {
     <div className="transport"><div className="transport-status"><span className="workspace-eyebrow">{participant?(party.following?`Following ${hostName}`:'Browsing independently'):party.active?'You control group reading':'Your quiet place'}</span><strong>{party.active?stageReference:`${bookName} ${chapterNumber}${speakingVerse?`:${speakingVerse}`:''}`}</strong></div>
       {participant && party.following ? <><button onClick={party.toggleNarration} aria-pressed={party.narrationMuted}>{party.narrationMuted?'Unmute narration':'Mute narration'}</button>{(!party.following||!samePassage)&&<button className="primary" onClick={()=>{party.returnToHost();setMobileView('reader');}}>Return to host</button>}{party.needsArm&&<button onClick={()=>{speech.unlock?.();party.arm();}}>Enable narration</button>}</> : <>{speechControls}{participant&&<button onClick={party.returnToHost}>Return to host</button>}</>}
     </div>
-    <div className="room-controls"><button onClick={()=>{if(view==='home')openReader();openTool('sound');}}><VolumeHighIcon/><span>Sound</span></button>{party.active&&<><button onClick={()=>{if(view==='home')openReader();openTool('group');}}><ReaderIcon name="people"/><span>Group · {party.members.length}</span></button><button className="leave-button" onClick={party.leaveParty}>Leave</button></>}</div>
+    <div className="room-controls"><button aria-label={ui.audio} onClick={()=>{if(view==='home')openReader();openTool('sound');}}><VolumeHighIcon/><span>{ui.audio}</span></button>{party.active&&<><button aria-label={ui.group} onClick={()=>{if(view==='home')openReader();openTool('group');}}><ReaderIcon name="people"/><span>Group · {party.members.length}</span></button><button className="leave-button" onClick={party.leaveParty}>Leave</button></>}</div>
   </footer>;
   return <><div hidden={view!=='home'} className={party.active?'home-in-session':''}>
-    <Landing app={app} onEnterReader={()=>{app.markProgress();openReader();}} onGroupStudy={()=>{openReader();openTool('group');}} onBookmarks={()=>{openReader();openLibrary('bookmarks');}} onPreferences={()=>tools.open('settings')} onBreakdown={(b,c,v)=>{app.goToVerse(b,c,v);setBreakdownRef({bookId:b,chapter:c,verse:v});openReader();openTool('breakdown');}} onProgress={()=>{openReader();openTool('progress');}} onStudy={()=>{openReader();openTool('study');}} onShareImage={(b,c,v)=>{void ledger.recordShare('image',b,c,v);}} progress={{chapters:ledger.chapters,streak:ledger.streak,percent:ledger.canon.all.percent,have:ledger.canon.all.have,need:ledger.canon.all.need}} partyMembers={party.active?party.members.length:0} banner={<ReminderBanner reminder={reminder}/>} />
-    {view==='home'&&tools.entries.some(e=>e.id==='settings')&&preferences}
+    <Landing app={app} onEnterReader={()=>{app.markProgress();returnToReading();openReader();}} onGroupStudy={()=>{openReader();openTool('group');}} onBookmarks={()=>{openReader();openLibrary('bookmarks');}} onPreferences={()=>tools.open('settings')} onBreakdown={(b,c,v)=>{app.goToVerse(b,c,v);setBreakdownRef({bookId:b,chapter:c,verse:v});openReader();openTool('breakdown');}} onProgress={()=>{openReader();openTool('progress');}} onStudy={()=>{openReader();openTool('study');}} onShareImage={(b,c,v)=>{void ledger.recordShare('image',b,c,v);}} progress={{chapters:ledger.chapters,streak:ledger.streak,percent:ledger.canon.all.percent,have:ledger.canon.all.have,need:ledger.canon.all.need}} partyMembers={party.active?party.members.length:0} banner={<ReminderBanner reminder={reminder}/>} />
+    {view==='home'&&tools.focused==='settings'&&preferences}
     {party.active&&<div className="home-session"><button onClick={openReader}>Return to study · {stageReference}</button>{dock}</div>}
   </div>
-  <div hidden={view!=='reader'} className={`study-workspace ${tools.entries.length?'has-tools':''} ${library?'has-library':''} ${tools.expanded?'wide-tools':''}`} data-mobile-view={mobileView}>
+  <div hidden={view!=='reader'} className={`study-workspace ${tools.focused?'has-tools':''} ${library?'has-library':''} ${tools.focused&&pageTools.includes(tools.focused)?'page-tool':''}`} data-mobile-view={mobileView}>
     <header className="workspace-header"><button className="workspace-brand" onClick={openHome} aria-label={label.home}><BookBibleIcon/><span>The Word</span></button>
       <div className="passage-picker"><button onClick={()=>openLibrary('books')}>{bookName} {chapterNumber} <span>⌄</span></button><span>{app.translations.find(t=>t.id===app.translationId)?.shortName}</span></div>
-      <nav aria-label="Reader tools"><button onClick={()=>openLibrary('search')}><ReaderIcon name="search"/><span>Search</span></button><button onClick={()=>openLibrary('bookmarks')}><ReaderIcon name="bookmark"/><span>Saved</span></button><button onClick={()=>openTool('study')}><ReaderIcon name="book"/><span>{label.study}</span></button><button onClick={()=>openTool('progress')}><ReaderIcon name="award"/><span>{label.progress}</span></button><button onClick={()=>openTool('group')}><ReaderIcon name="people"/><span>Group Study</span></button><button aria-label="Settings" onClick={()=>openTool('settings')}><ReaderIcon name="settings"/></button><button aria-label={label.toggleTheme} onClick={app.toggleTheme}><ReaderIcon name={app.theme==='dark'?'sun':'moon'}/></button></nav>
+      <nav aria-label="Reader tools">
+        <button data-read-nav aria-pressed={!library&&!tools.focused} onClick={returnToReading}><ReaderIcon name="book"/><span>{ui.read}</span></button>
+        <button aria-pressed={library==='search'} onClick={()=>openLibrary('search')}><ReaderIcon name="search"/><span>{label.search}</span></button>
+        <button aria-pressed={library==='bookmarks'} onClick={()=>openLibrary('bookmarks')}><ReaderIcon name="bookmark"/><span>{ui.saved}</span></button>
+        <button aria-pressed={tools.focused==='study'} onClick={()=>openTool('study')}><ReaderIcon name="people"/><span>{ui.study}</span></button>
+        <button aria-label={label.settings} aria-pressed={tools.focused==='settings'} onClick={()=>openTool('settings')}><ReaderIcon name="settings"/><span>{label.settings}</span></button>
+      </nav>
     </header>
-    {party.active&&<section className={`session-strip ${peopleMode}`} aria-label="Study participants"><div className="session-heading"><span><i className="live-dot"/>Group Study <small>· {party.isHost?'You are hosting':`${hostName} is hosting`} · {partyStatusText(party.status,label)}</small></span><div><button onClick={()=>setPeopleMode(peopleMode==='discussion'?'compact':'discussion')} aria-pressed={peopleMode==='discussion'}>{peopleMode==='discussion'?'Reading layout':'Discussion layout'}</button><button onClick={()=>setPeopleMode(peopleMode==='collapsed'?'compact':'collapsed')}>{peopleMode==='collapsed'?'Show people':'Hide people'}</button></div></div>
+    {party.active&&<section className="session-strip compact" aria-label="Study participants"><div className="session-heading"><span><i className="live-dot"/>{ui.group} <small>· {party.isHost?'You are hosting':`${hostName} is hosting`} · {partyStatusText(party.status,label)}</small></span><button onClick={()=>openTool('group')}>{ui.group}</button></div>
       {party.active&&(party.screenOn||party.screenMemberId)&&<ScreenStage
         stream={party.screenOn?party.screenStream:(party.screenMemberId?party.remoteStreams[party.screenMemberId]??null:null)}
         isSelf={party.screenOn}
@@ -358,13 +413,13 @@ function App() {
       />}
       <FaceRail members={party.members} selfId={party.identity.id} selfAvatar={party.avatar} localStream={party.localStream} remoteStreams={party.remoteStreams} micOn={party.micOn} youSuffix={label.youSuffix} mutedLabel={label.muted} onPickPhoto={file=>{void party.setAvatar(file);}}/>
     </section>}
-    <nav className="mobile-workspace-nav" aria-label="Workspace views"><button aria-pressed={mobileView==='reader'} onClick={()=>setMobileView('reader')}>Read</button><button aria-pressed={mobileView==='library'} onClick={()=>openLibrary(library??'books')}>Library</button><button aria-pressed={mobileView==='tools'} onClick={()=>{if(!tools.entries.length)openTool('group');else setMobileView('tools');}}>Tools {tools.entries.length||''}</button></nav>
+
     <main className="workspace-body">
-      <aside className="library-pane" aria-label="Scripture library" hidden={!library}><nav className="library-tabs" aria-label="Library sections"><button aria-pressed={library==='books'} onClick={()=>setLibrary('books')}>Books</button><button aria-pressed={library==='search'} onClick={()=>setLibrary('search')}>Search</button><button aria-pressed={library==='bookmarks'} onClick={()=>setLibrary('bookmarks')}>Saved</button><button onClick={()=>setLibrary(null)} aria-label="Close library">×</button></nav>
+      <aside className="library-pane" aria-label="Scripture library" hidden={!library} onKeyDown={event=>{if(event.key==='Escape'&&!event.defaultPrevented){event.preventDefault();returnToReading();}}}><button ref={libraryBack} className="back-to-reading" onClick={returnToReading}>← {ui.back}</button><nav className="library-tabs" aria-label="Library sections"><button aria-pressed={library==='books'} onClick={()=>setLibrary('books')}>Books</button><button aria-pressed={library==='search'} onClick={()=>setLibrary('search')}>Search</button><button aria-pressed={library==='bookmarks'} onClick={()=>setLibrary('bookmarks')}>Saved</button><button onClick={returnToReading} aria-label="Close library">×</button></nav>
         <div hidden={library!=='books'} className="book-navigation"><span className="workspace-eyebrow">Find your passage</span><h2>The Scriptures</h2><label>{label.translation}<SearchableSelect value={app.translationId} onChange={value=>{party.browseIndependently();app.changeTranslation(value);}} label={label.translation} filterPlaceholder={label.filterPlaceholder} options={app.translationOptions}/></label><label>{label.book}<SearchableSelect value={String(app.bookId)} onChange={value=>navigate(+value,1)} label={label.book} filterPlaceholder={label.filterPlaceholder} options={app.bookOptions}/></label><label>{label.chapter}<SearchableSelect searchable={false} value={String(chapterNumber)} onChange={value=>navigate(app.bookId,+value)} label={label.chapter} filterPlaceholder={label.filterPlaceholder} options={app.chapterOptions}/></label><p className="muted">{label.footerFree}<br/>{label.footerLocal}</p></div>
         <div hidden={library!=='search'}><div className="search-panel">
-          <div className="search-header"><h2>{label.searchTitle} · {app.translations.find((item) => item.id === app.translationId)?.shortName}</h2><button onClick={() => setLibrary(null)} aria-label={label.search}>×</button></div>
-          <input autoFocus placeholder={label.searchPlaceholder} value={app.query} onChange={(event) => { app.setQuery(event.target.value); if (event.target.value.trim()) app.setSelectedTopic(''); }} />
+          <div className="search-header"><h2>{label.searchTitle} · {app.translations.find((item) => item.id === app.translationId)?.shortName}</h2><button onClick={returnToReading} aria-label={label.search}>×</button></div>
+          <input ref={searchInput} aria-label={label.search} placeholder={label.searchPlaceholder} value={app.query} onChange={(event) => { app.setQuery(event.target.value); if (event.target.value.trim()) app.setSelectedTopic(''); }} />
           {activeTopic && (
             <div className="topic-chip">
               <strong>{activeTopic.name}</strong>
@@ -404,7 +459,7 @@ function App() {
             </div>
           )}
         </div></div><div hidden={library!=='bookmarks'}><div className="bookmarks-panel">
-          <div className="panel-header"><h2>{label.bookmarks}</h2><button onClick={() => setLibrary(null)} aria-label={label.closeBookmarks}>×</button></div>
+          <div className="panel-header"><h2>{label.bookmarks}</h2><button onClick={returnToReading} aria-label={label.closeBookmarks}>×</button></div>
           {app.bookmarkList.length ? app.bookmarkList.map((entry) => (
             <button className="bookmark-item" key={`${entry.bookId}:${entry.chapter}:${entry.verse}`} onClick={() => { navigate(entry.bookId, entry.chapter, entry.verse); }}>
               <span className="bookmark-reference">{app.books.find((item) => item.id === entry.bookId)?.name} {entry.chapter}:{entry.verse}</span>
@@ -433,7 +488,7 @@ function App() {
         })}</article>:<div className="empty-state"><h2>{label.chapterMissingTitle}</h2><p>{label.chapterMissingBody}</p></div>}
         <div className="reader-end"><span>Continue in the Word</span><button onClick={()=>navigate(app.bookId,chapterNumber+1)} disabled={!book||chapterNumber===book.chapters}>{label.next} →</button></div>
       </section>
-      <ToolDock tools={tools}>{ {group,settings:view==='reader'?preferences:null,sound,study:<StudyHub app={app} study={study} onOpenPassage={(b,c,v)=>navigate(b,c,v)} onReadTogether={()=>{openTool('group');if(!party.active)party.createParty();}} onSharedVerse={(b,c,v)=>{void ledger.recordShare('feed',b,c,v);}} onFriendRequest={()=>{if(party.active)logGroupOnce('friendRequest','friendRequest');}}/>,breakdown:<Breakdown app={app} target={breakdownRef} onNavigate={(b,c,v)=>{navigate(b,c,v);setBreakdownRef({bookId:b,chapter:c,verse:v});}}/>,progress:<ProgressPanel label={label} language={language} chapters={ledger.chapters} streak={ledger.streak} events={ledger.events} earned={ledger.earned}/>,references:<PassageTools passage={passage} app={app} onNavigate={navigate} onRefresh={()=>setPassage(snapshot(app,currentVerse))} follow={followTool} onFollow={setFollowTool}/>,guide:<PassageTools guide passage={guidePassage} app={app} onNavigate={navigate} onRefresh={()=>setGuidePassage(snapshot(app,currentVerse))} follow={followGuide} onFollow={setFollowGuide}/>,image:imageJob?<VerseImageEditor key={imageJob.reference+imageJob.text} embedded job={imageJob} fontStack={app.font.stack} label={label} onClose={()=>tools.close('image')} onSaved={()=>{void ledger.recordShare('image',app.bookId,chapterNumber,currentVerse,'saved');}} onShared={()=>{void ledger.recordShare('image',app.bookId,chapterNumber,currentVerse,'shared');}}/>:<p>Select a verse to create an image.</p>} }</ToolDock>
+      <ToolDock tools={tools} backLabel={ui.back} onBack={returnToReading} names={{...toolNames,settings:label.settings,study:ui.study,progress:label.progress,sound:ui.audio,share:ui.share,group:ui.group,guide:ui.context,references:ui.related,breakdown:ui.explanation,image:ui.image}}>{ {group,share:shareActions,settings:view==='reader'?preferences:null,sound,study:<><div className="study-destinations"><button onClick={()=>openTool('group')}>{ui.group}</button><button onClick={()=>openTool('progress')}>{label.progress}</button></div><StudyHub app={app} study={study} onOpenPassage={(b,c,v)=>navigate(b,c,v)} onReadTogether={()=>{openTool('group');}} onSharedVerse={(b,c,v)=>{void ledger.recordShare('feed',b,c,v);}} onFriendRequest={()=>{if(party.active)logGroupOnce('friendRequest','friendRequest');}}/></>,breakdown:<>{studySections}<Breakdown app={app} target={breakdownRef} onNavigate={(b,c,v)=>{navigate(b,c,v);setBreakdownRef({bookId:b,chapter:c,verse:v});}}/></>,progress:<ProgressPanel label={label} language={language} chapters={ledger.chapters} streak={ledger.streak} events={ledger.events} earned={ledger.earned}/>,references:<>{studySections}<PassageTools passage={passage} app={app} onNavigate={navigate} onRefresh={()=>setPassage(snapshot(app,currentVerse))} follow={followTool} onFollow={setFollowTool}/></>,guide:<>{studySections}<PassageTools guide passage={guidePassage} app={app} onNavigate={navigate} onRefresh={()=>setGuidePassage(snapshot(app,currentVerse))} follow={followGuide} onFollow={setFollowGuide}/></>,image:imageJob?<VerseImageEditor key={imageJob.reference+imageJob.text} embedded job={imageJob} fontStack={app.font.stack} label={label} onClose={returnToReading} onSaved={()=>{void ledger.recordShare('image',app.bookId,chapterNumber,currentVerse,'saved');}} onShared={()=>{void ledger.recordShare('image',app.bookId,chapterNumber,currentVerse,'shared');}}/>:<p>Select a verse to create an image.</p>} }</ToolDock>
     </main>
     {(notice||speechError||party.mediaError||party.capped)&&<div className="workspace-notice" role="status"><span>{notice||speechError||(party.mediaError==='photo'?'That photo could not be loaded.':party.mediaError==='system-audio-none'?'No audio came through. In the picker, choose a tab or your whole screen and tick "Share audio" — a single window cannot carry sound.':party.mediaError==='system-audio'?'That audio could not be shared.':party.mediaError==='screen-audio'?'Screen is sharing, but without sound. Desktop audio needs Chrome or Edge, and the "Share audio" box ticked in the picker.':party.mediaError==='screen'?'That screen could not be shared.':party.mediaError?'Microphone or camera unavailable. Check your browser permissions.':'This room is above the 8-person voice/video threshold. Chat and passage sharing remain available.')}</span>{notice&&<button onClick={()=>setNotice('')} aria-label="Dismiss message">×</button>}</div>}
     {noteVerse!==null&&<VerseNote
@@ -450,25 +505,13 @@ function App() {
       onDelete={()=>{void ledger.removeNote(app.bookId,chapterNumber,noteVerse);setNoteVerse(null);}}
       onClose={()=>setNoteVerse(null)}
     />}
-    {selectedVerses.size>0&&<div className="workspace-selection" aria-label="Selected verse actions"><strong>{selectedReference}</strong><div>
-      {(!participant||!party.following)&&<button className="primary" title={`Read from ${bookName} ${chapterNumber}:${currentVerse} onward${party.isHost?' to the group':''}`} onClick={()=>{app.speakFromVerse(app.bookId,chapterNumber,currentVerse);}}>{label.readFromHere}</button>}
-      <button onClick={app.copySelection}>Copy</button><button onClick={()=>{void (async()=>{
-      const verse=currentVerse;
-      const url=verseShareUrl(app.bookId,chapterNumber,verse);
-      const reference=formatVerseReference(bookName,chapterNumber,app.selectedVerseNumbers);
-      const body=verseShareText({reference,text:selectedText,translation:app.translations.find(t=>t.id===app.translationId)?.shortName,url});
-      try {
-        // The block already ends with the link, so pass it as `text` rather than splitting
-        // text/url — targets that only read `url` would otherwise drop the passage itself.
-        if (navigator.share) await navigator.share({ title: reference, text: body });
-        else { await navigator.clipboard.writeText(body); setNotice(label.verseCopied); }
-        void ledger.recordShare('link', app.bookId, chapterNumber, verse);
-      } catch (error) {
-        if ((error as {name?:string}).name==='AbortError') return;
-        try { await navigator.clipboard.writeText(body); setNotice(label.verseCopied); void ledger.recordShare('link', app.bookId, chapterNumber, verse); }
-        catch { setNotice(body); }
-      }
-    })();}}>{label.sharePassage}</button><button onClick={()=>app.selectedVerseNumbers.forEach(app.toggleBookmark)}>Bookmark</button><button onClick={()=>{setBreakdownRef({bookId:app.bookId,chapter:chapterNumber,verse:currentVerse});openTool('breakdown');}}>{label.breakItDown}</button><button onClick={()=>setNoteVerse(currentVerse)}>{ledger.noteAt(app.bookId,chapterNumber,currentVerse)?label.editNote:label.addNote}</button><button onClick={()=>inspect(currentVerse,'guide')}>Explore</button><button onClick={()=>{setImageJob({reference:selectedReference,text:selectedText,translation:app.translations.find(t=>t.id===app.translationId)?.shortName??'KJV',filename:verseImageFilename(bookName,chapterNumber),seed:selectedReference});openTool('image');}}>Image</button>{(!participant||!party.following)&&<button onClick={app.speakSelection}>{party.isHost?'Read to group':'Read selection'}</button>}{party.active&&party.isHost&&<button onClick={()=>party.showGroup(app.selectedVerseNumbers)}>Show group</button>}<button onClick={app.clearSelection} aria-label="Clear selection">×</button></div></div>}
+    {selectedVerses.size>0&&!tools.focused&&!library&&<div className="workspace-selection" aria-label="Selected verse actions"><strong>{selectedReference}</strong><div>
+      <button onClick={()=>app.selectedVerseNumbers.forEach(app.toggleBookmark)}>{label.bookmark}</button>
+      <button onClick={()=>setNoteVerse(currentVerse)}>{ledger.noteAt(app.bookId,chapterNumber,currentVerse)?label.editNote:label.addNote}</button>
+      <button onClick={()=>openTool('share')}>{label.sharePassage}</button>
+      <button onClick={()=>inspect(currentVerse,'guide')}>{ui.study}</button>
+      <button onClick={app.clearSelection} aria-label="Clear selection">×</button>
+    </div></div>}
     {dock}
   </div>
   {party.active&&party.sharedAnswers&&<AnswerBoard shared={party.sharedAnswers} isHost={party.isHost} onStop={()=>party.shareAnswers(false)}/>}
