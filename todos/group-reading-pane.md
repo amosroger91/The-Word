@@ -17,5 +17,8 @@ Verification: `npm test --prefix apps/web` (90 passing), `npm run typecheck --pr
 
 - [x] Use the workspace light/dark tokens for the shared group-reading scrollbar and any supporting library/participant rails.
 - [x] Keep mobile group reading on one thin, touch-friendly scroll surface with the meeting pane stacked below Scripture.
+- [x] Remove the Group Study conversation log's nested scrollbar so its messages use the shared workspace scroll surface.
 
-Verification: desktop and active-room browser checks confirm the shared scrollbar uses the workspace line/muted colors; the mobile rules keep the same treatment at a smaller width without adding a nested pane scrollbar.
+Verification: desktop and active-room browser checks confirm the shared scrollbar uses the workspace line/muted colors; the mobile rules keep the same treatment at a smaller width without adding a nested pane or conversation-log scrollbar.
+
+Rendered follow-up: hide scrollbar chrome throughout active group mode while retaining native scrolling; fix the mobile reader's horizontal flex layout and tablet library grid. Visually inspected 390x844 and 1000x900 screenshots, including scrolling to the mobile conversation controls.
