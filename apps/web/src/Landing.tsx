@@ -225,7 +225,7 @@ export function Landing({
                       {app.speechState === 'speaking' && <button className="primary" onClick={app.pauseSpeech}>{label.pause}</button>}
                       {app.speechState === 'paused' && <button className="primary" onClick={app.resumeSpeech}>{label.resume}</button>}
                       {app.speechState === 'paused' && <button onClick={app.listenFromBeginning}>{label.listenFromBeginning}</button>}
-                      <button onClick={app.stopSpeech}>{label.stop}</button>
+                      <button onClick={() => app.stopSpeech({ remember: true })}>{label.stop}</button>
                     </>
                   )}
                 </div>

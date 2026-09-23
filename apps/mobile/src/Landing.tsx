@@ -143,7 +143,7 @@ export function Landing({
                       {app.speechState === 'speaking' ? <Action styles={styles} text={label.pause} primary onPress={app.pauseSpeech} /> : null}
                       {app.speechState === 'paused' ? <Action styles={styles} text={label.resume} primary onPress={app.resumeSpeech} /> : null}
                       {app.speechState === 'paused' ? <Action styles={styles} text={label.listenFromBeginning} onPress={app.listenFromBeginning} /> : null}
-                      <Action styles={styles} text={label.stop} onPress={app.stopSpeech} />
+                      <Action styles={styles} text={label.stop} onPress={() => app.stopSpeech({ remember: true })} />
                     </>
                   )}
                   <Action styles={styles} text={label.openThisVerse} onPress={() => enter('none')} />

@@ -336,8 +336,8 @@ function App() {
     {speechState==='idle' && <button className="primary" onClick={()=>selectedVerses.size ? app.speakFromVerse(app.bookId,chapterNumber,currentVerse) : app.listen()} disabled={!chapter}>{selectedVerses.size?label.readFromHere:party.isHost?'Read to group':label.readAloud}</button>}
     {speechState==='speaking' && <button className="primary" onClick={app.pauseSpeech}>{party.isHost?'Pause group reading':label.pause}</button>}
     {speechState==='paused' && <button className="primary" onClick={app.resumeSpeech}>{party.isHost?'Resume group reading':label.resume}</button>}
-    {speechState==='paused' && <button onClick={app.listenFromBeginning} disabled={!chapter}>{label.listenFromBeginning}</button>}
-    {speechState!=='idle' && <button onClick={app.stopSpeech}>{label.stop}</button>}
+    {(speechState==='paused' || (speechState==='idle' && app.resumeAt?.bookId===app.bookId && app.resumeAt.chapter===chapterNumber)) && <button onClick={app.listenFromBeginning} disabled={!chapter}>{label.listenFromBeginning}</button>}
+    {speechState!=='idle' && <button onClick={()=>app.stopSpeech({remember:true})}>{label.stop}</button>}
   </>;
   const sound = <div className="sound-settings"><span className="workspace-eyebrow">Only on your device</span><h2>Find your balance.</h2><p role="status">{voiceState==='ready'?'Narration voice is ready on this device.':voiceState==='preparing'?'Preparing your narration voice in the background…':'Voice preparation failed. Check your connection or choose another voice in Settings.'}</p>
     <label>People’s voices · {Math.round(peopleVolume*100)}%<input aria-label="People volume" type="range" min="0" max="1" step="0.05" value={peopleVolume} onChange={e=>setPeopleVolume(+e.target.value)} /></label>

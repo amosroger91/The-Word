@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BIBLE_TOPICS, chapterCrossRefs, loadBookCrossRefs, localBible, type BookCrossRefFile } from '@the-word/bible';
 import type { SearchResult } from '@the-word/shared';
 import { clampFontSize, clampRate, clampVolume, defaults, fontFor, speechRateRange, speechVolumeRange, storageKeys, voicesFor } from './catalogue';
+import { spotToRemember, verseToResume, type ResumeSpot } from './resumeListening';
 import { languages, resolveLanguage, strings, type Language } from './i18n';
 import type { Platform } from './platform';
 import { useSpeech } from './useSpeech';
@@ -117,12 +118,16 @@ export function useWordApp({ storage, speech, clipboard, voices }: Platform, ini
   const autoAdvanceRef = useRef(false);
   // The verse that was playing when Listen was stopped, so the next Listen
   // continues there instead of restarting the chapter.
-  const resumeSpotRef = useRef<{ bookId: number; chapter: number; verse: number } | null>(null);
+  const resumeSpotRef = useRef<ResumeSpot | null>(null);
+  const [resumeAt, setResumeAt] = useState<ResumeSpot | null>(null);
   const [pendingAutoSpeak, setPendingAutoSpeak] = useState(false);
   const [pendingSpeak, setPendingSpeak] = useState<{ kind: 'chapter' | 'from'; bookId: number; chapter: number; verse: number } | null>(null);
 
   const handleSpeechComplete = useCallback(() => {
-    if (resumeSpotRef.current?.bookId === bookId && resumeSpotRef.current.chapter === chapterNumber) resumeSpotRef.current = null;
+    if (resumeSpotRef.current?.bookId === bookId && resumeSpotRef.current.chapter === chapterNumber) {
+      resumeSpotRef.current = null;
+      setResumeAt(null);
+    }
     if (!autoAdvanceRef.current) return;
     const next = nextReadingPosition(bookId, chapterNumber, books);
     if (!next) { autoAdvanceRef.current = false; return; }
@@ -308,8 +313,16 @@ export function useWordApp({ storage, speech, clipboard, voices }: Platform, ini
     Boolean(chapter && !chapterLoading && chapter.verses[0]?.ref.bookId === targetBook && chapter.verses[0]?.ref.chapter === targetChapter)
   ), [chapter, chapterLoading]);
 
+  const forgetSpot = useCallback((targetBook: number, targetChapter: number) => {
+    const spot = resumeSpotRef.current;
+    if (!spot || spot.bookId !== targetBook || spot.chapter !== targetChapter) return;
+    resumeSpotRef.current = null;
+    setResumeAt(null);
+  }, []);
+
   const speakChapter = useCallback(() => {
     if (!chapterIs(bookId, chapterNumber) || !chapter) return;
+    forgetSpot(bookId, chapterNumber);
     setPendingAutoSpeak(false);
     setPendingSpeak(null);
     // Reading a whole chapter turns on continuous mode so it rolls into the next one.
@@ -319,9 +332,10 @@ export function useWordApp({ storage, speech, clipboard, voices }: Platform, ini
       // The reference is announced once, ahead of the first verse.
       text: index === 0 ? `${chapterReference}. ${verse.text}` : verse.text,
     })));
-  }, [chapterIs, bookId, chapterNumber, chapter, chapterReference, player]);
+  }, [chapterIs, bookId, chapterNumber, chapter, chapterReference, player, forgetSpot]);
 
   const speakChapterAt = useCallback((targetBook: number, targetChapter: number, focusVerse?: number) => {
+    forgetSpot(targetBook, targetChapter);
     player.stop();
     setPendingAutoSpeak(false);
     setPendingSpeak(null);
@@ -341,10 +355,11 @@ export function useWordApp({ storage, speech, clipboard, voices }: Platform, ini
     // a pause() after the silent play() is what Chrome Android rejects.
     speech.unlock?.();
     setPendingSpeak({ kind: 'chapter', bookId: targetBook, chapter: targetChapter, verse: focusVerse ?? 1 });
-  }, [chapterIs, chapter, player, label, bookName, speech]);
+  }, [chapterIs, chapter, player, label, bookName, speech, forgetSpot]);
 
   // Continuous read-aloud from this verse to the end of the chapter, then onward.
   const speakFromVerse = useCallback((targetBook: number, targetChapter: number, verseNumber: number) => {
+    forgetSpot(targetBook, targetChapter);
     player.stop();
     setPendingAutoSpeak(false);
     setPendingSpeak(null);
@@ -366,10 +381,11 @@ export function useWordApp({ storage, speech, clipboard, voices }: Platform, ini
     // Same gesture rule as speakChapterAt: unlock only once stop() has paused.
     speech.unlock?.();
     setPendingSpeak({ kind: 'from', bookId: targetBook, chapter: targetChapter, verse: verseNumber });
-  }, [chapterIs, chapter, player, label, bookName, speech]);
+  }, [chapterIs, chapter, player, label, bookName, speech, forgetSpot]);
 
   const speakSelection = useCallback(() => {
     if (!chapter) return;
+    forgetSpot(bookId, chapterNumber);
     setPendingAutoSpeak(false);
     setPendingSpeak(null);
     // A selection is a one-off; do not roll into the next chapter.
@@ -379,7 +395,7 @@ export function useWordApp({ storage, speech, clipboard, voices }: Platform, ini
       verse: verse.ref.verse,
       text: index === 0 ? `${selectedReference}. ${verse.text}` : verse.text,
     })));
-  }, [chapter, selectedVerses, selectedReference, player]);
+  }, [chapter, selectedVerses, selectedReference, player, forgetSpot, bookId, chapterNumber]);
 
   // Speak a single verse (used by Read Party participants to follow the host's
   // current verse). Not continuous — it reads just that verse, no auto-advance.
@@ -428,13 +444,18 @@ export function useWordApp({ storage, speech, clipboard, voices }: Platform, ini
   }, [pendingSpeak, chapterLoading, chapter, bookId, chapterNumber, player, chapterReference, label, bookName]);
 
   const listen = useCallback(() => {
-    const spot = resumeSpotRef.current;
-    if (spot && spot.bookId === bookId && spot.chapter === chapterNumber) {
-      speakFromVerse(spot.bookId, spot.chapter, spot.verse);
+    const verses = chapter?.verses.map((verse) => verse.ref.verse) ?? [];
+    const verse = verseToResume(resumeSpotRef.current, bookId, chapterNumber, verses);
+    if (verse) {
+      speakFromVerse(bookId, chapterNumber, verse);
       return;
     }
+    if (resumeSpotRef.current?.bookId === bookId && resumeSpotRef.current.chapter === chapterNumber) {
+      resumeSpotRef.current = null;
+      setResumeAt(null);
+    }
     speakChapter();
-  }, [bookId, chapterNumber, speakFromVerse, speakChapter]);
+  }, [bookId, chapterNumber, chapter, speakFromVerse, speakChapter]);
 
   const listenFromBeginning = useCallback(() => {
     resumeSpotRef.current = null;
@@ -443,11 +464,16 @@ export function useWordApp({ storage, speech, clipboard, voices }: Platform, ini
 
   // Stopping read-aloud also leaves continuous mode, but keeps the verse so
   // Listen can continue from it.
-  const stopSpeech = useCallback(() => {
-    const verse = player.speakingVerse;
-    if ((player.state === 'speaking' || player.state === 'paused') && verse && verse > 1) {
-      resumeSpotRef.current = { bookId, chapter: chapterNumber, verse };
-    }
+  const stopSpeech = useCallback((options?: { remember?: boolean }) => {
+    const next = spotToRemember(resumeSpotRef.current, {
+      remember: options?.remember === true,
+      state: player.state,
+      verse: player.speakingVerse,
+      bookId,
+      chapter: chapterNumber,
+    });
+    resumeSpotRef.current = next;
+    setResumeAt(next);
     autoAdvanceRef.current = false;
     setPendingAutoSpeak(false);
     setPendingSpeak(null);
@@ -571,6 +597,7 @@ export function useWordApp({ storage, speech, clipboard, voices }: Platform, ini
     speakFromVerse,
     listen,
     listenFromBeginning,
+    resumeAt,
     speakSelection,
     speakVerse,
     pauseSpeech: player.pause,
