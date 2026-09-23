@@ -22,7 +22,7 @@ export function ToolDock({ tools, children, names = toolNames, backLabel, onBack
   useEffect(() => { if (tools.focused) heading.current?.focus(); }, [tools.focused]);
   return <aside className="tool-dock" aria-label={tools.focused ? names[tools.focused] : 'Study'} hidden={!tools.focused}
     onKeyDown={event=>{if(event.key==='Escape'&&!event.defaultPrevented){event.preventDefault();onBack();}}}>
-    <div className="dock-heading"><button onClick={onBack}>← {backLabel}</button>
+    <div className="dock-heading"><button className="pane-close" aria-label={backLabel} title={backLabel} onClick={onBack}><span aria-hidden="true">×</span></button>
       <h2 ref={heading} tabIndex={-1}>{tools.focused ? names[tools.focused] : ''}</h2></div>
     {tools.visited.map(id=><section key={id} className="tool-pane" aria-label={names[id]} hidden={tools.focused!==id}>
       <div className="pane-content">{children[id]}</div>
