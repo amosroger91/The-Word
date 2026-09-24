@@ -9,7 +9,7 @@ function setup({synthesize=async()=>({size:32})}={}){
   const timers=new Map(),intervals=new Map(),urls=new Set();let id=0,now=0,audio;
   class Audio {
     constructor(){audio=this;this.readyState=3;this.paused=true;this.currentTime=0;this.duration=NaN;this.ended=false;this.failures=[];this.plays=0;}
-    setAttribute(){} removeAttribute(){} load(){}
+    setAttribute(){} removeAttribute(name){ if(name==='src') this.url=''; } load(){ this.loads=(this.loads||0)+1; }
     play(){this.plays++;const err=this.failures.shift();if(err)return Promise.reject(err);this.paused=false;return Promise.resolve();}
     pause(){if(!this.paused){this.paused=true;this.onpause?.();}}
     end(){this.ended=true;this.paused=true;this.onended?.();}
@@ -32,7 +32,9 @@ test('a long reading releases every playback timer and blob after each verse',as
     h.audio.currentTime=15;h.advance(20000); // a long verse making progress is healthy
     h.audio.end();assert.equal(await done,'ended');
     assert.equal(h.timers.size,0);assert.equal(h.intervals.size,0);assert.equal(h.urls.size,0);
+    assert.equal(h.audio.url,'');
   }
+  assert.ok(h.audio.loads>=200);
   h.adapter.dispose();
 });
 test('stop while already paused settles the verse without waiting for another pause event',async()=>{

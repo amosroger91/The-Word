@@ -74,14 +74,22 @@ export function createWebSpeech(): SpeechAdapter {
     return e.name === 'AbortError' || /interrupted by a call to pause/i.test(e.message ?? '');
   }
 
+  function releaseElement() {
+    // Leaving src pointed at a revoked blob puts the element in an error state.
+    // After enough verses Chrome then stops advancing currentTime, which is the
+    // freeze in both solo reading and a group.
+    detachHandlers();
+    audio.pause();
+    audio.removeAttribute('src');
+    audio.load();
+    revokeUrl();
+  }
+
   function clearMedia() {
     // pause() emits no event when already paused. Settle explicitly so stop and
     // verse changes also release a paused or still-loading playback promise.
     cancelPlayback?.();
-    detachHandlers();
-    audio.pause();
-    audio.removeAttribute('src');
-    revokeUrl();
+    releaseElement();
     hasVerse = false;
     pausedByUser = false;
   }
@@ -195,8 +203,23 @@ export function createWebSpeech(): SpeechAdapter {
               lastTime = audio.currentTime; lastProgress = Date.now(); recoveries = 0;
             } else if (Date.now() - lastProgress >= 15_000) {
               lastProgress = Date.now();
-              if (recoveries++ < 2) attemptPlay(2);
-              else finish('stopped', speechFailure('speechStalled', 'Playback stopped responding. Press Resume to continue from this verse.'));
+              const recovery = recoveries++;
+              if (recovery < 2) {
+                // The second miss rebuilds the media pipeline. play() alone does
+                // not recover an element stuck on a dead blob.
+                if (recovery === 1 && objectUrl) {
+                  const url = objectUrl;
+                  audio.pause();
+                  audio.removeAttribute('src');
+                  audio.load();
+                  audio.src = url;
+                  audio.playbackRate = rate;
+                  audio.volume = volume;
+                  lastTime = 0;
+                  heardProgress = false;
+                }
+                attemptPlay(2);
+              } else finish('stopped', speechFailure('speechStalled', 'Playback stopped responding. Press Resume to continue from this verse.'));
             }
           }, 1000);
 
@@ -214,9 +237,8 @@ export function createWebSpeech(): SpeechAdapter {
         });
       } finally {
         if (started === generation) {
-          detachHandlers();
+          releaseElement();
           hasVerse = false;
-          revokeUrl();
         }
       }
     },

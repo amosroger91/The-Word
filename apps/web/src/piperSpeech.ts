@@ -1,10 +1,19 @@
 // Serialize warmup and narration, skipping superseded verses before they reach
 // Piper. Its own busy queue cannot reject safely, and has no cancellation API.
+// The ONNX heap is not returned after a verse. Reusing one worker for a long
+// chapter is what freezes the tab, in a group or reading alone.
+export const PIPER_RECYCLE_EVERY = 24;
+
+export function shouldRecycleWorker(successfulGenerations: number) {
+  return successfulGenerations > 0 && successfulGenerations % PIPER_RECYCLE_EVERY === 0;
+}
+
 export function createPiperSynthesizer() {
   let worker: Worker | null = null;
   let tail: Promise<unknown> = Promise.resolve();
   let abortGenerate: (() => void) | null = null;
   let epoch = 0;
+  let generations = 0;
   const readyVoices = new Set<string>();
 
   function reset() {
@@ -78,7 +87,10 @@ export function createPiperSynthesizer() {
         for (let attempt = 0; attempt < 2 && current(); attempt++) {
           try {
             const file = await generate(text, voice);
-            return current() ? file : null;
+            if (!current()) return null;
+            generations += 1;
+            if (shouldRecycleWorker(generations)) reset();
+            return file;
           } catch (error) {
             reset();
             if (!current() || (error instanceof Error && error.name === 'NarrationCancelled')) return null;
