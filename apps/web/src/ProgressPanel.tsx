@@ -10,6 +10,7 @@ export function ProgressPanel({
   streak,
   events,
   earned,
+  onPlans,
 }: {
   label: WordApp['label'];
   language: Language;
@@ -17,6 +18,7 @@ export function ProgressPanel({
   streak: number;
   events: LedgerEvent[];
   earned: EarnedBadge[];
+  onPlans?: () => void;
 }) {
   const earnedIds = new Set(earned.map((badge) => badge.id));
   const canon = bibleProgress(events);
@@ -28,8 +30,9 @@ export function ProgressPanel({
 
   return (
     <div className="progress-panel">
-      <span className="workspace-eyebrow">{label.progress}</span>
-      <h2>{streak ? label.streakCount(streak) : label.progress}</h2>
+      <div className="reading-page-heading"><h2>{streak ? label.streakCount(streak) : label.progress}</h2>
+        {onPlans && <button onClick={onPlans}>{label.study} <span aria-hidden="true">→</span></button>}
+      </div>
       <p>{label.chaptersReadCount(chapters)}. {label.progressHint}</p>
 
       <ReadBar label={label.wholeBible} fraction={label.chaptersFraction(canon.all.have, canon.all.need)} percent={canon.all.percent} large />
