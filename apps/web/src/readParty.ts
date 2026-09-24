@@ -144,8 +144,11 @@ export function joinParty({ code, identity, handlers = {}, create = true }: {
   let sweeping = false;
   const dropping = new Set<string>();
   const seenAt = new Map<string, number>();
+  const retired = new Map<DataConnection, ReturnType<typeof setTimeout>>();
   let me = identity;
   const mediaConns = new Map<string, MediaConnection>();
+  const mediaOwners = new Map<string, string>();
+  const mediaRetries = new Map<string, { failures: number; after: number }>();
   let reconcileTimer: ReturnType<typeof setTimeout> | null = null;
   let connectionTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -417,17 +420,24 @@ export function joinParty({ code, identity, handlers = {}, create = true }: {
   function resolveMemberId(peerId: string) {
     return members.find((x) => x.peerId === peerId)?.id || peerId;
   }
+  function endRemote(peerId: string) {
+    const memberId = mediaOwners.get(peerId) || resolveMemberId(peerId);
+    mediaOwners.delete(peerId);
+    h.onRemoteEnd?.(memberId);
+  }
   function trackCall(call: MediaConnection) {
     const pid = call.peer;
     const previous = mediaConns.get(pid);
     mediaConns.set(pid, call);
     previous?.close();
     call.on('stream', (s) => {
-      if (mediaConns.get(pid) === call) h.onRemoteStream?.(resolveMemberId(pid), s);
+      if (mediaConns.get(pid) === call) { mediaRetries.delete(pid); const id = resolveMemberId(pid); mediaOwners.set(pid, id); h.onRemoteStream?.(id, s); }
     });
     const ended = () => {
       if (mediaConns.get(pid) !== call) return;
-      mediaConns.delete(pid); h.onRemoteEnd?.(resolveMemberId(pid));
+      mediaConns.delete(pid); endRemote(pid);
+      const failures = (mediaRetries.get(pid)?.failures ?? 0) + 1;
+      mediaRetries.set(pid, { failures, after: Date.now() + Math.min(30000, 1000 * 2 ** Math.min(failures - 1, 5)) });
       call.close(); scheduleReconcile();
     };
     call.on('close', ended);
@@ -436,44 +446,58 @@ export function joinParty({ code, identity, handlers = {}, create = true }: {
       if (call.peerConnection.connectionState === 'failed') ended();
     });
   }
-  function scheduleReconcile() {
+  function scheduleReconcile(delay = 350) {
     if (leaving) return;
     if (reconcileTimer) clearTimeout(reconcileTimer);
-    reconcileTimer = setTimeout(reconcileMesh, 350);
+    reconcileTimer = setTimeout(reconcileMesh, delay);
   }
   function reconcileMesh() {
     if (leaving || capped() || !hasMedia() || !peer) return;
     const stream = getLocalStream();
     if (!stream) return;
+    let retryIn = Infinity;
     for (const m of members) {
       if (m.id === me.id || !m.peerId) continue;
       if (mediaConns.has(m.peerId)) continue;
       // Lower peer-id dials when both are in the call. If the other person
       // has not unmuted yet, we still dial so they can hear us.
       if (m.av && myPeerId() > m.peerId) continue;
-      try { trackCall(peer.call(m.peerId, stream)); } catch { /* dial failed */ }
+      const wait = (mediaRetries.get(m.peerId)?.after ?? 0) - Date.now();
+      if (wait > 0) { retryIn = Math.min(retryIn, wait); continue; }
+      try { trackCall(peer.call(m.peerId, stream)); } catch {
+        const failures = (mediaRetries.get(m.peerId)?.failures ?? 0) + 1;
+        const delay = Math.min(30000, 1000 * 2 ** Math.min(failures - 1, 5));
+        mediaRetries.set(m.peerId, { failures, after: Date.now() + delay });
+        retryIn = Math.min(retryIn, delay);
+      }
     }
+    if (Number.isFinite(retryIn)) scheduleReconcile(Math.max(350, retryIn));
   }
   function pruneStaleMedia() {
     const live = new Set(members.map((m) => m.peerId));
+    for (const pid of mediaRetries.keys()) if (!live.has(pid)) mediaRetries.delete(pid);
     for (const [pid, call] of mediaConns) {
       if (!live.has(pid)) {
-        try { call.close(); } catch { /* ignore */ }
         mediaConns.delete(pid);
-        h.onRemoteEnd?.(resolveMemberId(pid));
+        try { call.close(); } catch { /* ignore */ }
+        endRemote(pid);
       }
     }
   }
   function closeAllMedia() {
-    for (const [pid, call] of mediaConns) {
+    const calls = [...mediaConns];
+    mediaConns.clear();
+    mediaRetries.clear();
+    for (const [pid, call] of calls) {
       try { call.close(); } catch { /* ignore */ }
-      h.onRemoteEnd?.(resolveMemberId(pid));
+      endRemote(pid);
     }
     mediaConns.clear();
   }
   function answerCalls() {
+    const owner = peer;
     peer!.on('call', (call) => {
-      if (leaving || capped()) { call.close(); return; }
+      if (leaving || peer !== owner || capped()) { call.close(); return; }
       // When both sides refresh together, keep the lower peer's outgoing call.
       if (mediaConns.has(call.peer) && myPeerId() < call.peer) { call.close(); return; }
       trackCall(call);
@@ -484,20 +508,31 @@ export function joinParty({ code, identity, handlers = {}, create = true }: {
   function retirePeer(peerId: string, memberId: string) {
     const conn = clientConns.get(peerId);
     clientConns.delete(peerId);
+    seenAt.delete(peerId);
+    mediaRetries.delete(peerId);
+    // A still-live old tab must stop reconnecting, not compete for the same seat.
+    // Allow the reliable control message to drain before forcing the old link closed.
+    if (conn) {
+      try { conn.send({ t: 'replaced' }); } catch { /* already gone */ }
+      retired.set(conn, setTimeout(() => {
+        retired.delete(conn);
+        try { conn.close(); } catch { /* already gone */ }
+      }, 1000));
+    }
     // The member record already points at the replacement peer. Closing the old
     // channel must not announce a leave or delete that seat.
-    try { conn?.close(); } catch { /* already gone */ }
     const call = mediaConns.get(peerId);
     if (call) {
       mediaConns.delete(peerId);
       try { call.close(); } catch { /* already gone */ }
     }
     // The tile is keyed by member, not by the peer that just went away.
+    mediaOwners.delete(peerId);
     h.onRemoteEnd?.(memberId);
   }
 
   function dropClient(c: DataConnection) {
-    if (dropping.has(c.peer)) return;
+    if (leaving || !isHub || clientConns.get(c.peer) !== c || dropping.has(c.peer)) return;
     const member = members.find((x) => x.peerId === c.peer);
     if (!clientConns.has(c.peer) && !member) return;
     dropping.add(c.peer);
@@ -539,10 +574,22 @@ export function joinParty({ code, identity, handlers = {}, create = true }: {
   function wireClientConn(c: DataConnection) {
     hubConn = c;
     c.on('open', () => {
+      if (leaving || hubConn !== c) { c.close(); return; }
       status('connected');
       try { c.send({ t: 'hello', d: { id: me.id, name: me.name, color: me.color, avatar: me.avatar || null, av: hasMedia(), mic: getState().audio, cam: getState().video, screen: getState().screen } }); } catch { /* dropped */ }
     });
-    c.on('data', handleFromHub);
+    c.on('data', raw => {
+      if (leaving || hubConn !== c) return;
+      if ((raw as Envelope)?.t === 'replaced') {
+        leaveRoom();
+        h.onReading?.(null);
+        h.onSelf?.({ host: false });
+        status('disconnected');
+        h.onError?.('session-replaced');
+        return;
+      }
+      handleFromHub(raw);
+    });
     const lost = () => {
       if (leaving || hubConn !== c || c.open) return;
       if (joined) reelect(); else { status('disconnected'); h.onError?.('room-unavailable'); }
@@ -568,9 +615,19 @@ export function joinParty({ code, identity, handlers = {}, create = true }: {
     emitRoster();
     // A re-elected hub keeps everyone in sync by re-announcing the reading state.
     if (readingState) broadcast({ t: 'reading', d: readingState });
+    const owner = peer;
     peer!.on('connection', (c) => {
-      c.on('open', () => { clientConns.set(c.peer, c); noteSeen(c.peer); watchConnectionHealth(c); });
-      c.on('data', (env) => { noteSeen(c.peer); handleAtHub(env as Envelope, c.peer); });
+      c.on('open', () => {
+        if (leaving || peer !== owner || !isHub) { c.close(); return; }
+        const previous = clientConns.get(c.peer);
+        clientConns.set(c.peer, c);
+        if (previous && previous !== c) previous.close();
+        noteSeen(c.peer); watchConnectionHealth(c);
+      });
+      c.on('data', (env) => {
+        if (leaving || peer !== owner || clientConns.get(c.peer) !== c) return;
+        noteSeen(c.peer); handleAtHub(env as Envelope, c.peer);
+      });
       c.on('close', () => dropClient(c));
       c.on('error', () => { /* close follows when the channel is actually gone */ });
     });
@@ -589,6 +646,8 @@ export function joinParty({ code, identity, handlers = {}, create = true }: {
 
   function reelect() {
     if (leaving) return;
+    clearRetired();
+    seenAt.clear();
     closeAllMedia();
     if (reelectTimer) clearTimeout(reelectTimer);
     if (reconnectTimer) clearTimeout(reconnectTimer);
@@ -634,7 +693,7 @@ export function joinParty({ code, identity, handlers = {}, create = true }: {
     if (!create && !joined) { connectAsClient(); return; }
     peer = new Peer(HUB_ID);
     const attempt = peer;
-    peer.once('open', () => startAsHub());
+    peer.once('open', () => { if (!leaving && peer === attempt) startAsHub(); });
     keepSignalingAlive(attempt);
     peer.on('error', (e: { type?: string }) => {
       if (leaving || peer !== attempt) return;
@@ -657,12 +716,12 @@ export function joinParty({ code, identity, handlers = {}, create = true }: {
   function connectAsClient() {
     peer = new Peer();
     const attempt = peer;
-    peer.once('open', startAsClient);
+    peer.once('open', () => { if (!leaving && peer === attempt) startAsClient(); });
     keepSignalingAlive(attempt);
     peer.on('error', (error: { type?: string }) => {
       if (leaving || peer !== attempt) return;
       const type = error.type || 'connection-error';
-      if (type === 'peer-unavailable' && joined) reelect();
+      if (type === 'peer-unavailable' && joined) { if (!hubConn?.open) reelect(); }
       else if (type === 'unavailable-id' && joined) tolerateHubSignaling(attempt);
       else if (isSignalingBlip(type)) {
         // The disconnected handler reconnects this same peer. A broker blip is
@@ -689,6 +748,29 @@ export function joinParty({ code, identity, handlers = {}, create = true }: {
       // same id; do not destroy the peer or every guest is kicked.
       try { candidate.reconnect(); } catch { tolerateHubSignaling(candidate); }
     });
+  }
+
+  function clearRetired() {
+    for (const [c, timer] of retired) { clearTimeout(timer); try { c.close(); } catch { /* gone */ } }
+    retired.clear();
+  }
+
+  function leaveRoom() {
+    leaving = true;
+    clearRetired();
+    seenAt.clear();
+    connectionReady();
+    closeAllMedia();
+    if (reelectTimer) clearTimeout(reelectTimer);
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    if (sweepTimer) clearInterval(sweepTimer);
+    if (pingTimer) clearInterval(pingTimer);
+    if (reconcileTimer) clearTimeout(reconcileTimer);
+    try { for (const c of clientConns.values()) c.close(); } catch { /* ignore */ }
+    clientConns.clear();
+    try { hubConn?.close(); } catch { /* ignore */ }
+    try { peer?.destroy(); } catch { /* ignore */ }
+    peer = null;
   }
 
   connect();
@@ -733,20 +815,6 @@ export function joinParty({ code, identity, handlers = {}, create = true }: {
       if (isHub) { emitRoster(); broadcast({ t: 'roster', d: members.slice() }); }
       else { toHub({ t: 'meta', d: { av: hasMedia(), mic: getState().audio, cam: getState().video, screen: getState().screen } }); scheduleReconcile(); }
     },
-    leave() {
-      leaving = true;
-      connectionReady();
-      closeAllMedia();
-      if (reelectTimer) clearTimeout(reelectTimer);
-      if (reconnectTimer) clearTimeout(reconnectTimer);
-      if (sweepTimer) clearInterval(sweepTimer);
-      if (pingTimer) clearInterval(pingTimer);
-      if (reconcileTimer) clearTimeout(reconcileTimer);
-      try { for (const c of clientConns.values()) c.close(); } catch { /* ignore */ }
-      clientConns.clear();
-      try { hubConn?.close(); } catch { /* ignore */ }
-      try { peer?.destroy(); } catch { /* ignore */ }
-      peer = null;
-    },
+    leave: leaveRoom,
   };
 }

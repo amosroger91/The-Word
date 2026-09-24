@@ -89,7 +89,16 @@ export function createWebSpeech(): SpeechAdapter {
   return {
     async speak(text: string, options: SpeakOptions) {
       const started = generation;
-      const file = await synthesizer.synthesize(text, options.voice, () => started === generation);
+      let file: Blob | null;
+      try {
+        file = await synthesizer.synthesize(text, options.voice, () => started === generation);
+      } catch (error) {
+        if (started !== generation) return 'stopped';
+        gestureUnlock = false;
+        audio.loop = false;
+        clearMedia();
+        throw error;
+      }
       if (!file || started !== generation) return 'stopped';
       // Stop cancels an in-flight warm-up. A finished verse means this voice is ready.
       if (warmedVoice === options.voice) {
@@ -113,6 +122,7 @@ export function createWebSpeech(): SpeechAdapter {
           let lastTime = audio.currentTime;
           let lastProgress = Date.now();
           let recoveries = 0;
+          let playAttempt = 0;
           // A single sample sitting on a wrong duration must not skip the verse.
           // Real playback has to have moved before the end of the file counts.
           let heardProgress = audio.currentTime > 0.2;
@@ -146,10 +156,12 @@ export function createWebSpeech(): SpeechAdapter {
             if (settled) return;
             if (stale()) { finish('stopped'); return; }
             if (pausedByUser) return;
+            const attempt = ++playAttempt;
+            window.clearTimeout(retryTimer);
             const p = audio.play();
             if (!p) return;
             void p.catch((err) => {
-              if (settled) return;
+              if (settled || attempt !== playAttempt) return;
               if (stale()) { finish('stopped'); return; }
               if (pausedByUser) return;
               // Chrome Android: "The play() request was interrupted by a call to pause()"
