@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { currentStreak, dayKey, storageKeys } from '@the-word/core';
+import { currentStreak, dayKey, longestStreak, recentDayMarks, storageKeys } from '@the-word/core';
 import { loadAccount } from './nostrAccount';
 import { activeReader, loadReaders, saveReaders, type ReaderState } from './readers';
 import {
-  alreadyReadToday,
   appendEvent,
+  chapterCompleted,
   eventsForActor,
   eventsForReader,
   loadEvents,
@@ -12,8 +12,10 @@ import {
   noteFor,
   noteList,
   readDayKeys,
+  readsOf,
   saveEvents,
   uniqueChapters,
+  versesRead,
   type LedgerEvent,
   type NoteEvent,
   type GroupAction,
@@ -78,7 +80,14 @@ export function useLedger() {
   const recordChapterRead = useCallback(async (bookId: number, chapter: number, verses?: number[]) => {
     const all = await loadEvents();
     const mine = eventsForReader(eventsForActor(all, gunPub.current), readerId.current);
-    if (alreadyReadToday(mine, bookId, chapter)) return [];
+    if (chapterCompleted(mine, bookId, chapter)) return [];
+    const seenVerses = new Set<number>();
+    for (const event of readsOf(mine)) {
+      if (event.bookId !== bookId || event.chapter !== chapter) continue;
+      for (const verse of event.verses ?? []) seenVerses.add(verse);
+    }
+    const incoming = verses?.filter((verse) => Number.isInteger(verse) && verse > 0 && !seenVerses.has(verse));
+    if (verses && !incoming?.length) return [];
     const before = evaluate(mine, BADGES);
     const { event } = appendEvent(mine, gunPub.current, {
       kind: 'read',
@@ -86,7 +95,7 @@ export function useLedger() {
       readerId: readerId.current,
       bookId,
       chapter,
-      verses,
+      ...(incoming?.length ? { verses: incoming } : {}),
     });
     const merged = mergeLedgers(all, [event]);
     await saveEvents(merged);
@@ -185,8 +194,11 @@ export function useLedger() {
   }, [refresh]);
 
   const chapters = uniqueChapters(events).length;
-  const streak = currentStreak(readDayKeys(events), dayKey());
+  const days = readDayKeys(events);
+  const today = dayKey();
+  const streak = currentStreak(days, today);
   const canon = bibleProgress(events);
+  const verses = versesRead(events);
 
   return {
     ready,
@@ -197,6 +209,11 @@ export function useLedger() {
     recordChapterRead,
     chapters,
     streak,
+    longestStreak: longestStreak(days),
+    daysRead: days.length,
+    recentDays: recentDayMarks(days, today),
+    verses,
+    chapterDone: (bookId: number, chapter: number) => chapterCompleted(events, bookId, chapter),
     canon,
     readers: readerState.readers,
     activeReader: activeReader(readerState),

@@ -110,6 +110,10 @@
 .badge-card strong { font-size: 14px; }
 .badge-card small { color: var(--ws-muted); font-size: 12px; line-height: 1.45; }
 .badge-card.locked { opacity: 0.62; }
+.consistency { display: grid; gap: 8px; margin: 16px 0 8px; }
+.consistency-days { display: grid; grid-template-columns: repeat(14, minmax(0, 1fr)); gap: 4px; max-width: 420px; }
+.consistency-days i { aspect-ratio: 1; border-radius: 3px; background: var(--ws-line, #d9d1c3); }
+.consistency-days i.on { background: var(--ws-accent, #947849); }
 
 /* Verse-image share stats */
 .share-stat-grid { list-style: none; margin: 10px 0 0; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }

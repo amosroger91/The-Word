@@ -22,6 +22,7 @@ function transpile(file, destName, rewrite = (text) => text) {
 }
 
 transpile(path.join(root, 'packages/core/src/day.ts'), 'day.mjs');
+transpile(path.join(here, '../src/verseCounts.ts'), 'verseCounts.mjs');
 transpile(path.join(root, 'packages/bible/src/schema.ts'), 'schema.mjs');
 transpile(path.join(root, 'packages/bible/src/parseRef.ts'), 'parseRef.mjs', (text) => text
   .replaceAll("'./schema'", "'./schema.mjs'")
@@ -32,7 +33,9 @@ const verseLinkUrl = transpile(path.join(here, '../src/verseLink.ts'), 'verseLin
   .replaceAll('"@the-word/bible"', "'./bible.mjs'"));
 const ledgerUrl = transpile(path.join(here, '../src/ledger.ts'), 'ledger.mjs', (text) => text
   .replaceAll("'@the-word/core'", "'./day.mjs'")
-  .replaceAll('"@the-word/core"', "'./day.mjs'"));
+  .replaceAll('"@the-word/core"', "'./day.mjs'")
+  .replaceAll("'./verseCounts'", "'./verseCounts.mjs'")
+  .replaceAll('"./verseCounts"', "'./verseCounts.mjs'"));
 const badgesUrl = transpile(path.join(here, '../src/badges.ts'), 'badges.mjs', (text) => text
   .replaceAll("'@the-word/core'", "'./day.mjs'")
   .replaceAll('"@the-word/core"', "'./day.mjs'")
@@ -41,7 +44,7 @@ const badgesUrl = transpile(path.join(here, '../src/badges.ts'), 'badges.mjs', (
   .replaceAll("'./ledger'", "'./ledger.mjs'")
   .replaceAll('"./ledger"', "'./ledger.mjs'"));
 
-const { appendEvent, mergeLedgers, uniqueChapters, alreadyReadToday, latestAnswers, eventId, shareCount, distinctShareCount, imageShareStats, groupActionCount, groupActionsDone } = await import(ledgerUrl);
+const { appendEvent, mergeLedgers, uniqueChapters, alreadyReadToday, latestAnswers, eventId, shareCount, distinctShareCount, imageShareStats, groupActionCount, groupActionsDone, versesRead, chapterCompleted } = await import(ledgerUrl);
 const { evaluate, BADGES, progressToward, hashLedger, bibleProgress } = await import(badgesUrl);
 const { parseVerseHash, encodeVerseRef, readerViewFromHash } = await import(verseLinkUrl);
 const { BOOKS_DATA } = await import(pathToFileURL(path.join(compiledDir, 'schema.mjs')).href);
@@ -86,6 +89,16 @@ test('a changed answer appends; the newest at wins; null is a tombstone', () => 
   ];
   const latest = latestAnswers(events).get('p:s:q');
   assert.equal(latest.value, null);
+});
+
+test('a few verses do not finish the chapter, and a last verse does', () => {
+  const partial = { id: eventId(ACTOR, 1), kind: 'read', at: '2026-09-01T12:00:00.000Z', bookId: 43, chapter: 3, verses: [1, 2] };
+  assert.equal(chapterCompleted([partial], 43, 3), false);
+  assert.equal(uniqueChapters([partial]).length, 0);
+  const finished = { ...partial, id: eventId(ACTOR, 2), verses: [36] };
+  assert.equal(chapterCompleted([partial, finished], 43, 3), true);
+  assert.equal(versesRead([partial]).have, 2);
+  assert.equal(versesRead([finished]).have, 36);
 });
 
 test('badges are derived: earnedAt is the event that crossed the threshold', () => {

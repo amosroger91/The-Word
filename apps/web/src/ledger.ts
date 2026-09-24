@@ -1,6 +1,7 @@
 // Append-only reading ledger. Local IndexedDB is the source of truth; Gun will
 // sync this later. Event ids are `${gunPub}:${counter}` so a merge is a set union.
 import { dayKey } from '@the-word/core';
+import { VERSE_COUNTS } from './verseCounts';
 
 export type EventId = string;
 
@@ -21,7 +22,7 @@ export type ReaderId = string;
 export type GroupAction = 'join' | 'chapter' | 'mic' | 'cam' | 'public' | 'private' | 'friendRequest';
 
 export type LedgerEvent =
-  | { id: EventId; kind: 'read'; at: string; readerId?: ReaderId; bookId: number; chapter: number; verses?: number[] }
+  | { id: EventId; kind: 'read'; at: string; readerId?: ReaderId; bookId: number; chapter: number; verses?: number[]; complete?: boolean }
   | { id: EventId; kind: 'answer'; at: string; readerId?: ReaderId; planId: string; sessionId: string; questionId: string;
       value: AnswerValue; circleId?: string; share: 'private' | 'circle' }
   | { id: EventId; kind: 'session'; at: string; readerId?: ReaderId; planId: string; sessionId: string; circleId?: string }
@@ -91,13 +92,53 @@ export function readsOf(events: LedgerEvent[]): ReadEvent[] {
   return events.filter((event): event is ReadEvent => event.kind === 'read');
 }
 
+export function verseTotal(bookId: number, chapter: number): number {
+  return VERSE_COUNTS[bookId]?.[chapter - 1] ?? 0;
+}
+
+// A read with no verse list is a finished chapter from before verse tracking.
+// A list counts as finished when it reaches the chapter's last verse.
+export function readIsComplete(event: ReadEvent): boolean {
+  if (event.complete || event.verses == null) return true;
+  const total = verseTotal(event.bookId, event.chapter);
+  return total > 0 && event.verses.some((verse) => verse >= total);
+}
+
+export function chapterCompleted(events: LedgerEvent[], bookId: number, chapter: number): boolean {
+  return readsOf(events).some((event) => event.bookId === bookId && event.chapter === chapter && readIsComplete(event));
+}
+
 export function uniqueChapters(events: LedgerEvent[]): { bookId: number; chapter: number; at: string }[] {
   const first = new Map<string, { bookId: number; chapter: number; at: string }>();
   for (const event of readsOf(events).sort(byTime)) {
+    if (!readIsComplete(event)) continue;
     const key = `${event.bookId}:${event.chapter}`;
     if (!first.has(key)) first.set(key, { bookId: event.bookId, chapter: event.chapter, at: event.at });
   }
   return [...first.values()];
+}
+
+export function versesRead(events: LedgerEvent[]): { have: number; need: number } {
+  const partial = new Map<string, Set<number>>();
+  const done = new Set<string>();
+  for (const event of readsOf(events)) {
+    const key = `${event.bookId}:${event.chapter}`;
+    if (readIsComplete(event)) { done.add(key); continue; }
+    const set = partial.get(key) ?? new Set<number>();
+    for (const verse of event.verses ?? []) set.add(verse);
+    partial.set(key, set);
+  }
+  let have = 0;
+  let need = 0;
+  for (const [bookId, counts] of Object.entries(VERSE_COUNTS)) {
+    counts.forEach((total, index) => {
+      need += total;
+      const key = `${bookId}:${index + 1}`;
+      if (done.has(key)) have += total;
+      else have += [...(partial.get(key) ?? [])].filter((verse) => verse >= 1 && verse <= total).length;
+    });
+  }
+  return { have, need };
 }
 
 export function readDayKeys(events: LedgerEvent[]): string[] {
@@ -197,7 +238,7 @@ export function groupActionsDone(events: LedgerEvent[]): Set<GroupAction> {
 
 export function chaptersOfBook(events: LedgerEvent[], bookId: number): Set<number> {
   const set = new Set<number>();
-  for (const event of readsOf(events)) if (event.bookId === bookId) set.add(event.chapter);
+  for (const event of readsOf(events)) if (event.bookId === bookId && readIsComplete(event)) set.add(event.chapter);
   return set;
 }
 

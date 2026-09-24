@@ -26,6 +26,7 @@ export interface BadgeDefinition {
   criteria:
     | { kind: 'chaptersRead'; count: number }
     | { kind: 'streakDays'; days: number }
+    | { kind: 'daysRead'; count: number }
     | { kind: 'bookComplete'; bookId: number | 'any' }
     | { kind: 'testamentComplete'; testament: 'old' | 'new' | 'all' }
     | { kind: 'sessionsComplete'; count: number }
@@ -178,6 +179,76 @@ export const BADGES: BadgeDefinition[] = [
     },
     icon: 'M7 3v2M17 3v2M4 8h16v12H4V8Zm3 4h2v2H7v-2Zm4 0h2v2h-2v-2Zm4 0h2v2h-2v-2Z',
     criteria: { kind: 'streakDays', days: 7 },
+  },
+  {
+    id: 'streak-30',
+    tier: 'gold',
+    title: { en: 'Thirty days', es: 'Treinta días', fr: 'Trente jours', zh: '三十天', vi: 'Ba mươi ngày' },
+    description: {
+      en: 'Read every day for a month.',
+      es: 'Lee todos los días durante un mes.',
+      fr: 'Lire chaque jour pendant un mois.',
+      zh: '连续一个月每天阅读。',
+      vi: 'Đọc mỗi ngày trong một tháng.',
+    },
+    icon: 'M7 3v2M17 3v2M4 8h16v12H4V8Zm2 4h2v2H6v-2Zm4 0h2v2h-2v-2Zm4 0h2v2h-2v-2Zm4 0h2v2h-2v-2Z',
+    criteria: { kind: 'streakDays', days: 30 },
+  },
+  {
+    id: 'streak-100',
+    tier: 'gold',
+    title: { en: 'One hundred days', es: 'Cien días', fr: 'Cent jours', zh: '一百天', vi: 'Một trăm ngày' },
+    description: {
+      en: 'Keep a hundred-day reading streak.',
+      es: 'Mantén una racha de cien días.',
+      fr: 'Garder une série de cent jours.',
+      zh: '保持一百天的连续阅读。',
+      vi: 'Giữ chuỗi đọc một trăm ngày.',
+    },
+    icon: 'M8 21V9m4 12V5m4 16v-7',
+    criteria: { kind: 'streakDays', days: 100 },
+  },
+  {
+    id: 'days-20',
+    tier: 'bronze',
+    title: { en: 'Steady', es: 'Constante', fr: 'Régulier', zh: '稳定', vi: 'Đều đặn' },
+    description: {
+      en: 'Read on twenty different days.',
+      es: 'Lee en veinte días distintos.',
+      fr: 'Lire vingt jours différents.',
+      zh: '在二十个不同的日子阅读。',
+      vi: 'Đọc trong hai mươi ngày khác nhau.',
+    },
+    icon: 'M4 12h4l2-6 4 12 2-6h4',
+    criteria: { kind: 'daysRead', count: 20 },
+  },
+  {
+    id: 'days-50',
+    tier: 'silver',
+    title: { en: 'Faithful', es: 'Fiel', fr: 'Fidèle', zh: '忠心', vi: 'Trung tín' },
+    description: {
+      en: 'Read on fifty different days.',
+      es: 'Lee en cincuenta días distintos.',
+      fr: 'Lire cinquante jours différents.',
+      zh: '在五十个不同的日子阅读。',
+      vi: 'Đọc trong năm mươi ngày khác nhau.',
+    },
+    icon: 'M12 3l2.2 4.6L19 8.2l-3.5 3.4.8 4.9L12 14.2 7.7 16.5l.8-4.9L5 8.2l4.8-.6Z',
+    criteria: { kind: 'daysRead', count: 50 },
+  },
+  {
+    id: 'days-100',
+    tier: 'gold',
+    title: { en: 'Devoted', es: 'Devoto', fr: 'Assidu', zh: '专心', vi: 'Tận tâm' },
+    description: {
+      en: 'Read on one hundred different days.',
+      es: 'Lee en cien días distintos.',
+      fr: 'Lire cent jours différents.',
+      zh: '在一百个不同的日子阅读。',
+      vi: 'Đọc trong một trăm ngày khác nhau.',
+    },
+    icon: 'M12 2l2.6 5.4L20 8.2l-4 3.9.9 5.5L12 15.2 7.1 17.6 8 12.1 4 8.2l5.4-.8Z',
+    criteria: { kind: 'daysRead', count: 100 },
   },
   {
     id: 'any-book',
@@ -600,6 +671,10 @@ export function progressToward(definition: BadgeDefinition, events: LedgerEvent[
   if (criteria.kind === 'streakDays') {
     const have = currentStreak(readDayKeys(events), today);
     return { have, need: criteria.days, done: have >= criteria.days };
+  }
+  if (criteria.kind === 'daysRead') {
+    const have = readDayKeys(events).length;
+    return { have, need: criteria.count, done: have >= criteria.count };
   }
   if (criteria.kind === 'bookComplete') {
     if (criteria.bookId === 'any') {

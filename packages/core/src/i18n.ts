@@ -273,6 +273,13 @@ export interface Strings {
   passwordTooShort: string;
   progress: string;
   progressHint: string;
+  markChapterRead: string;
+  chapterMarkedRead: string;
+  versesReadCount: (count: number) => string;
+  versesFraction: (have: number, need: number) => string;
+  consistency: string;
+  longestStreak: (days: number) => string;
+  daysReadCount: (count: number) => string;
   chaptersReadCount: (count: number) => string;
   streakCount: (days: number) => string;
   noBadgesYet: string;
@@ -586,6 +593,13 @@ export const strings: Record<Language, Strings> = {
     passwordTooShort: 'Use at least 8 characters.',
     progress: 'Your reading',
     progressHint: 'Badges come from chapters you finish — the last verse, not just opening the page.',
+    markChapterRead: 'Mark chapter as read',
+    chapterMarkedRead: 'Chapter marked read',
+    versesReadCount: (count) => count === 1 ? '1 verse' : `${count} verses`,
+    versesFraction: (have, need) => `${have} of ${need} verses`,
+    consistency: 'Consistency',
+    longestStreak: (days) => days === 1 ? 'Longest streak: 1 day' : `Longest streak: ${days} days`,
+    daysReadCount: (count) => count === 1 ? '1 day read' : `${count} days read`,
     chaptersReadCount: (count) => count === 1 ? '1 chapter read' : `${count} chapters read`,
     streakCount: (days) => days === 1 ? '1-day streak' : `${days}-day streak`,
     noBadgesYet: 'Finish a chapter to start earning badges.',
@@ -891,6 +905,13 @@ export const strings: Record<Language, Strings> = {
     passwordTooShort: 'Usa al menos 8 caracteres.',
     progress: 'Tu lectura',
     progressHint: 'Las insignias salen de capítulos que terminas: el último versículo, no solo abrir la página.',
+    markChapterRead: 'Marcar capítulo como leído',
+    chapterMarkedRead: 'Capítulo marcado',
+    versesReadCount: (count) => count === 1 ? '1 versículo' : `${count} versículos`,
+    versesFraction: (have, need) => `${have} de ${need} versículos`,
+    consistency: 'Constancia',
+    longestStreak: (days) => days === 1 ? 'Racha más larga: 1 día' : `Racha más larga: ${days} días`,
+    daysReadCount: (count) => count === 1 ? '1 día de lectura' : `${count} días de lectura`,
     chaptersReadCount: (count) => count === 1 ? '1 capítulo leído' : `${count} capítulos leídos`,
     streakCount: (days) => days === 1 ? 'Racha de 1 día' : `Racha de ${days} días`,
     noBadgesYet: 'Termina un capítulo para empezar a ganar insignias.',
@@ -1196,6 +1217,13 @@ export const strings: Record<Language, Strings> = {
     passwordTooShort: 'Utilisez au moins 8 caractères.',
     progress: 'Votre lecture',
     progressHint: 'Les badges viennent des chapitres terminés — le dernier verset, pas seulement l’ouverture de la page.',
+    markChapterRead: 'Marquer le chapitre comme lu',
+    chapterMarkedRead: 'Chapitre marqué comme lu',
+    versesReadCount: (count) => count === 1 ? '1 verset' : `${count} versets`,
+    versesFraction: (have, need) => `${have} sur ${need} versets`,
+    consistency: 'Régularité',
+    longestStreak: (days) => days === 1 ? 'Plus longue série : 1 jour' : `Plus longue série : ${days} jours`,
+    daysReadCount: (count) => count === 1 ? '1 jour de lecture' : `${count} jours de lecture`,
     chaptersReadCount: (count) => count === 1 ? '1 chapitre lu' : `${count} chapitres lus`,
     streakCount: (days) => days === 1 ? 'Série de 1 jour' : `Série de ${days} jours`,
     noBadgesYet: 'Terminez un chapitre pour commencer à gagner des badges.',
@@ -1501,6 +1529,13 @@ export const strings: Record<Language, Strings> = {
     passwordTooShort: '请至少使用 8 个字符。',
     progress: '你的阅读',
     progressHint: '徽章来自真正读完的章——读到最后一节，而不是只打开页面。',
+    markChapterRead: '标为已读',
+    chapterMarkedRead: '本章已读',
+    versesReadCount: (count) => `${count} 节`,
+    versesFraction: (have, need) => `${have} / ${need} 节`,
+    consistency: '坚持',
+    longestStreak: (days) => `最长连续 ${days} 天`,
+    daysReadCount: (count) => `已读 ${count} 天`,
     chaptersReadCount: (count) => `已读 ${count} 章`,
     streakCount: (days) => `连续 ${days} 天`,
     noBadgesYet: '读完一章即可开始获得徽章。',
@@ -1806,6 +1841,13 @@ export const strings: Record<Language, Strings> = {
     passwordTooShort: 'Dùng ít nhất 8 ký tự.',
     progress: 'Việc đọc của bạn',
     progressHint: 'Huy hiệu đến từ những đoạn bạn đọc xong — câu cuối, không chỉ mở trang.',
+    markChapterRead: 'Đánh dấu đã đọc',
+    chapterMarkedRead: 'Đã đánh dấu đoạn này',
+    versesReadCount: (count) => count === 1 ? '1 câu' : `${count} câu`,
+    versesFraction: (have, need) => `${have} / ${need} câu`,
+    consistency: 'Đều đặn',
+    longestStreak: (days) => days === 1 ? 'Chuỗi dài nhất: 1 ngày' : `Chuỗi dài nhất: ${days} ngày`,
+    daysReadCount: (count) => count === 1 ? '1 ngày đã đọc' : `${count} ngày đã đọc`,
     chaptersReadCount: (count) => count === 1 ? 'Đã đọc 1 đoạn' : `Đã đọc ${count} đoạn`,
     streakCount: (days) => days === 1 ? 'Chuỗi 1 ngày' : `Chuỗi ${days} ngày`,
     noBadgesYet: 'Đọc xong một đoạn để bắt đầu nhận huy hiệu.',

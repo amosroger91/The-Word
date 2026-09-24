@@ -7,7 +7,11 @@ export function ProgressPanel({
   label,
   language,
   chapters,
+  verses,
   streak,
+  longest,
+  daysRead,
+  recentDays,
   events,
   earned,
   onPlans,
@@ -15,7 +19,11 @@ export function ProgressPanel({
   label: WordApp['label'];
   language: Language;
   chapters: number;
+  verses: { have: number; need: number };
   streak: number;
+  longest: number;
+  daysRead: number;
+  recentDays: boolean[];
   events: LedgerEvent[];
   earned: EarnedBadge[];
   onPlans?: () => void;
@@ -33,9 +41,18 @@ export function ProgressPanel({
       <div className="reading-page-heading"><h2>{streak ? label.streakCount(streak) : label.progress}</h2>
         {onPlans && <button onClick={onPlans}>{label.study} <span aria-hidden="true">→</span></button>}
       </div>
-      <p>{label.chaptersReadCount(chapters)}. {label.progressHint}</p>
+      <p>{label.chaptersReadCount(chapters)}. {label.versesReadCount(verses.have)}. {label.progressHint}</p>
+
+      <div className="consistency">
+        <span className="section-label">{label.consistency}</span>
+        <p>{label.longestStreak(longest)}. {label.daysReadCount(daysRead)}.</p>
+        <div className="consistency-days" aria-label={label.consistency}>
+          {recentDays.map((read, index) => <i key={index} className={read ? 'on' : ''} />)}
+        </div>
+      </div>
 
       <ReadBar label={label.wholeBible} fraction={label.chaptersFraction(canon.all.have, canon.all.need)} percent={canon.all.percent} large />
+      <ReadBar label={label.versesReadCount(verses.have)} fraction={label.versesFraction(verses.have, verses.need)} percent={verses.need ? Math.round((verses.have / verses.need) * 1000) / 10 : 0} />
       <div className="read-bar-row">
         <ReadBar label={label.oldTestament} fraction={label.chaptersFraction(canon.old.have, canon.old.need)} percent={canon.old.percent} />
         <ReadBar label={label.newTestament} fraction={label.chaptersFraction(canon.new.have, canon.new.need)} percent={canon.new.percent} />

@@ -24,3 +24,23 @@ export function currentStreak(days: Iterable<string>, today: string): number {
   }
   return count;
 }
+
+export function longestStreak(days: Iterable<string>): number {
+  const sorted = [...new Set(days)].sort();
+  let best = 0;
+  let run = 0;
+  let previous = '';
+  for (const day of sorted) {
+    run = previous && shiftDay(previous, 1) === day ? run + 1 : 1;
+    previous = day;
+    if (run > best) best = run;
+  }
+  return best;
+}
+
+export function recentDayMarks(days: Iterable<string>, today: string, count = 28): boolean[] {
+  const set = new Set(days);
+  const marks: boolean[] = [];
+  for (let offset = count - 1; offset >= 0; offset -= 1) marks.push(set.has(shiftDay(today, -offset)));
+  return marks;
+}
