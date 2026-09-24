@@ -49,7 +49,7 @@ function harness({media = false} = {}) {
   const js=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText;
   const exports={};
   vm.runInNewContext(js,{exports,require:(id)=>id==='peerjs'?{Peer}:{getLocalStream:()=>media?{id:'test-stream'}:null,hasMedia:()=>media,getState:()=>({audio:media,video:false})},setTimeout,clearTimeout,setInterval,clearInterval,Date:{now:()=>clock},Math,Map,Set});
-  return {join:exports.joinParty,Peer,advance(ms){clock+=ms;}};
+  return {join:exports.joinParty,Peer,Call,advance(ms){clock+=ms;}};
 }
 const tick=()=>new Promise(resolve=>setTimeout(resolve,30));
 function person(id,states,rosters){return {code:'test-private',identity:{id,name:id,color:'#947849'},handlers:{onReading:s=>states.push(s),onRoster:r=>rosters.push(r)}};}
@@ -410,4 +410,82 @@ test('a stolen host id keeps the current calls and does not step down', async ()
     assert.equal(host.isHost, true);
     assert.equal(guestLink.open, true, 'retrying the broker must not kick the guest');
   } finally { guest.leave(); host.leave(); }
+});
+
+
+test('a replaced live tab does not reconnect and evict its replacement', async () => {
+  const {join, Peer} = harness();
+  const host = join(person('Anna', [], [])); await tick();
+  const old = join(person('Ben', [], [])); await tick();
+  const replacement = join(person('Ben', [], [])); await tick();
+  const selected = [...Peer.registry.values()].find(p => p.id.startsWith('client') && !p.dead && p.connections.some(c=>c.open));
+  try {
+    await new Promise(r => setTimeout(r, 1500));
+    assert.equal(host.size, 2);
+    assert.equal(selected.dead, undefined, 'replacement must keep its connection');
+    assert.equal([...Peer.registry.values()].filter(p=>p.id.startsWith('client')).length, 1);
+  } finally { old.leave(); replacement.leave(); host.leave(); }
+});
+
+test('late packets from a retired channel cannot reclaim a seat', async () => {
+  const {join, Peer} = harness();
+  const rosters=[];
+  const host=join(person('Anna',[],rosters)); await tick();
+  const old=join(person('Ben',[],[])); await tick();
+  const hub=[...Peer.registry.values()].find(p=>p.id.startsWith('tw-party'));
+  const stale=hub.connections.find(c=>c.open);
+  const replacement=join(person('Ben',[],[])); await tick();
+  try {
+    const seat=rosters.at(-1).find(m=>m.id==='Ben').peerId;
+    stale.emit('data',{t:'hello',d:{id:'Ben',name:'stale'}}); await tick();
+    assert.equal(rosters.at(-1).find(m=>m.id==='Ben').peerId,seat);
+  } finally {old.leave();replacement.leave();host.leave();}
+});
+
+test('an unavailable media peer cannot tear down a healthy hub connection', async () => {
+  const {join,Peer}=harness();
+  const host=join(person('Anna',[],[]));await tick();
+  const guest=join(person('Ben',[],[]));await tick();
+  const client=[...Peer.registry.values()].find(p=>p.id.startsWith('client'));
+  try {
+    client.emit('error',{type:'peer-unavailable'});await tick();
+    assert.equal(client.dead,undefined);
+    assert.equal(client.connections[0].open,true);
+    assert.equal(host.size,2);
+  } finally {guest.leave();host.leave();}
+});
+
+
+test('repeated failed media dials back off instead of spinning every 350ms', async () => {
+  const {join,Peer,Call,advance}=harness({media:true});
+  Call.prototype.answer=function(){}; // negotiated call never produces a stream
+  const host=join(person('Anna',[],[]));await tick();
+  const guest=join(person('Ben',[],[]));await tick();
+  try {
+    await new Promise(r=>setTimeout(r,400));
+    const calls=()=>[...Peer.registry.values()].flatMap(p=>p.calls);
+    const first=calls();assert.ok(first.length);
+    first.find(c=>c.open).close();
+    await new Promise(r=>setTimeout(r,450));
+    assert.equal(calls().length,first.length,'no immediate redial');
+    advance(1100);
+    guest.updateIdentity({name:'Ben online'});await new Promise(r=>setTimeout(r,400));
+    assert.ok(calls().length>first.length,'retry resumes after cooldown');
+  } finally {guest.leave();host.leave();}
+});
+
+
+test('removing a roster entry releases its stream using the original member id',async()=>{
+  const {join,Peer}=harness({media:true});
+  const ended=[],streams=[];
+  const host=join({...person('Anna',[],[]),handlers:{onRemoteStream:id=>streams.push(id),onRemoteEnd:id=>ended.push(id)}});await tick();
+  const guest=join(person('Ben',[],[]));await tick();
+  try {
+    await new Promise(r=>setTimeout(r,400));
+    assert.ok(streams.includes('Ben'));
+    const hub=[...Peer.registry.values()].find(p=>p.id.startsWith('tw-party'));
+    // Data closes before the media close event: roster no longer resolves the id.
+    hub.connections.find(c=>c.open).close();await tick();
+    assert.ok(ended.includes('Ben'),'React stream state must release the member key, not a transport id');
+  } finally {guest.leave();host.leave();}
 });

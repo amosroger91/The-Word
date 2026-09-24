@@ -5,7 +5,7 @@ const vm=require('node:vm');
 const ts=require('typescript');
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
 const options={voice:'voice',rate:1,volume:1,language:'en'};
-function setup(){
+function setup({synthesize=async()=>({size:32})}={}){
   const timers=new Map(),intervals=new Map(),urls=new Set();let id=0,now=0,audio;
   class Audio {
     constructor(){audio=this;this.readyState=3;this.paused=true;this.currentTime=0;this.duration=NaN;this.ended=false;this.failures=[];this.plays=0;}
@@ -17,7 +17,7 @@ function setup(){
   }
   const exports={};
   vm.runInNewContext(ts.transpileModule(fs.readFileSync(require('node:path').join(__dirname,'../src/platform.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText,{
-    exports,require:()=>({createPiperSynthesizer:()=>({synthesize:async()=>({size:32}),cancel(){},dispose(){}})}),
+    exports,require:()=>({createPiperSynthesizer:()=>({synthesize,cancel(){},dispose(){}})}),
     Audio,HTMLMediaElement:{HAVE_FUTURE_DATA:3},Error,Date:{now:()=>now},
     URL:{createObjectURL(){const u=`blob:${++id}`;urls.add(u);return u;},revokeObjectURL(u){urls.delete(u);}},
     window:{setTimeout(fn){timers.set(++id,fn);return id;},clearTimeout(id){timers.delete(id);},setInterval(fn){intervals.set(++id,fn);return id;},clearInterval(id){intervals.delete(id);}},
@@ -74,4 +74,29 @@ test('exhausted interrupted-play retries reject and clean up rather than silentl
   const h=setup();const error=new Error('interrupted');error.name='AbortError';h.audio.failures.push(error,error,error);
   const done=h.adapter.speak('Verse',options);const rejected=assert.rejects(done,/Resume/);await tick();
   h.retry();await tick();h.retry();await rejected;assert.equal(h.intervals.size,0);assert.equal(h.urls.size,0);
+});
+
+
+test('voice generation failure releases the gesture loop and can be retried',async()=>{
+  let fail=true;
+  const h=setup({synthesize:async()=>{if(fail)throw new Error('voice failed');return {size:32};}});
+  h.adapter.unlock();
+  await assert.rejects(h.adapter.speak('Verse',options),/voice failed/);
+  assert.equal(h.audio.paused,true);
+  assert.equal(h.audio.loop,false);
+  assert.equal(h.urls.size,0);
+  fail=false;
+  const done=h.adapter.speak('Verse',options);await tick();h.audio.end();
+  assert.equal(await done,'ended');h.adapter.dispose();
+});
+
+test('a late rejected play attempt cannot cancel a successful Resume',async()=>{
+  const h=setup();let rejectOld;
+  h.audio.play=()=>new Promise((resolve,reject)=>{rejectOld=reject;});
+  const done=h.adapter.speak('Verse',options);done.catch(()=>{});await tick();
+  h.adapter.pause();
+  h.audio.play=()=>{h.audio.paused=false;return Promise.resolve();};
+  h.adapter.resume();
+  rejectOld(new Error('old play failed'));await tick();
+  h.audio.end();assert.equal(await done,'ended');h.adapter.dispose();
 });
