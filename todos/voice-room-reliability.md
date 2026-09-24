@@ -8,7 +8,7 @@
 - [x] Remote stream cleanup retains its original member id even after the roster removes it. Retired channels, timers, and presence entries are released.
 - [x] Voice-generation failure stops the silent gesture loop. Rejected older play attempts cannot interrupt a newer Resume.
 - [x] Full automated suite: 116 passing tests; TypeScript passes. Seven new regression tests added.
-- [ ] Publish and verify deployed revision.
+- [x] Publish and verify deployed revision.
 
 ## Review coverage and limits
 
@@ -25,3 +25,5 @@ Remaining operational risks:
 Suggested physical soak: 2–8 participants for 2+ hours, multiple chapter transitions, slow device, repeated refreshes, Wi-Fi changes, screen lock, host handoff and host closure. Verify no duplicate seats, preserved Resume position, bounded resource growth, and recovery without rapid reconnect loops.
 
 Browser verification: created an unlisted room, joined from a second tab, refreshed and rejoined that guest, and confirmed People (2) on the host and Group 2 on the guest. Both sessions were then left and the temporary guest tab closed. Microphone/camera capture was not enabled.
+
+Published from main after PR #12. The web suite was re-run first: 116 tests passed. GitHub Pages is serving `index-BiF4PFUj.js`, which contains the `session-replaced` recovery. A phone screen-lock soak and a multi-network room were not run.
