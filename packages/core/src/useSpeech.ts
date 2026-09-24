@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { strings } from './i18n';
 import type { SpeakOptions, SpeechAdapter } from './platform';
+import { shouldRetryVerse } from './speechRetry';
 
 export interface SpeechChunk {
   verse: number;
@@ -76,52 +77,65 @@ export function useSpeech(adapter: SpeechAdapter, options: SpeakOptions, onCompl
   }, [adapter]);
 
   const run = useCallback(async (requestId: number) => {
+    let retries = 0;
     try {
       while (indexRef.current < queueRef.current.length) {
         if (requestId !== requestRef.current) return;
         const chunk = queueRef.current[indexRef.current];
         setSpeakingVerse(chunk.verse);
-        const outcome = await adapter.speak(chunk.text, optionsRef.current);
-        if (requestId !== requestRef.current) return;
-        // A stopped chunk means pause-by-restart or stop; the queue position is left untouched.
-        if (outcome === 'stopped') {
-          if (stateRef.current === 'speaking') {
+        try {
+          const outcome = await adapter.speak(chunk.text, optionsRef.current);
+          if (requestId !== requestRef.current) return;
+          // A stopped chunk means pause-by-restart or stop; the queue position is left untouched.
+          if (outcome === 'stopped') {
+            if (stateRef.current === 'speaking') {
+              stateRef.current = 'paused';
+              setState('paused');
+              setError(strings[optionsRef.current.language].speechInterrupted);
+            }
+            return;
+          }
+          indexRef.current += 1;
+          retries = 0;
+          if (stateRef.current === 'paused') return;
+        } catch (e) {
+          if (requestId !== requestRef.current) return;
+          // One automatic replay of this verse. A stuck clip otherwise ends the
+          // chapter here, which is the freeze people hit after a long reading.
+          if (stateRef.current === 'speaking' && shouldRetryVerse(e, retries)) {
+            retries += 1;
+            continue;
+          }
+          // Autoplay blocks are a UX gate, not a speech failure — the party UI
+          // re-shows "tap to read along" instead of an error banner.
+          if (isAutoplayBlocked(e)) {
+            setAutoplayBlocked(true);
+            setError('');
             stateRef.current = 'paused';
             setState('paused');
-            setError(strings[optionsRef.current.language].speechInterrupted);
+            return;
           }
+          // pause() raced the gesture play() and the adapter's retries were used up.
+          // Leave this verse paused so Resume retries it, instead of advancing the chapter.
+          if (isPlayInterrupted(e)) {
+            setError(strings[optionsRef.current.language].speechInterrupted);
+            stateRef.current = 'paused';
+            setState('paused');
+            return;
+          }
+          setError(spokenError(e, optionsRef.current.language));
+          stateRef.current = 'paused';
+          setState('paused');
           return;
         }
-        indexRef.current += 1;
-        if (stateRef.current === 'paused') return;
       }
       setSpeakingVerse(null);
       setFinished(true);
       stateRef.current = 'idle';
       setState('idle');
       onCompleteRef.current?.();
-    } catch (e) {
-      if (requestId !== requestRef.current) return;
-      // Autoplay blocks are a UX gate, not a speech failure — the party UI
-      // re-shows "tap to read along" instead of an error banner.
-      if (isAutoplayBlocked(e)) {
-        setAutoplayBlocked(true);
-        setError('');
-        stateRef.current = 'paused';
-        setState('paused');
-        return;
-      }
-      // pause() raced the gesture play() and the adapter's retries were used up.
-      // Leave this verse paused so Resume retries it, instead of advancing the chapter.
-      if (isPlayInterrupted(e)) {
-        setError(strings[optionsRef.current.language].speechInterrupted);
-        stateRef.current = 'paused';
-        setState('paused');
-        return;
-      }
-      setError(spokenError(e, optionsRef.current.language));
-      stateRef.current = 'paused';
-      setState('paused');
+    } catch {
+      // Adapter failures are handled per verse above.
     }
   }, [adapter]);
 
