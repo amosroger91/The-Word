@@ -1,0 +1,28 @@
+The Word is a quiet, private Scripture reader. Everything runs on your phone: no account, no ads, no tracking.
+
+<b>Read</b>
+<ul>
+<li>Eight public-domain translations bundled for offline use: King James Version, American Standard Version, World English Bible, Reina-Valera 1909 and 1602, Louis Segond, Chinese Union Version and the 1934 Vietnamese Bible</li>
+<li>Interface in English, Spanish, French, Chinese and Vietnamese</li>
+<li>Words of Christ in red</li>
+<li>Cross-references on every verse</li>
+<li>Light and dark themes, adjustable text size, and reading fonts including Atkinson Hyperlegible and OpenDyslexic</li>
+</ul>
+
+<b>Find</b>
+<ul>
+<li>Fast full-text search by all words or exact phrase, filtered by testament or book</li>
+<li>Bookmarks you can come back to</li>
+</ul>
+
+<b>Listen</b>
+<ul>
+<li>Read-aloud with your device's own text-to-speech voices, with speed control</li>
+</ul>
+
+<b>Share</b>
+<ul>
+<li>Turn a verse into an image with your choice of background, font and translation</li>
+</ul>
+
+The app icon uses the "book-bible" icon from Font Awesome Free (CC BY 4.0).

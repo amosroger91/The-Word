@@ -1,0 +1,44 @@
+Categories:
+  - Reading
+License: GPL-3.0-or-later
+AuthorName: Roger Hernandez
+SourceCode: https://github.com/amosroger91/The-Word
+IssueTracker: https://github.com/amosroger91/The-Word/issues
+
+AutoName: The Word
+
+RepoType: git
+Repo: https://github.com/amosroger91/The-Word.git
+
+Builds:
+  - versionName: 1.0.0
+    versionCode: 1
+    commit: v1.0.0
+    subdir: apps/mobile/android/app
+    sudo:
+      - curl -Lo /tmp/node.tar.xz https://nodejs.org/dist/v20.20.2/node-v20.20.2-linux-x64.tar.xz
+      - echo "df770b2a6f130ed8627c9782c988fda9669fa23898329a61a871e32f965e007d  /tmp/node.tar.xz"
+        | sha256sum -c -
+      - tar xJf /tmp/node.tar.xz --strip-components=1 -C /usr/local
+    init:
+      - cd ../../../..
+      - npm --prefix packages/shared ci
+      - npm --prefix packages/bible ci
+      - npm --prefix packages/core ci
+      - npm --prefix apps/mobile ci
+    gradle:
+      - yes
+    prebuild:
+      - cd ../..
+      - node scripts/download-fonts.mjs
+    scandelete:
+      - apps/mobile/node_modules
+      - packages/shared/node_modules
+      - packages/bible/node_modules
+      - packages/core/node_modules
+    ndk: 26.1.10909125
+
+AutoUpdateMode: Version
+UpdateCheckMode: Tags
+CurrentVersion: 1.0.0
+CurrentVersionCode: 1

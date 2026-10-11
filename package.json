@@ -2,6 +2,7 @@
   "name": "the-word",
   "version": "0.0.1",
   "private": true,
+  "license": "GPL-3.0-or-later",
   "scripts": {
     "dev:web": "npm --prefix apps/web run dev",
     "dev:mobile": "npm --prefix apps/mobile run dev",

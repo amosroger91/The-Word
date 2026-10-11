@@ -1,0 +1,1 @@
+An offline, ad-free Bible reader with read-aloud and shareable verse images.
