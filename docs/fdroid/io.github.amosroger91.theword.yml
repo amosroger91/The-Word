@@ -13,7 +13,7 @@ Repo: https://github.com/amosroger91/The-Word.git
 Builds:
   - versionName: 1.0.0
     versionCode: 1
-    commit: v1.0.0
+    commit: 4dd89959e59c9a6c9568f0ecae9e452b7fc6f7fd
     subdir: apps/mobile/android/app
     sudo:
       - curl -Lo /tmp/node.tar.xz https://nodejs.org/dist/v20.20.2/node-v20.20.2-linux-x64.tar.xz
