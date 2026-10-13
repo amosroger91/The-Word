@@ -36,6 +36,10 @@ Builds:
     scanignore:
       - apps/mobile/android/build.gradle
       - apps/mobile/node_modules/react-native/sdks/hermesc/linux64-bin/hermesc
+      - apps/mobile/node_modules/expo-modules-autolinking/scripts/android/autolinking_implementation.gradle
+      - apps/mobile/node_modules/expo-modules-core/android/ExpoModulesCorePlugin.gradle
+      - apps/mobile/node_modules/@react-native-async-storage/async-storage/android/build.gradle
+      - apps/mobile/node_modules/react-native-webview/android/build.gradle
     scandelete:
       - apps/mobile/node_modules
     ndk: 26.1.10909125
