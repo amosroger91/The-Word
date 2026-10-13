@@ -16,6 +16,9 @@ Builds:
     commit: 4dd89959e59c9a6c9568f0ecae9e452b7fc6f7fd
     subdir: apps/mobile/android/app
     sudo:
+      - echo "deb https://deb.debian.org/debian bookworm main" > /etc/apt/sources.list.d/bookworm.list
+      - apt-get update
+      - apt-get install -y -t bookworm openjdk-17-jdk-headless
       - curl -Lo /tmp/node.tar.gz https://nodejs.org/dist/v20.20.2/node-v20.20.2-linux-x64.tar.gz
       - echo "19e56f0825510207dd904f087fe52faa0a4eb6b2aab5f0ea7a33830d04888b8b  /tmp/node.tar.gz"
         | sha256sum -c -
