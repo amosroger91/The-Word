@@ -16,10 +16,10 @@ Builds:
     commit: 4dd89959e59c9a6c9568f0ecae9e452b7fc6f7fd
     subdir: apps/mobile/android/app
     sudo:
-      - curl -Lo /tmp/node.tar.xz https://nodejs.org/dist/v20.20.2/node-v20.20.2-linux-x64.tar.xz
-      - echo "df770b2a6f130ed8627c9782c988fda9669fa23898329a61a871e32f965e007d  /tmp/node.tar.xz"
+      - curl -Lo /tmp/node.tar.gz https://nodejs.org/dist/v20.20.2/node-v20.20.2-linux-x64.tar.gz
+      - echo "19e56f0825510207dd904f087fe52faa0a4eb6b2aab5f0ea7a33830d04888b8b  /tmp/node.tar.gz"
         | sha256sum -c -
-      - tar xJf /tmp/node.tar.xz --strip-components=1 -C /usr/local
+      - tar xzf /tmp/node.tar.gz --strip-components=1 -C /usr/local
     init:
       - cd ../../../..
       - npm --prefix packages/shared ci
