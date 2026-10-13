@@ -28,14 +28,16 @@ Builds:
       - npm --prefix apps/mobile ci
     gradle:
       - yes
+    rm:
+      - package.json
     prebuild:
       - cd ../..
       - node scripts/download-fonts.mjs
+    scanignore:
+      - apps/mobile/android/build.gradle
+      - apps/mobile/node_modules/react-native/sdks/hermesc/linux64-bin/hermesc
     scandelete:
       - apps/mobile/node_modules
-      - packages/shared/node_modules
-      - packages/bible/node_modules
-      - packages/core/node_modules
     ndk: 26.1.10909125
 
 AutoUpdateMode: Version
