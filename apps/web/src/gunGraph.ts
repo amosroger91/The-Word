@@ -216,8 +216,17 @@ function gossipSend(node: GraphNode) {
 
 export function startGraphGossip() {
   if (gossip || typeof window === 'undefined') return;
+  // Expo Go and a build without the WebRTC native module have no peer connection.
+  // The local graph still works; only the gossip hop is skipped.
+  if (typeof RTCPeerConnection === 'undefined') return;
   const conns = new Set<DataConnection>();
-  const peer = new Peer(GOSSIP_ID);
+  let peer: Peer;
+  try {
+    peer = new Peer(GOSSIP_ID);
+  } catch {
+    gossip = null;
+    return;
+  }
   gossip = { peer, conns };
   function hear(conn: DataConnection) {
     conns.add(conn);
@@ -232,8 +241,14 @@ export function startGraphGossip() {
   peer.on('error', (error) => {
     const message = String((error as { type?: string }).type || error);
     if (!message.includes('unavailable-id') && !message.includes('peer-unavailable')) return;
-    peer.destroy();
-    const client = new Peer();
+    try { peer.destroy(); } catch { /* already gone */ }
+    let client: Peer;
+    try {
+      client = new Peer();
+    } catch {
+      gossip = null;
+      return;
+    }
     gossip = { peer: client, conns };
     client.on('open', () => {
       const conn = client.connect(GOSSIP_ID);

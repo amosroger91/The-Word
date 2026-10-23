@@ -12,7 +12,7 @@ import {
 } from './membership';
 import { loadEvents, mergeLedgers, saveEvents, appendEvent, eventsForActor, type DraftEvent, type LedgerEvent } from './ledger';
 import { getNode, loadGraph, nodesWithPrefix, pullRelays, putNode, signNode, startGraphGossip, userSoul } from './gunGraph';
-import { loadPlan, loadPlanIndex, type StudyPlan } from './plans';
+import { loadPlan, loadPlanIndex, validatePlan, type StudyPlan } from './plans';
 import { accept, addImported, importPlanFile, loadImported, needsAcceptance, removeImported, type ImportedPlan } from './importedPlans';
 import {
   admitMember,
@@ -126,6 +126,15 @@ export function useStudy(earned: EarnedBadge[]) {
     acceptPlan: (id: string) => { accept(id); setImported(loadImported()); },
     importPlan: async (file: File) => {
       const plan = await importPlanFile(file);
+      setImported(addImported(plan));
+      return plan;
+    },
+    // Android has no file picker wired through the web File type. The text is
+    // the same JSON a plan file would contain.
+    importPlanText: async (text: string) => {
+      const plan = JSON.parse(text) as StudyPlan;
+      const errors = validatePlan(plan);
+      if (errors.length) throw new Error(errors.join(','));
       setImported(addImported(plan));
       return plan;
     },

@@ -116,13 +116,26 @@ export function connectStudyBoard(onList: (list: PublicStudy[]) => void) {
 
   function connect() {
     if (leaving) return;
-    peer = new Peer(BOARD_ID);
+    if (typeof RTCPeerConnection === 'undefined') return;
+    let peerNext: Peer;
+    try {
+      peerNext = new Peer(BOARD_ID);
+    } catch {
+      peer = null;
+      return;
+    }
+    peer = peerNext;
     peer.on('open', () => startAsHub());
     peer.on('error', (e: { type?: string }) => {
       const type = e?.type || String(e);
       if (type === 'unavailable-id') {
         try { peer?.destroy(); } catch { /* ignore */ }
-        peer = new Peer();
+        try {
+          peer = new Peer();
+        } catch {
+          peer = null;
+          return;
+        }
         peer.on('open', () => startAsClient());
         peer.on('error', () => { if (!leaving) reelect(); });
       } else if (!leaving) {

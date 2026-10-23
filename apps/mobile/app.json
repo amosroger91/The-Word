@@ -8,15 +8,41 @@
     "assetBundlePatterns": [
       "**/*"
     ],
+    "scheme": "theword",
     "plugins": [
-      "expo-font"
+      "expo-font",
+      "expo-notifications"
     ],
     "ios": {
       "bundleIdentifier": "com.theword.reader",
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "The Word uses the camera when you join a group study.",
+        "NSMicrophoneUsageDescription": "The Word uses the microphone when you join a group study."
+      }
     },
     "android": {
-      "package": "com.theword.reader"
+      "package": "com.theword.reader",
+      "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
+        "MODIFY_AUDIO_SETTINGS",
+        "POST_NOTIFICATIONS"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": false,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "amosroger91.github.io",
+              "pathPrefix": "/The-Word"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
     }
   }
 }

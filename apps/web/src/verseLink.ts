@@ -21,8 +21,13 @@ export function parseVerseHash(hash: string): ParsedReference | null {
   return parseReference(`${book} ${match[2]}:${match[3]}`);
 }
 
+function pageBase(): string {
+  const base = (globalThis as { __WORD_BASE_URL__?: string }).__WORD_BASE_URL__;
+  return base || '/';
+}
+
 export function verseShareUrl(bookId: number, chapter: number, verse: number): string {
-  const base = new URL(import.meta.env.BASE_URL, window.location.origin);
+  const base = new URL(pageBase(), window.location.origin);
   base.hash = encodeVerseRef(bookId, chapter, verse);
   return base.toString();
 }

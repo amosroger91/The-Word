@@ -87,15 +87,37 @@ function refErrors(ref: PassageRef, at = 'ref'): string[] {
   return [];
 }
 
+type PlanBundle = { index: string[]; byId: Record<string, StudyPlan> };
+
+// The Android app has no static host. It sets this before the first load.
+function bundledPlans(): PlanBundle | null {
+  const bundle = (globalThis as { __WORD_PLAN_BUNDLE__?: PlanBundle }).__WORD_PLAN_BUNDLE__;
+  if (!bundle || !Array.isArray(bundle.index) || !bundle.byId) return null;
+  return bundle;
+}
+
+function assetBase(): string {
+  const base = (globalThis as { __WORD_BASE_URL__?: string }).__WORD_BASE_URL__;
+  return base || '/';
+}
+
 export async function loadPlanIndex(): Promise<string[]> {
-  const res = await fetch(`${import.meta.env.BASE_URL}plans/index.json`);
+  const bundled = bundledPlans();
+  if (bundled) return bundled.index;
+  const res = await fetch(`${assetBase()}plans/index.json`);
   if (!res.ok) return [];
   const body = await res.json() as { plans?: string[] };
   return body.plans ?? [];
 }
 
 export async function loadPlan(id: string): Promise<StudyPlan> {
-  const res = await fetch(`${import.meta.env.BASE_URL}plans/${id}.json`);
+  const bundled = bundledPlans()?.byId[id];
+  if (bundled) {
+    const errors = validatePlan(bundled);
+    if (errors.length) throw new Error(errors.join(','));
+    return bundled;
+  }
+  const res = await fetch(`${assetBase()}plans/${id}.json`);
   if (!res.ok) throw new Error('missing');
   const plan = await res.json() as StudyPlan;
   const errors = validatePlan(plan);

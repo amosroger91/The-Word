@@ -1,9 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Modal, Platform, Pressable, SafeAreaView, ScrollView, StatusBar as RNStatusBar, StyleSheet, Text, TextInput, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
+import { Modal, Platform, Pressable, SafeAreaView, ScrollView, Share, StatusBar as RNStatusBar, StyleSheet, Text, TextInput, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { fontFor, paletteFor, readingFonts, speechRateRange, speechVolumeRange, verseImageFilename, verseRuns, type Language, type Palette, type WordApp } from '@the-word/core';
+import { useChapterRead } from '../../web/src/useLedger';
+import { verseShareText } from '../../web/src/verseLink';
 import { CrossRefSheet } from './CrossRefSheet';
+import { useOptionalFeatures } from './features/context';
 import { PickerSheet, type PickerOption } from './PickerSheet';
+import { versePageUrl } from './platform/links';
 import { VerseImageEditor, type VerseImageJob } from './VerseImageEditor';
 import { VerseImageShare, type VerseImageRequest } from './VerseImageShare';
 
@@ -27,6 +31,16 @@ export function Reader({ app, onHome }: { app: WordApp; onHome?: () => void }) {
   const lastSpokenVerse = useRef<number | null>(null);
 
   const { label, chapter, chapterLoading, book, bookName, chapterNumber, speechState, speakingVerse } = app;
+  const features = useOptionalFeatures();
+  const [lastInView, setLastInView] = useState(false);
+  const lastVerse = chapter?.verses.length ? chapter.verses[chapter.verses.length - 1].ref.verse : null;
+  useChapterRead(features?.ledger.recordChapterRead ?? (async () => []), {
+    bookId: app.bookId,
+    chapter: chapterNumber,
+    lastVerse: features ? lastVerse : null,
+    speakingVerse: features ? speakingVerse : null,
+    lastInView: Boolean(features) && lastInView,
+  });
   const nativeFont = fontFor(app.fontId).native;
   const readerFont = nativeFont === 'serif' ? undefined : nativeFont;
 
@@ -34,7 +48,9 @@ export function Reader({ app, onHome }: { app: WordApp; onHome?: () => void }) {
   const readingBarOpen = speechState !== 'idle' && !headerVisible && app.selectedVerses.size === 0;
 
   function onScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
-    setHeaderVisible(event.nativeEvent.contentOffset.y < 90);
+    const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+    setHeaderVisible(contentOffset.y < 90);
+    setLastInView(contentOffset.y + layoutMeasurement.height >= contentSize.height - 48);
   }
 
   if (speakingVerse !== null && speakingVerse !== lastSpokenVerse.current) {
@@ -119,6 +135,11 @@ export function Reader({ app, onHome }: { app: WordApp; onHome?: () => void }) {
           <IconButton styles={styles} label={label.search} glyph="⌕" onPress={() => setSearchOpen(true)} />
           <IconButton styles={styles} label={label.bookmarks} glyph="◈" onPress={() => setBookmarksOpen(true)} />
           <IconButton styles={styles} label={label.toggleTheme} glyph="◐" onPress={app.toggleTheme} />
+          {features ? <Chip styles={styles} text={label.progress} onPress={() => features.openTool('progress')} /> : null}
+          {features ? <Chip styles={styles} text={label.study} onPress={() => features.openTool('study')} /> : null}
+          {features ? <Chip styles={styles} text={label.readParty} onPress={() => features.openTool('group')} /> : null}
+          {features ? <Chip styles={styles} text={label.breakdownVerse} onPress={() => features.openTool('breakdown')} /> : null}
+          {features ? <Chip styles={styles} text={label.readers} onPress={() => features.openTool('account')} /> : null}
         </View>
         <View style={styles.pickerRow}>
           <Selector styles={styles} flex={1.4} label={label.translation} value={app.translations.find((item) => item.id === app.translationId)?.shortName ?? ''} onPress={() => setSheet('translation')} />
@@ -133,6 +154,11 @@ export function Reader({ app, onHome }: { app: WordApp; onHome?: () => void }) {
             <Text style={[styles.navText, chapterNumber === 1 && styles.disabled]}>← {label.previous}</Text>
           </Pressable>
           <Text style={styles.navReference}>{bookName} {chapterNumber}</Text>
+          {features && speechState === 'idle' && !features.ledger.chapterDone(app.bookId, chapterNumber) ? (
+            <Pressable onPress={() => { void features.ledger.recordChapterRead(app.bookId, chapterNumber); }}>
+              <Text style={styles.navText}>{label.markChapterRead}</Text>
+            </Pressable>
+          ) : null}
           <Pressable disabled={!book || chapterNumber === book.chapters} onPress={() => app.moveChapter(1)}>
             <Text style={[styles.navText, (!book || chapterNumber === book.chapters) && styles.disabled]}>{label.next} →</Text>
           </Pressable>
@@ -140,6 +166,8 @@ export function Reader({ app, onHome }: { app: WordApp; onHome?: () => void }) {
         {chapterLoading ? <Text style={styles.empty}>{label.loading}</Text> : chapter ? chapter.verses.map((verse) => {
           const selected = app.selectedVerses.has(verse.ref.verse);
           const speaking = speakingVerse === verse.ref.verse;
+          const hostHere = features?.party.hostVerse === verse.ref.verse;
+          const noted = Boolean(features?.ledger.noteAt(app.bookId, chapterNumber, verse.ref.verse)?.text);
           const focused = !speaking && !selected && app.focusedVerse === verse.ref.verse;
           const refs = app.crossRefs[verse.ref.verse];
           return (
@@ -148,9 +176,10 @@ export function Reader({ app, onHome }: { app: WordApp; onHome?: () => void }) {
               onPress={() => {
                 if (skipVerseToggle.current) { skipVerseToggle.current = false; return; }
                 app.toggleVerse(verse.ref.verse);
+                if (features?.party.presenting && features.party.isHost) features.party.setFocusVerse(verse.ref.verse);
               }}
               onLayout={(event) => { versePositions.current[verse.ref.verse] = event.nativeEvent.layout.y; }}
-              style={[styles.verseRow, selected && styles.verseSelected, speaking && styles.verseSpeaking, focused && styles.verseFocused]}
+              style={[styles.verseRow, selected && styles.verseSelected, speaking && styles.verseSpeaking, focused && styles.verseFocused, hostHere && styles.verseHost]}
             >
               <Text style={[styles.verse, { fontSize: app.fontSize, lineHeight: app.fontSize * 1.7, fontFamily: readerFont }]}>
                 <Text style={styles.verseNumber}>{verse.ref.verse} </Text>
@@ -158,6 +187,7 @@ export function Reader({ app, onHome }: { app: WordApp; onHome?: () => void }) {
                   <Text key={index} style={run.red ? styles.redLetter : undefined}>{run.text}</Text>
                 ))}
                 {app.bookmarks.has(app.bookmarkKey(verse.ref.verse)) ? <Text style={styles.bookmarkMark}> ◆</Text> : null}
+                {noted ? <Text style={styles.bookmarkMark}> ✎</Text> : null}
                 {refs?.length ? (
                   <Text
                     onPress={() => { skipVerseToggle.current = true; setXrefVerse(verse.ref.verse); }}
@@ -183,6 +213,28 @@ export function Reader({ app, onHome }: { app: WordApp; onHome?: () => void }) {
             <BarButton styles={styles} text={label.bookmark} onPress={() => app.selectedVerseNumbers.forEach(app.toggleBookmark)} />
             <BarButton styles={styles} text={label.copy} onPress={() => { void app.copySelection(); }} />
             <BarButton styles={styles} text={label.readSelection} onPress={app.speakSelection} />
+            {features ? <BarButton styles={styles} text={label.noteFor} onPress={() => { const verse = app.selectedVerseNumbers[0]; if (verse) features.openNote(verse); }} /> : null}
+            {features ? (
+              <BarButton
+                styles={styles}
+                text={label.shareVerse}
+                onPress={() => {
+                  const verse = app.selectedVerseNumbers[0];
+                  if (!verse || !app.selectedText) return;
+                  const url = versePageUrl(app.bookId, chapterNumber, verse);
+                  const message = verseShareText({
+                    reference: app.selectedReference,
+                    text: app.selectedText,
+                    translation: app.translations.find((item) => item.id === app.translationId)?.shortName,
+                    url,
+                  });
+                  void Share.share({ message }).then((result) => {
+                    if (result.action === Share.sharedAction) void features.ledger.recordShare('link', app.bookId, chapterNumber, verse, 'shared');
+                  });
+                }}
+              />
+            ) : null}
+            {features ? <BarButton styles={styles} text={label.breakdownVerse} onPress={() => features.openTool('breakdown')} /> : null}
             <BarButton
               styles={styles}
               text={label.image}
@@ -231,7 +283,12 @@ export function Reader({ app, onHome }: { app: WordApp; onHome?: () => void }) {
       ) : null}
       <VerseImageShare
         request={imageRequest}
-        onDone={() => { setImageRequest(null); app.clearSelection(); }}
+        onDone={() => {
+          const verse = app.selectedVerseNumbers[0];
+          if (features && verse) void features.ledger.recordShare('image', app.bookId, chapterNumber, verse, 'saved');
+          setImageRequest(null);
+          app.clearSelection();
+        }}
         onError={(message) => { setImageRequest(null); setExportError(message); }}
       />
 
@@ -437,6 +494,7 @@ function createStyles(palette: Palette) {
     verseSelected: { backgroundColor: palette.highlight },
     verseSpeaking: { backgroundColor: palette.speaking },
     verseFocused: { backgroundColor: palette.highlight, borderColor: palette.accent, borderWidth: 2 },
+    verseHost: { borderColor: palette.accentSoft, borderWidth: 2 },
     verse: { color: palette.text },
     verseNumber: { color: palette.accentSoft, fontSize: 12, fontWeight: '700' },
     redLetter: { color: palette.redLetter },

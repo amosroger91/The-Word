@@ -23,10 +23,12 @@ export function Landing({
   app,
   onEnterReader,
   onGroupStudy,
+  tools,
 }: {
   app: WordApp;
   onEnterReader: () => void;
   onGroupStudy?: () => void;
+  tools?: { label: string; onPress: () => void }[];
 }) {
   const palette = paletteFor(app.theme);
   const styles = useMemo(() => createStyles(palette), [palette]);
@@ -111,6 +113,15 @@ export function Landing({
           <Pressable style={styles.group} onPress={onGroupStudy} accessibilityRole="button">
             <Text style={styles.groupText}>{label.readParty}</Text>
           </Pressable>
+        ) : null}
+        {tools?.length ? (
+          <View style={styles.tools}>
+            {tools.map((tool) => (
+              <Pressable key={tool.label} style={styles.tool} onPress={tool.onPress} accessibilityRole="button">
+                <Text style={styles.toolText}>{tool.label}</Text>
+              </Pressable>
+            ))}
+          </View>
         ) : null}
         <View style={styles.verseCard}>
           {daily.status === 'loading' ? <Text style={styles.muted}>{label.loadingVerse}</Text> : null}
@@ -247,6 +258,9 @@ function createStyles(palette: Palette) {
     readText: { color: '#fff7f2', fontSize: 18, fontWeight: '600' },
     resume: { color: palette.muted, fontSize: 14, textAlign: 'center', marginTop: -12 },
     group: { borderColor: palette.border, borderWidth: 1, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
+    tools: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    tool: { borderColor: palette.border, borderWidth: 1, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12 },
+    toolText: { color: palette.text, fontSize: 14 },
     groupText: { color: palette.text, fontSize: 16 },
     verseCard: { gap: 12 },
     verseArt: { minHeight: 380, borderRadius: 16, overflow: 'hidden', padding: 28, justifyContent: 'center', gap: 14 },

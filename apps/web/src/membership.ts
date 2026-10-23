@@ -115,8 +115,17 @@ export async function requestMembership(account = loadAccount(), relays = loadRe
 }
 
 export async function loadPublishedRelays(): Promise<RelayConfig> {
+  const preset = (globalThis as { __WORD_RELAY__?: RelayConfig }).__WORD_RELAY__;
+  if (preset) {
+    const local = loadRelays();
+    if (local.urls.length || local.issuerPub) return local;
+    const next = { urls: Array.isArray(preset.urls) ? preset.urls : [], issuerPub: String(preset.issuerPub || '') };
+    saveRelays(next);
+    return next;
+  }
   try {
-    const res = await fetch(`${import.meta.env.BASE_URL}relay.json`);
+    const base = (globalThis as { __WORD_BASE_URL__?: string }).__WORD_BASE_URL__ || '/';
+    const res = await fetch(`${base}relay.json`);
     if (!res.ok) return loadRelays();
     const published = await res.json() as Partial<RelayConfig>;
     const local = loadRelays();
