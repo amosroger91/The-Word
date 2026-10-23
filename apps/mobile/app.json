@@ -2,7 +2,7 @@
   "expo": {
     "name": "The Word",
     "slug": "the-word",
-    "version": "0.0.1",
+    "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "assetBundlePatterns": [
@@ -23,6 +23,12 @@
     },
     "android": {
       "package": "com.theword.reader",
+      "versionCode": 1,
+      "blockedPermissions": [
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+      ],
       "permissions": [
         "CAMERA",
         "RECORD_AUDIO",

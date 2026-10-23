@@ -62,39 +62,47 @@ export async function applyReminder(settings: ReminderSettings, title: string, b
   writeReminder(settings);
   const Notifications = await notifications();
   if (!Notifications) return settings.enabled ? 'unsupported' : 'ok';
-  await prepare(Notifications);
-  await Notifications.cancelScheduledNotificationAsync(NOTIFICATION_ID).catch(() => undefined);
-  if (!settings.enabled) return 'ok';
-  const current = await Notifications.getPermissionsAsync();
-  let granted = current.granted;
-  if (!granted) {
-    const asked = await Notifications.requestPermissionsAsync();
-    granted = asked.granted;
+  try {
+    await prepare(Notifications);
+    await Notifications.cancelScheduledNotificationAsync(NOTIFICATION_ID).catch(() => undefined);
+    if (!settings.enabled) return 'ok';
+    const current = await Notifications.getPermissionsAsync();
+    let granted = current.granted;
+    if (!granted) {
+      const asked = await Notifications.requestPermissionsAsync();
+      granted = asked.granted;
+    }
+    if (!granted) {
+      writeReminder({ ...settings, enabled: false });
+      return 'blocked';
+    }
+    const [hour, minute] = settings.time.split(':').map((part) => Number(part));
+    await Notifications.scheduleNotificationAsync({
+      identifier: NOTIFICATION_ID,
+      content: { title, body },
+      trigger: { hour, minute, repeats: true, channelId: CHANNEL },
+    });
+    return 'ok';
+  } catch {
+    return 'unsupported';
   }
-  if (!granted) {
-    writeReminder({ ...settings, enabled: false });
-    return 'blocked';
-  }
-  const [hour, minute] = settings.time.split(':').map((part) => Number(part));
-  await Notifications.scheduleNotificationAsync({
-    identifier: NOTIFICATION_ID,
-    content: { title, body },
-    trigger: { hour, minute, repeats: true, channelId: CHANNEL },
-  });
-  return 'ok';
 }
 
 export async function sendTestReminder(title: string, body: string): Promise<'ok' | 'blocked' | 'unsupported'> {
   const Notifications = await notifications();
   if (!Notifications) return 'unsupported';
-  await prepare(Notifications);
-  const current = await Notifications.getPermissionsAsync();
-  if (!current.granted) return 'blocked';
-  await Notifications.scheduleNotificationAsync({
-    content: { title, body },
-    trigger: null,
-  });
-  return 'ok';
+  try {
+    await prepare(Notifications);
+    const current = await Notifications.getPermissionsAsync();
+    if (!current.granted) return 'blocked';
+    await Notifications.scheduleNotificationAsync({
+      content: { title, body },
+      trigger: null,
+    });
+    return 'ok';
+  } catch {
+    return 'unsupported';
+  }
 }
 
 export async function ensureReminderScheduled(title: string, body: string) {
