@@ -12,3 +12,8 @@
 -keep class com.facebook.react.turbomodule.** { *; }
 
 # Add any project specific keep options here:
+
+# WebRTC looks up classes and native methods by name.
+-keep class org.webrtc.** { *; }
+-keep class com.oney.WebRTCModule.** { *; }
+-dontwarn org.webrtc.**

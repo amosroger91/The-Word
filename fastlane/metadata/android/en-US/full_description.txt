@@ -1,0 +1,11 @@
+The Word is an offline Bible reader. The text is bundled in the app, so reading does not need an account or a network connection.
+
+Eight public-domain translations are included: the King James Version, the American Standard Version, the World English Bible, Reina-Valera 1909, Valera 1602 Purificada, Louis Segond 1910, the Chinese Union Version (新标点和合本), and Kinh Thánh 1934. The interface can be set to English, Spanish, French, Chinese, or Vietnamese.
+
+Reading can use Atkinson Hyperlegible or OpenDyslexic, an adjustable text size, and a light or dark theme. Read-aloud uses the voice installed on the device.
+
+The Android app includes the study tools from the web version. You can track a reading streak and trophies, write a note on a verse, and follow a study plan, including one pasted in as text. Circles are groups you open or join with an invite code, and the host admits people. A verse feed, friends, and direct messages are addressed by public key, and relays are optional. Group study includes chat and follow-the-host reading. Each device speaks with its own voice, and the host audio is not streamed. Microphone and camera are optional. Verse breakdown can use an optional model that stays on the device. A verse link opens that verse. A group link opens group study with the code filled in, and it does not join on its own.
+
+An account is a key stored on the device. There is no sign-up server, and a forgotten backup password cannot be reset. Household readers are local names, and a reader can have a PIN. Backup is an encrypted file you keep.
+
+A daily reminder control is in the app. This F-Droid build leaves out the notification library, so the reminder reports that it is unavailable.
