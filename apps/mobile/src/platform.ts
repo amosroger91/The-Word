@@ -43,29 +43,68 @@ export function voicesForLanguage(all: VoiceOption[]) {
 }
 
 // The system speech engine reads one verse per utterance; the shared queue drives the rest.
+// One generation owns the settle slot. stop() resolves that verse immediately, and a
+// late onDone from the engine must not resolve the verse that started afterwards.
+const NATIVE_SPEECH_TIMEOUT_MS = 90000;
+
 export function createNativeSpeech(): SpeechAdapter {
   let rate = 1;
   let volume = 1;
+  let generation = 0;
   let settle: ((outcome: 'ended' | 'stopped') => void) | null = null;
+  let fail: ((error: Error) => void) | null = null;
+  let timer: ReturnType<typeof setTimeout> | null = null;
 
-  function finish(outcome: 'ended' | 'stopped') {
+  function clearTimer() {
+    if (timer) { clearTimeout(timer); timer = null; }
+  }
+
+  function finish(gen: number, outcome: 'ended' | 'stopped') {
+    if (gen !== generation) return;
+    clearTimer();
     const resolve = settle;
     settle = null;
+    fail = null;
     resolve?.(outcome);
+  }
+
+  function armTimer(gen: number) {
+    clearTimer();
+    timer = setTimeout(() => {
+      if (gen !== generation) return;
+      clearTimer();
+      const reject = fail;
+      settle = null;
+      fail = null;
+      generation += 1;
+      void Speech.stop();
+      reject?.(Object.assign(new Error('The device took too long to read this verse.'), { code: 'speechVoiceTimeout' }));
+    }, NATIVE_SPEECH_TIMEOUT_MS);
   }
 
   return {
     speak(text: string, options: SpeakOptions) {
+      const gen = ++generation;
+      clearTimer();
+      const previous = settle;
+      settle = null;
+      fail = null;
+      previous?.('stopped');
       return new Promise<'ended' | 'stopped'>((resolve, reject) => {
         settle = resolve;
+        fail = reject;
+        armTimer(gen);
         Speech.speak(text, {
           voice: options.voice || undefined,
           rate,
           volume,
-          onDone: () => finish('ended'),
-          onStopped: () => finish('stopped'),
+          onDone: () => finish(gen, 'ended'),
+          onStopped: () => finish(gen, 'stopped'),
           onError: (error) => {
+            if (gen !== generation) return;
+            clearTimer();
             settle = null;
+            fail = null;
             reject(error instanceof Error ? error : Object.assign(new Error('The device could not read this verse.'), { code: 'speechDeviceFailed' }));
           },
         });
@@ -74,17 +113,24 @@ export function createNativeSpeech(): SpeechAdapter {
     pause() {
       // expo-speech can only truly pause on iOS; Android restarts the verse on resume.
       if (!settle || RNPlatform.OS !== 'ios') return false;
+      clearTimer();
       void Speech.pause();
       return true;
     },
     resume() {
       if (!settle || RNPlatform.OS !== 'ios') return false;
+      armTimer(generation);
       void Speech.resume();
       return true;
     },
     stop() {
+      generation += 1;
+      clearTimer();
       void Speech.stop();
-      finish('stopped');
+      const resolve = settle;
+      settle = null;
+      fail = null;
+      resolve?.('stopped');
     },
     setRate(next: number) {
       rate = next;
@@ -93,6 +139,10 @@ export function createNativeSpeech(): SpeechAdapter {
       volume = next;
     },
     dispose() {
+      generation += 1;
+      clearTimer();
+      settle = null;
+      fail = null;
       void Speech.stop();
     },
   };

@@ -77,8 +77,17 @@ export class LocalBibleRepository {
     if (this.datasets.has(translationId)) return;
     const loader = translationLoaders[translationId];
     if (!loader) throw new Error(`Translation is not installed: ${translationId}`);
-    const pending = this.loading.get(translationId) ?? loader();
-    this.loading.set(translationId, pending);
+    let pending = this.loading.get(translationId);
+    if (!pending) {
+      // A rejected import must not stay in the map. The reader retries the
+      // same translation after a blip; awaiting the old rejection forever
+      // made that retry look like a missing chapter.
+      pending = loader().catch((error: unknown) => {
+        this.loading.delete(translationId);
+        throw error;
+      });
+      this.loading.set(translationId, pending);
+    }
     const [dataset, red, names] = await Promise.all([
       pending,
       redLetterLoaders[translationId]?.().catch(() => ({})) ?? Promise.resolve({}),

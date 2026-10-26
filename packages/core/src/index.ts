@@ -8,4 +8,5 @@ export * from './verseImage';
 export * from './verseBackgrounds';
 export * from './dailyVerse';
 export * from './day';
+export * from './clock';
 export type { CrossReference } from '@the-word/bible';

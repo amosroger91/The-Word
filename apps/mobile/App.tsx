@@ -1,9 +1,10 @@
 import './src/platform/installShims';
 import { useEffect, useMemo, useState, type ComponentType } from 'react';
-import { ActivityIndicator, Appearance, View } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
 import { useFonts } from 'expo-font';
 import { useWordApp, type KeyValueStore, type Platform, type VoiceOption } from '@the-word/core';
 import { createNativeSpeech, loadStorage, loadVoices, nativeClipboard, voicesForLanguage } from './src/platform';
+import { deviceColorScheme, deviceLocales, watchDeviceColorScheme } from './src/platform/system';
 import { Landing } from './src/Landing';
 import { Reader } from './src/Reader';
 
@@ -55,7 +56,8 @@ export default function App() {
   }, []);
 
   if (!storage || !fontsLoaded || !voicesReady || !sessionReady) {
-    return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f7f4ee' }}><ActivityIndicator color="#947849" /></View>;
+    const background = deviceColorScheme() === 'dark' ? '#191816' : '#f7f4ee';
+    return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: background }}><ActivityIndicator color="#947849" /></View>;
   }
 
   if (session) {
@@ -73,8 +75,11 @@ function OfflineWord({ storage, voices }: { storage: KeyValueStore; voices: Voic
     speech,
     clipboard: nativeClipboard,
     voices: voices.length ? voicesForLanguage(voices) : undefined,
+    locales: deviceLocales(),
+    colorScheme: deviceColorScheme,
+    watchColorScheme: watchDeviceColorScheme,
   }), [storage, speech, voices]);
-  const app = useWordApp(platform, Appearance.getColorScheme() === 'dark' ? 'dark' : 'light');
+  const app = useWordApp(platform, deviceColorScheme());
   const [view, setView] = useState<'home' | 'reader'>('home');
   if (view === 'home') {
     return <Landing app={app} onEnterReader={() => { app.markProgress(); setView('reader'); }} />;

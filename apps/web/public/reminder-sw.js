@@ -94,6 +94,19 @@ async function maybeNotify() {
   const today = dayKey(now);
   if (config.lastShown === today) return;
 
+  // An exact alarm already queued for today uses this tag. Showing again from
+  // the open-tab catch-up would ring a second time the same morning.
+  try {
+    const options = { includeTriggered: true };
+    const shown = await self.registration.getNotifications(options);
+    if (shown.some((notification) => notification.tag === `word-reminder-${today}`)) {
+      await writeConfig({ ...config, lastShown: today });
+      return;
+    }
+  } catch {
+    // getNotifications can reject; the lastShown guard above still applies.
+  }
+
   const due = targetOn(now, config.time).getTime();
   const elapsed = now.getTime() - due;
   if (elapsed < 0 || elapsed > CATCH_UP_MS) return;

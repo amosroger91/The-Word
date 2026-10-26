@@ -61,9 +61,11 @@ export function Landing({
   const copy = welcomeCopy[language];
   const urls = useMemo(() => {
     const snapshot = `${import.meta.env.BASE_URL}daily.json`;
+    // The live feed first. daily.json is only today's verse; an older bundled
+    // snapshot is skipped inside fetchDailyVerse rather than shown as today.
     return import.meta.env.DEV
       ? ['/daily-api', DAILY_VERSE_API, snapshot]
-      : [snapshot, DAILY_VERSE_API];
+      : [DAILY_VERSE_API, snapshot];
   }, []);
   const daily = useDailyVerse(urls);
   const saved = useSavedDailyVerse(daily.verse);
@@ -194,7 +196,7 @@ export function Landing({
                   <div className="verse-foot">
                     <cite>
                       {displayReference}
-                      {translationName ? <span className="verse-translation">{translationName}</span> : null}
+                      {local.text && translationName ? <span className="verse-translation">{translationName}</span> : null}
                     </cite>
                     {/* Preview only — the exported PNG carries its own footer. */}
                     {verse?.url && (
@@ -205,10 +207,10 @@ export function Landing({
               </div>
             </div>
 
-            {failed && (
+            {(failed || local.failed) && (
               <p className="verse-notice">
                 {displayText ? <span>{label.dailyVerseUnavailable}</span> : null}
-                <button type="button" onClick={daily.reload}>{label.tryAgain}</button>
+                <button type="button" onClick={() => { daily.reload(); local.reload(); }}>{label.tryAgain}</button>
               </p>
             )}
 

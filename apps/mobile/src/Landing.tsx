@@ -128,13 +128,18 @@ export function Landing({
           {daily.status === 'error' ? (
             <>
               <Text style={styles.muted}>{label.dailyVerseUnavailable}</Text>
-              <Pressable style={styles.secondary} onPress={daily.reload}>
+              <Pressable style={styles.secondary} onPress={() => { daily.reload(); local.reload(); }}>
                 <Text style={styles.secondaryText}>{label.tryAgain}</Text>
               </Pressable>
             </>
           ) : null}
           {daily.status === 'ready' && daily.verse ? (
             <>
+              {local.failed ? (
+                <Pressable style={styles.secondary} onPress={local.reload}>
+                  <Text style={styles.secondaryText}>{label.tryAgain}</Text>
+                </Pressable>
+              ) : null}
               <View style={styles.verseArt}>
                 <Image source={verseBackgroundModules[art.file]} style={StyleSheet.absoluteFillObject} resizeMode="cover" />
                 {artOverlay > 0 ? <View style={[StyleSheet.absoluteFillObject, { backgroundColor: `rgba(0,0,0,${artOverlay})` }]} /> : null}
@@ -162,11 +167,11 @@ export function Landing({
                   <Action
                     styles={styles}
                     text={label.image}
-                    disabled={!displayText}
+                    disabled={!local.text}
                     onPress={() => setImageJob({
                       reference: displayReference,
-                      text: displayText,
-                      translation: translationName || 'KJV',
+                      text: local.text || displayText,
+                      translation: local.text ? translationName : '',
                       filename: verseImageFilename(bookName || 'verse', parsed.chapter),
                       seed: daily.verse?.date || displayReference,
                     })}

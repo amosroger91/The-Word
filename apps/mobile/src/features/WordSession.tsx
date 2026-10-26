@@ -1,5 +1,5 @@
 import { Component, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Appearance, Pressable, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import * as Linking from 'expo-linking';
 import { paletteFor, useWordApp, type KeyValueStore, type Platform, type VoiceOption, type WordApp } from '@the-word/core';
 import { needsBackup } from '../../../web/src/backupState';
@@ -8,6 +8,7 @@ import { useReadParty } from '../../../web/src/useReadParty';
 import { useStudy } from '../../../web/src/useStudy';
 import { useStudyBoard } from '../../../web/src/useStudyBoard';
 import { createNativeSpeech, nativeClipboard, voicesForLanguage } from '../platform';
+import { deviceColorScheme, deviceLocales, watchDeviceColorScheme } from '../platform/system';
 import { linkTarget } from '../platform/links';
 import { ensureReminderScheduled } from '../platform/reminder';
 import { webrtcReady } from '../platform/webrtc';
@@ -54,8 +55,11 @@ function SessionBody({
     speech,
     clipboard: nativeClipboard,
     voices: voices.length ? voicesForLanguage(voices) : undefined,
+    locales: deviceLocales(),
+    colorScheme: deviceColorScheme,
+    watchColorScheme: watchDeviceColorScheme,
   }), [storage, speech, voices]);
-  const app = useWordApp(platform, Appearance.getColorScheme() === 'dark' ? 'dark' : 'light');
+  const app = useWordApp(platform, deviceColorScheme());
   const appRef = useRef(app);
   appRef.current = app;
   const ledger = useLedger();

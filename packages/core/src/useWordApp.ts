@@ -3,8 +3,9 @@ import { BIBLE_TOPICS, chapterCrossRefs, loadBookCrossRefs, localBible, type Boo
 import type { SearchResult } from '@the-word/shared';
 import { clampFontSize, clampRate, clampVolume, defaults, fontFor, speechRateRange, speechVolumeRange, storageKeys, voicesFor } from './catalogue';
 import { spotToRemember, verseToResume, type ResumeSpot } from './resumeListening';
-import { languages, resolveLanguage, strings, type Language } from './i18n';
+import { languages, preferredLanguage, resolveLanguage, strings, type Language } from './i18n';
 import type { Platform } from './platform';
+import { explicitTheme, type Theme } from './theme';
 import { useSpeech } from './useSpeech';
 
 export interface BookmarkEntry {
@@ -12,8 +13,6 @@ export interface BookmarkEntry {
   chapter: number;
   verse: number;
 }
-
-export type Theme = 'light' | 'dark';
 
 function parseBookmarkKey(key: string): BookmarkEntry | null {
   const parts = key.split(':');
@@ -60,18 +59,25 @@ function nextReadingPosition(
 }
 
 // Every piece of reader behaviour lives here so the web and native views only render.
-export function useWordApp({ storage, speech, clipboard, voices }: Platform, initialTheme: Theme = 'light') {
+export function useWordApp({ storage, speech, clipboard, voices, locales, colorScheme, watchColorScheme }: Platform, initialTheme: Theme = 'light') {
+  const initialLanguage = preferredLanguage(
+    storage.get(storageKeys.language),
+    storage.get(storageKeys.languageSet) === '1',
+    locales,
+  );
   const [translationId, setTranslationId] = useState(() => storage.get(storageKeys.translation) ?? defaults.translationId);
-  const [language, setLanguage] = useState<Language>(() => resolveLanguage(storage.get(storageKeys.language)));
-  const [theme, setTheme] = useState<Theme>(() => {
-    const stored = storage.get(storageKeys.theme);
-    return stored === 'dark' || stored === 'light' ? stored : initialTheme;
-  });
+  const [language, setLanguage] = useState<Language>(initialLanguage);
+  const [themeChoice, setThemeChoice] = useState<Theme | null>(() => explicitTheme(
+    storage.get(storageKeys.theme),
+    storage.get(storageKeys.themeSet) === '1',
+  ));
+  const [systemTheme, setSystemTheme] = useState<Theme>(() => colorScheme?.() ?? initialTheme);
+  const theme: Theme = themeChoice ?? systemTheme;
   const [bookId, setBookId] = useState(() => readNumber(storage.get(storageKeys.book), defaults.bookId));
   const [chapterNumber, setChapterNumber] = useState(() => readNumber(storage.get(storageKeys.chapter), defaults.chapter));
   const [fontSize, setFontSizeValue] = useState(() => clampFontSize(readNumber(storage.get(storageKeys.fontSize), defaults.fontSize)));
   const [fontId, setFontId] = useState(() => fontFor(storage.get(storageKeys.font) ?? defaults.fontId).id);
-  const [speechVoice, setSpeechVoice] = useState(() => storage.get(storageKeys.voice) ?? voicesFor(resolveLanguage(storage.get(storageKeys.language)))[0].id);
+  const [speechVoice, setSpeechVoice] = useState(() => storage.get(storageKeys.voice) ?? voicesFor(initialLanguage)[0].id);
   const [speechRate, setSpeechRate] = useState(() => clampRate(readNumber(storage.get(storageKeys.rate), defaults.rate)));
   const [speechVolume, setSpeechVolume] = useState(() => {
     const raw = storage.get(storageKeys.volume);
@@ -84,6 +90,8 @@ export function useWordApp({ storage, speech, clipboard, voices }: Platform, ini
   const [focusedVerse, setFocusedVerse] = useState<number | null>(null);
   const [chapter, setChapter] = useState<Awaited<ReturnType<typeof localBible.getChapter>>>(null);
   const [chapterLoading, setChapterLoading] = useState(true);
+  const [chapterError, setChapterError] = useState(false);
+  const [chapterAttempt, setChapterAttempt] = useState(0);
   const [query, setQuery] = useState('');
   const [searchMode, setSearchMode] = useState<'all' | 'exact'>('all');
   const [searchBookId, setSearchBookId] = useState('all');
@@ -140,8 +148,13 @@ export function useWordApp({ storage, speech, clipboard, voices }: Platform, ini
   const player = useSpeech(speech, speechOptions, handleSpeechComplete);
 
   useEffect(() => { storage.set(storageKeys.translation, translationId); }, [translationId]);
-  useEffect(() => { storage.set(storageKeys.language, language); }, [language]);
-  useEffect(() => { storage.set(storageKeys.theme, theme); }, [theme]);
+  useEffect(() => {
+    if (storage.get(storageKeys.languageSet) === '1') storage.set(storageKeys.language, language);
+  }, [language, storage]);
+  useEffect(() => {
+    if (!watchColorScheme) return undefined;
+    return watchColorScheme(setSystemTheme);
+  }, [watchColorScheme]);
   useEffect(() => { storage.set(storageKeys.book, String(bookId)); }, [bookId]);
   useEffect(() => { storage.set(storageKeys.chapter, String(chapterNumber)); }, [chapterNumber]);
   useEffect(() => { storage.set(storageKeys.fontSize, String(fontSize)); }, [fontSize]);
@@ -159,29 +172,36 @@ export function useWordApp({ storage, speech, clipboard, voices }: Platform, ini
   useEffect(() => {
     let active = true;
     setChapterLoading(true);
-    // A translation chunk is a dynamic import over the network (see local.ts);
-    // it can reject on a flaky connection or a stale tab after a redeploy
-    // changes chunk hashes. One retry clears the common transient case; if it
-    // still fails, stop the spinner and fall through to the existing "chapter
-    // not available" empty state rather than spinning forever.
+    setChapterError(false);
+    // A translation chunk is a dynamic import over the network (see local.ts).
+    // One retry covers a blip. A real failure stays an error with Try again,
+    // instead of the "not installed" empty state, which is only for a chapter
+    // the translation genuinely does not contain.
     void localBible.getChapter(translationId, bookId, chapterNumber)
       .catch(() => localBible.getChapter(translationId, bookId, chapterNumber))
-      .catch(() => null)
       .then((loaded) => {
         if (!active) return;
         setChapter(loaded);
+        setChapterError(false);
+        setChapterLoading(false);
+      })
+      .catch(() => {
+        if (!active) return;
+        setChapter(null);
+        setChapterError(true);
         setChapterLoading(false);
       });
     return () => { active = false; };
-  }, [translationId, bookId, chapterNumber]);
+  }, [translationId, bookId, chapterNumber, chapterAttempt]);
 
   useEffect(() => {
     let active = true;
     void loadBookCrossRefs(bookId).then((loaded) => {
       if (active) setBookCrossRefs(loaded);
     }).catch(() => {
-      // Cross-references are a supplement to the reader, not required to read
-      // the chapter; leave whatever was previously loaded rather than crash.
+      // The previous book's file is keyed only by chapter number. Keeping it
+      // would show that book's links on this one. A later visit retries.
+      if (active) setBookCrossRefs(null);
     });
     return () => { active = false; };
   }, [bookId]);
@@ -220,16 +240,53 @@ export function useWordApp({ storage, speech, clipboard, voices }: Platform, ini
   const selectedReference = selectedVerses.size ? label.verseReference(bookName, chapterNumber, selectedVerseNumbers) : '';
   const chapterReference = label.chapterReference(bookName, chapterNumber);
 
-  const changeTranslation = useCallback((nextId: string) => {
-    setTranslationId(nextId);
-    const next = localBible.getTranslations().find((item) => item.id === nextId);
-    if (next) setLanguage(resolveLanguage(next.language));
-    setSelectedVerses(new Set());
-    setFocusedVerse(null);
+  // Stop the verse that is actually playing before the passage changes, and
+  // remember it against this chapter. Auto-advance sets the book and chapter
+  // directly, so it is not interrupted here.
+  // Speech state and the open passage change on every verse. Reading them
+  // through refs keeps haltReading stable, so a deep-link effect cannot treat
+  // each of those updates as a new navigation and stop the reading.
+  const speechLiveRef = useRef({ state: player.state, verse: player.speakingVerse, stop: player.stop });
+  speechLiveRef.current = { state: player.state, verse: player.speakingVerse, stop: player.stop };
+  const passageRef = useRef({ bookId, chapterNumber });
+  passageRef.current = { bookId, chapterNumber };
+
+  const haltReading = useCallback((remember: boolean) => {
+    const place = passageRef.current;
+    const live = speechLiveRef.current;
+    const next = spotToRemember(resumeSpotRef.current, {
+      remember,
+      state: live.state,
+      verse: live.verse,
+      bookId: place.bookId,
+      chapter: place.chapterNumber,
+    });
+    resumeSpotRef.current = next;
+    setResumeAt(next);
+    autoAdvanceRef.current = false;
+    setPendingAutoSpeak(false);
+    setPendingSpeak(null);
+    live.stop();
   }, []);
 
-  const changeLanguage = useCallback((nextLanguage: Language) => {
+  const chooseLanguage = useCallback((nextLanguage: Language) => {
+    storage.set(storageKeys.languageSet, '1');
+    storage.set(storageKeys.language, nextLanguage);
     setLanguage(nextLanguage);
+  }, [storage]);
+
+  const changeTranslation = useCallback((nextId: string) => {
+    haltReading(true);
+    setTranslationId(nextId);
+    const next = localBible.getTranslations().find((item) => item.id === nextId);
+    if (next) chooseLanguage(resolveLanguage(next.language));
+    setSelectedVerses(new Set());
+    setFocusedVerse(null);
+  }, [chooseLanguage, haltReading]);
+
+  const changeLanguage = useCallback((nextLanguage: Language) => {
+    haltReading(true);
+    chooseLanguage(nextLanguage);
     setTranslationId((current) => {
       const list = localBible.getTranslations();
       if (list.find((item) => item.id === current)?.language === nextLanguage) return current;
@@ -238,20 +295,22 @@ export function useWordApp({ storage, speech, clipboard, voices }: Platform, ini
       setSelectedVerses(new Set());
       return replacement.id;
     });
-  }, []);
+  }, [chooseLanguage, haltReading]);
 
   const changeBook = useCallback((nextBookId: number) => {
+    haltReading(true);
     setBookId(nextBookId);
     setChapterNumber(1);
     setSelectedVerses(new Set());
     setFocusedVerse(null);
-  }, []);
+  }, [haltReading]);
 
   const changeChapter = useCallback((next: number) => {
+    haltReading(true);
     setChapterNumber(next);
     setSelectedVerses(new Set());
     setFocusedVerse(null);
-  }, []);
+  }, [haltReading]);
 
   const moveChapter = useCallback((direction: -1 | 1) => {
     const next = chapterNumber + direction;
@@ -296,18 +355,22 @@ export function useWordApp({ storage, speech, clipboard, voices }: Platform, ini
   }), [bookmarks]);
 
   const goTo = useCallback((nextBookId: number, nextChapter: number) => {
+    // Followers sync through here. Stop the old passage, but do not move the
+    // resume spot — only an explicit Stop or the reader's own navigation does.
+    haltReading(false);
     setBookId(nextBookId);
     setChapterNumber(nextChapter);
     setSelectedVerses(new Set());
     setFocusedVerse(null);
-  }, []);
+  }, [haltReading]);
 
   const goToVerse = useCallback((nextBookId: number, nextChapter: number, verse: number) => {
+    haltReading(true);
     setBookId(nextBookId);
     setChapterNumber(nextChapter);
     setSelectedVerses(new Set());
     setFocusedVerse(verse);
-  }, []);
+  }, [haltReading]);
 
   const chapterIs = useCallback((targetBook: number, targetChapter: number) => (
     Boolean(chapter && !chapterLoading && chapter.verses[0]?.ref.bookId === targetBook && chapter.verses[0]?.ref.chapter === targetChapter)
@@ -415,7 +478,13 @@ export function useWordApp({ storage, speech, clipboard, voices }: Platform, ini
   useEffect(() => {
     if (!pendingAutoSpeak || chapterLoading) return;
     const first = chapter?.verses[0]?.ref;
-    if (!first || first.bookId !== bookId || first.chapter !== chapterNumber) return;
+    // A failed or missing chapter must not leave the flag set. The next chapter
+    // that eventually matches this position would start reading on its own.
+    if (!first || first.bookId !== bookId || first.chapter !== chapterNumber) {
+      setPendingAutoSpeak(false);
+      autoAdvanceRef.current = false;
+      return;
+    }
     setPendingAutoSpeak(false);
     speakChapter();
   }, [pendingAutoSpeak, chapterLoading, chapter, bookId, chapterNumber, speakChapter]);
@@ -444,7 +513,11 @@ export function useWordApp({ storage, speech, clipboard, voices }: Platform, ini
   }, [pendingSpeak, chapterLoading, chapter, bookId, chapterNumber, player, chapterReference, label, bookName]);
 
   const listen = useCallback(() => {
-    const verses = chapter?.verses.map((verse) => verse.ref.verse) ?? [];
+    // While the previous chapter is still on screen, its verse list must not
+    // be used to decide that a saved spot is missing. That deleted the spot
+    // and the later load started at verse 1.
+    if (!chapterIs(bookId, chapterNumber) || !chapter) return;
+    const verses = chapter.verses.map((verse) => verse.ref.verse);
     const verse = verseToResume(resumeSpotRef.current, bookId, chapterNumber, verses);
     if (verse) {
       speakFromVerse(bookId, chapterNumber, verse);
@@ -455,7 +528,7 @@ export function useWordApp({ storage, speech, clipboard, voices }: Platform, ini
       setResumeAt(null);
     }
     speakChapter();
-  }, [bookId, chapterNumber, chapter, speakFromVerse, speakChapter]);
+  }, [bookId, chapterNumber, chapter, chapterIs, speakFromVerse, speakChapter]);
 
   const listenFromBeginning = useCallback(() => {
     resumeSpotRef.current = null;
@@ -465,20 +538,8 @@ export function useWordApp({ storage, speech, clipboard, voices }: Platform, ini
   // Stopping read-aloud also leaves continuous mode, but keeps the verse so
   // Listen can continue from it.
   const stopSpeech = useCallback((options?: { remember?: boolean }) => {
-    const next = spotToRemember(resumeSpotRef.current, {
-      remember: options?.remember === true,
-      state: player.state,
-      verse: player.speakingVerse,
-      bookId,
-      chapter: chapterNumber,
-    });
-    resumeSpotRef.current = next;
-    setResumeAt(next);
-    autoAdvanceRef.current = false;
-    setPendingAutoSpeak(false);
-    setPendingSpeak(null);
-    player.stop();
-  }, [player, bookId, chapterNumber]);
+    haltReading(options?.remember === true);
+  }, [haltReading]);
 
   const changeSpeechRate = useCallback((delta: number) => {
     setSpeechRate((rate) => clampRate(rate + delta));
@@ -523,8 +584,17 @@ export function useWordApp({ storage, speech, clipboard, voices }: Platform, ini
     language,
     languageOptions,
     theme,
-    setTheme,
-    toggleTheme: useCallback(() => setTheme((current) => (current === 'dark' ? 'light' : 'dark')), []),
+    setTheme: useCallback((next: Theme) => {
+      storage.set(storageKeys.themeSet, '1');
+      storage.set(storageKeys.theme, next);
+      setThemeChoice(next);
+    }, [storage]),
+    toggleTheme: useCallback(() => {
+      const next: Theme = theme === 'dark' ? 'light' : 'dark';
+      storage.set(storageKeys.themeSet, '1');
+      storage.set(storageKeys.theme, next);
+      setThemeChoice(next);
+    }, [storage, theme]),
     translations,
     translationId,
     translationOptions,
@@ -542,6 +612,9 @@ export function useWordApp({ storage, speech, clipboard, voices }: Platform, ini
     moveChapter,
     chapter,
     chapterLoading,
+    chapterError,
+    chapterReady: Boolean(chapter && !chapterLoading && !chapterError && chapter.verses[0]?.ref.bookId === bookId && chapter.verses[0]?.ref.chapter === chapterNumber),
+    reloadChapter: useCallback(() => setChapterAttempt((attempt) => attempt + 1), []),
     chapterReference,
     fontId,
     setFontId,

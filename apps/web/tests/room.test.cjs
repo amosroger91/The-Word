@@ -265,6 +265,28 @@ test('a failed guest channel is removed so the host stops broadcasting to it', a
   } finally { guest.leave(); host.leave(); }
 });
 
+test('a welcome with no question does not close an open one or drop unshared replies', async () => {
+  const {join, Peer} = harness();
+  const anna = asker('Anna'), ben = asker('Ben');
+  const host = join(anna.spec); await tick();
+  const guest = join(ben.spec); await tick();
+  try {
+    host.askQuestion('Hold this'); await tick();
+    const asked = anna.seen.questions.at(-1);
+    guest.sendAnswer(asked.id, 'Still here'); await tick();
+    host.transferHost('Ben'); await tick();
+    assert.deepEqual(ben.seen.answers.at(-1), ['Ben:Still here']);
+    const client = [...Peer.registry.values()].find((peer) => String(peer.id).startsWith('client'));
+    client.connections[0].emit('data', {
+      t: 'welcome',
+      d: { roster: [], chat: [], reading: null, question: null, replies: [], answers: null },
+    });
+    await tick();
+    assert.equal(ben.seen.questions.at(-1).id, asked.id);
+    assert.deepEqual(ben.seen.answers.at(-1), ['Ben:Still here']);
+  } finally { guest.leave(); host.leave(); }
+});
+
 test('closing the question clears it everywhere', async () => {
   const {join} = harness();
   const anna = asker('Anna'), ben = asker('Ben');

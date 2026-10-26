@@ -53,6 +53,12 @@ export interface Platform {
   clipboard: ClipboardAdapter;
   // Native lists the system voices; the web falls back to the bundled Piper catalogue.
   voices?: (language: Language) => VoiceOption[];
+  // BCP-47 tags in the system preference order. Absent means English.
+  locales?: readonly string[];
+  // Current system appearance. Absent means the initialTheme argument.
+  colorScheme?: () => 'light' | 'dark';
+  // Fires when the system appearance changes. Return an unsubscribe function.
+  watchColorScheme?: (listener: (theme: 'light' | 'dark') => void) => () => void;
 }
 
 export function createMemoryStore(initial: Record<string, string> = {}, onWrite?: (key: string, value: string) => void): KeyValueStore {

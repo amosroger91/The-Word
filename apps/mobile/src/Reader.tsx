@@ -59,6 +59,22 @@ export function Reader({ app, onHome }: { app: WordApp; onHome?: () => void }) {
     if (offset !== undefined) scrollRef.current?.scrollTo({ y: Math.max(0, offset - 120), animated: true });
   }
 
+  const hostVerse = features?.party.hostVerse ?? null;
+  useEffect(() => {
+    if (speakingVerse != null || hostVerse == null) return;
+    const verse = hostVerse;
+    const tryScroll = () => {
+      const offset = versePositions.current[verse];
+      if (offset === undefined) return false;
+      scrollRef.current?.scrollTo({ y: Math.max(0, offset - 120), animated: true });
+      return true;
+    };
+    if (tryScroll()) return;
+    const poll = setInterval(() => { if (tryScroll()) clearInterval(poll); }, 50);
+    const stop = setTimeout(() => clearInterval(poll), 1200);
+    return () => { clearInterval(poll); clearTimeout(stop); };
+  }, [speakingVerse, hostVerse, chapterLoading, app.bookId, chapterNumber]);
+
   useEffect(() => {
     if (chapterLoading || app.focusedVerse == null) return;
     const verse = app.focusedVerse;
@@ -87,10 +103,10 @@ export function Reader({ app, onHome }: { app: WordApp; onHome?: () => void }) {
 
   const speechButtons = (
     <>
-      {speechState === 'idle' && <Chip styles={styles} disabled={!chapter} onPress={app.listen} text={label.readAloud} />}
+      {speechState === 'idle' && <Chip styles={styles} disabled={!app.chapterReady} onPress={app.listen} text={label.readAloud} />}
       {speechState === 'speaking' && <Chip styles={styles} onPress={app.pauseSpeech} text={label.pause} />}
       {speechState === 'paused' && <Chip styles={styles} onPress={app.resumeSpeech} text={label.resume} />}
-      {(speechState === 'paused' || (speechState === 'idle' && app.resumeAt?.bookId === app.bookId && app.resumeAt.chapter === chapterNumber)) && <Chip styles={styles} disabled={!chapter} onPress={app.listenFromBeginning} text={label.listenFromBeginning} />}
+      {(speechState === 'paused' || (speechState === 'idle' && app.resumeAt?.bookId === app.bookId && app.resumeAt.chapter === chapterNumber)) && <Chip styles={styles} disabled={!app.chapterReady} onPress={app.listenFromBeginning} text={label.listenFromBeginning} />}
       {speechState !== 'idle' && <Chip styles={styles} onPress={() => app.stopSpeech({ remember: true })} text={label.stop} />}
     </>
   );
@@ -198,7 +214,13 @@ export function Reader({ app, onHome }: { app: WordApp; onHome?: () => void }) {
               </Text>
             </Pressable>
           );
-        }) : (
+        }) : app.chapterError ? (
+          <View>
+            <Text style={styles.emptyTitle}>{label.chapterLoadFailedTitle}</Text>
+            <Text style={styles.empty}>{label.chapterLoadFailedBody}</Text>
+            <Pressable onPress={app.reloadChapter}><Text style={styles.navText}>{label.tryAgain}</Text></Pressable>
+          </View>
+        ) : (
           <View>
             <Text style={styles.emptyTitle}>{label.chapterMissingTitle}</Text>
             <Text style={styles.empty}>{label.chapterMissingBody}</Text>

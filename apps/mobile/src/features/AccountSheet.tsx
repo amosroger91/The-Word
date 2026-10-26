@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Share, Text, TextInput, View } from 'react-native';
+import { Platform, Share, Text, TextInput, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { paletteFor, type WordApp } from '@the-word/core';
 import { exportBackup, MIN_BACKUP_PASSWORD, restoreBackup } from '../../../web/src/nostrAccount';
@@ -36,9 +36,20 @@ export function AccountSheet({ app, onClose }: { app: WordApp; onClose: () => vo
   }
 
   async function shareText(filename: string, body: string) {
-    await Share.share({ title: filename, message: body });
-    markBackedUp();
-    setNotice(label.backupDone);
+    try {
+      const result = await Share.share({ title: filename, message: body });
+      // iOS reports a dismiss. Android resolves with sharedAction either way,
+      // so a closed sheet must not record the key as saved.
+      if (Platform.OS === 'ios' && result.action === Share.sharedAction) {
+        markBackedUp();
+        setNotice(label.backupDone);
+        return;
+      }
+      if (result.action === Share.dismissedAction) return;
+      setNotice(label.backupUnconfirmed);
+    } catch {
+      setNotice(label.backupUnconfirmed);
+    }
   }
 
   return (
@@ -140,8 +151,11 @@ export function AccountSheet({ app, onClose }: { app: WordApp; onClose: () => vo
       />
       <TextInput style={styles.input} value={time} onChangeText={setTime} placeholder={label.reminderTime} placeholderTextColor={palette.muted} />
       <Button styles={styles} text={label.reminderTime} onPress={() => {
-        if (!/^\d{2}:\d{2}$/.test(time)) return;
-        void applyReminder({ enabled: true, time }, label.reminderTitle, label.reminderBody);
+        void applyReminder({ enabled: true, time }, label.reminderTitle, label.reminderBody).then((result) => {
+          if (result === 'blocked') setNotice(label.reminderBlocked);
+          else if (result === 'unsupported') setNotice(label.reminderUnsupported);
+          else setNotice(label.reminderNext(time));
+        });
       }} />
       <Button styles={styles} text={label.reminderTest} onPress={() => {
         void sendTestReminder(label.reminderTitle, label.reminderBody).then((result) => {

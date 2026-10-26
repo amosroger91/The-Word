@@ -49,6 +49,19 @@ export function BreakdownSheet({ app, onClose, onOpenVerse }: { app: WordApp; on
   }, [verse, app.bookId, app.chapterNumber, app.translationId, app.translations, compare]);
 
   useEffect(() => {
+    if (model.phase !== 'checking' && model.phase !== 'downloading' && model.phase !== 'idle') return undefined;
+    if (model.phase === 'idle' && !enabled) return undefined;
+    const timer = setTimeout(() => {
+      setModel((current) => (
+        current.phase === 'checking' || current.phase === 'downloading' || current.phase === 'idle'
+          ? { phase: 'unavailable', progress: 0, loaded: 0, total: 0, error: 'timeout' }
+          : current
+      ));
+    }, 180000);
+    return () => clearTimeout(timer);
+  }, [model.phase, enabled]);
+
+  useEffect(() => {
     setQuestions([]);
     setRejected([]);
     if (!data || model.phase !== 'ready') return;
@@ -75,8 +88,22 @@ export function BreakdownSheet({ app, onClose, onOpenVerse }: { app: WordApp; on
   function ask(prompt: string): Promise<string> {
     const id = nextId.current++;
     return new Promise((resolve, reject) => {
-      waiters.current.set(id, { resolve, reject });
-      webRef.current?.injectJavaScript(`window.__wordModel(${JSON.stringify(JSON.stringify({ type: 'generate', id, prompt, maxTokens: 48 }))}); true;`);
+      const timer = setTimeout(() => {
+        if (!waiters.current.has(id)) return;
+        waiters.current.delete(id);
+        reject(new Error('timeout'));
+      }, 30000);
+      waiters.current.set(id, {
+        resolve: (text) => { clearTimeout(timer); resolve(text); },
+        reject: (error) => { clearTimeout(timer); reject(error); },
+      });
+      if (!webRef.current) {
+        clearTimeout(timer);
+        waiters.current.delete(id);
+        reject(new Error('not-ready'));
+        return;
+      }
+      webRef.current.injectJavaScript(`window.__wordModel(${JSON.stringify(JSON.stringify({ type: 'generate', id, prompt, maxTokens: 48 }))}); true;`);
     });
   }
 

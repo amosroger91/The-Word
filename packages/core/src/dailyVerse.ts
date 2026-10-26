@@ -45,6 +45,28 @@ function asDailyVerse(data: unknown): DailyVerse {
 
 const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
 
+export function localDayKey(now: Date): string {
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+}
+
+// Feed dates are English ordinals ("23rd Oct 2026"). Some responses also use ISO.
+export function verseDayKey(raw: string): string | null {
+  const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(raw.trim());
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+  const match = /^(\d{1,2})[a-z]*\s+([a-z]+)\.?\s+(\d{4})$/i.exec(raw.trim());
+  if (!match) return null;
+  const month = MONTHS.indexOf(match[2].slice(0, 3).toLowerCase());
+  if (month < 0) return null;
+  const day = Number(match[1]);
+  if (day < 1 || day > 31) return null;
+  return `${match[3]}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+export function verseIsCurrent(date: string, now = new Date()): boolean {
+  const key = verseDayKey(date);
+  return key !== null && key === localDayKey(now);
+}
+
 // The feed dates in English ("4th Sep 2026"). Reformat it in the reader's own
 // language so a translated sentence does not carry an English ordinal.
 export function formatVerseDate(raw: string, language: string) {
@@ -61,29 +83,37 @@ export function formatVerseDate(raw: string, language: string) {
   }
 }
 
-let cache: { key: string; verse: DailyVerse } | null = null;
+let cache: { key: string; day: string; verse: DailyVerse } | null = null;
 
 function cacheKey(urls: string[]) {
   return urls.join('\n');
 }
 
-function peekDailyVerse(urls: string[]) {
+function peekDailyVerse(urls: string[], now = new Date()) {
   const key = cacheKey(urls);
-  return cache?.key === key ? cache.verse : null;
+  const day = localDayKey(now);
+  return cache?.key === key && cache.day === day ? cache.verse : null;
 }
 
-// Tries each URL until one returns a verse. Web needs a same-origin URL (Vite
-// proxy or daily.json) because discoverybiblestudy.org sends neither CORS nor CORP.
-export async function fetchDailyVerse(urls: string[], bypassCache = false): Promise<DailyVerse> {
+// Tries each URL until one returns today's verse. A bundled daily.json from
+// another day is a miss, not a success: the card must not show it as today.
+// Web needs a same-origin URL (Vite proxy or a current daily.json) because
+// discoverybiblestudy.org sends neither CORS nor CORP.
+export async function fetchDailyVerse(urls: string[], bypassCache = false, now = new Date()): Promise<DailyVerse> {
   const key = cacheKey(urls);
-  if (!bypassCache && cache?.key === key) return cache.verse;
+  const day = localDayKey(now);
+  if (!bypassCache && cache?.key === key && cache.day === day) return cache.verse;
   let lastError: unknown;
   for (const url of urls) {
     try {
       const response = await fetch(url, { headers: { Accept: 'application/json' } });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const verse = asDailyVerse(await response.json());
-      cache = { key, verse };
+      if (!verseIsCurrent(verse.date, now)) {
+        lastError = new Error('stale daily verse');
+        continue;
+      }
+      cache = { key, day, verse };
       return verse;
     } catch (error) {
       lastError = error;
@@ -117,6 +147,13 @@ export function useDailyVerse(urls: string[]) {
     return () => { active = false; };
   }, [list, retry]);
 
+  useEffect(() => {
+    const now = new Date();
+    const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    const timer = setTimeout(() => setRetry((count) => count + 1), Math.max(1000, next.getTime() - now.getTime()));
+    return () => clearTimeout(timer);
+  }, [retry]);
+
   return {
     status,
     verse,
@@ -129,22 +166,31 @@ export function useDailyVerse(urls: string[]) {
 export function useLocalVerse(translationId: string, ref: ParsedReference | null) {
   const [text, setText] = useState<string | null>(null);
   const [ready, setReady] = useState(!ref);
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     if (!ref) {
       setText(null);
       setReady(true);
+      setFailed(false);
       return;
     }
     let active = true;
     setReady(false);
+    setFailed(false);
     void localBible.getChapter(translationId, ref.bookId, ref.chapter).then((chapter) => {
       if (!active) return;
       setText(chapter?.verses.find((verse) => verse.ref.verse === ref.verse)?.text ?? null);
       setReady(true);
+    }).catch(() => {
+      if (!active) return;
+      setText(null);
+      setReady(true);
+      setFailed(true);
     });
     return () => { active = false; };
-  }, [translationId, ref?.bookId, ref?.chapter, ref?.verse]);
+  }, [translationId, ref?.bookId, ref?.chapter, ref?.verse, attempt]);
 
-  return { text, ready };
+  return { text, ready, failed, reload: () => setAttempt((count) => count + 1) };
 }

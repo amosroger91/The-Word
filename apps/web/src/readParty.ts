@@ -246,9 +246,9 @@ export function joinParty({ code, identity, handlers = {}, create = true }: {
   function deliverAnswerList() {
     const list = [...answers.values()];
     h.onAnswerList?.(presenterId === me.id ? list : []);
-    const host = members.find(m => m.id === presenterId);
-    const connection = host ? clientConns.get(host.peerId) : null;
-    if (connection?.open) connection.send({ t: 'answer-list', d: list });
+    // Every client stores the replies so a new hub can restore them. Only the
+    // presenter is told to show the private list.
+    broadcast({ t: 'reply-sync', d: list });
   }
 
   function recordAnswer(answer: PartyAnswer) {
@@ -338,7 +338,7 @@ export function joinParty({ code, identity, handlers = {}, create = true }: {
       upsert({ id, name: m.name || 'Reader', color: m.color || '#888', avatar: m.avatar || null, peerId: fromPeerId, av: Boolean(m.av), mic: Boolean(m.mic), cam: Boolean(m.cam), screen: Boolean(m.screen) });
       const conn = clientConns.get(fromPeerId);
       if (conn) {
-        try { conn.send({ t: 'welcome', d: { roster: members.slice(), chat: chatLog.slice(-CHAT_HISTORY), reading: readingState, question, answers: sharedAnswers } }); } catch { /* dropped */ }
+        try { conn.send({ t: 'welcome', d: { roster: members.slice(), chat: chatLog.slice(-CHAT_HISTORY), reading: readingState, question, replies: [...answers.values()], answers: sharedAnswers } }); } catch { /* dropped */ }
       }
       if (!previous) {
         const sm = systemMessage(`${m.name || 'Someone'} joined the party`, 'joined', m.name || 'Someone');
@@ -381,17 +381,38 @@ export function joinParty({ code, identity, handlers = {}, create = true }: {
       connectionReady();
       joined = true;
       const d = (env.d || {}) as { roster?: PartyMember[]; chat?: PartyChatMessage[]; reading?: ReadingState | null;
-        question?: PartyQuestion | null; answers?: SharedAnswers | null };
+        question?: PartyQuestion | null; questionClosed?: boolean; replies?: PartyAnswer[]; answers?: SharedAnswers | null };
       members = (d.roster || []).slice();
       readingState = d.reading || null;
       chatLog.length = 0;
       (d.chat || []).slice(-CHAT_HISTORY).forEach(recordChat);
       if (readingState) h.onReading?.(readingState);
-      // Someone joining mid-question still gets the prompt and any shared board.
-      question = d.question || null;
-      sharedAnswers = d.answers || null;
-      h.onQuestion?.(question);
-      h.onSharedAnswers?.(sharedAnswers);
+      // A welcome with no question is not a close. The client that wins the hub
+      // id may have missed `ask`; applying its null used to wipe the prompt and
+      // the replies that were never on the shared board.
+      const incoming = d.question;
+      if (incoming && typeof incoming === 'object' && incoming.id) {
+        question = incoming;
+        h.onQuestion?.(question);
+      } else if (d.questionClosed === true) {
+        question = null;
+        answers.clear();
+        h.onQuestion?.(null);
+      }
+      if (Array.isArray(d.replies) && (d.replies.length > 0 || d.questionClosed === true)) {
+        answers.clear();
+        for (const item of d.replies) {
+          if (item && item.memberId && item.questionId) answers.set(item.memberId, item);
+        }
+      }
+      if (d.answers) {
+        sharedAnswers = d.answers;
+        h.onSharedAnswers?.(sharedAnswers);
+      } else if (d.questionClosed === true) {
+        sharedAnswers = null;
+        h.onSharedAnswers?.(null);
+      }
+      if (presenterId === me.id) h.onAnswerList?.([...answers.values()]);
       emitRoster();
     } else if (env.t === 'roster') {
       members = ((env.d || []) as PartyMember[]).slice();
@@ -400,10 +421,17 @@ export function joinParty({ code, identity, handlers = {}, create = true }: {
       if (presenterId !== me.id) h.onAnswerList?.([]);
     } else if (env.t === 'chat') {
       recordChat(env.d as PartyChatMessage);
-    } else if (env.t === 'answer-list') {
-      if (presenterId === me.id && Array.isArray(env.d)) h.onAnswerList?.(env.d as PartyAnswer[]);
+    } else if (env.t === 'answer-list' || env.t === 'reply-sync') {
+      if (Array.isArray(env.d)) {
+        answers.clear();
+        for (const item of env.d as PartyAnswer[]) {
+          if (item?.memberId && item.questionId) answers.set(item.memberId, item);
+        }
+        if (presenterId === me.id) h.onAnswerList?.([...answers.values()]);
+      }
     } else if (env.t === 'ask') {
       question = (env.d || null) as PartyQuestion | null;
+      if (!question) answers.clear();
       h.onQuestion?.(question);
     } else if (env.t === 'answers') {
       sharedAnswers = (env.d || null) as SharedAnswers | null;
@@ -483,6 +511,26 @@ export function joinParty({ code, identity, handlers = {}, create = true }: {
         endRemote(pid);
       }
     }
+  }
+  function replaceOutgoingTracks(): boolean {
+    if (!mediaConns.size) return false;
+    const stream = getLocalStream();
+    const audio = stream?.getAudioTracks?.().find((track) => track.readyState === 'live') ?? null;
+    const video = stream?.getVideoTracks?.().find((track) => track.readyState === 'live') ?? null;
+    for (const call of mediaConns.values()) {
+      const senders = call.peerConnection?.getSenders?.();
+      if (!senders) return false;
+      const audioSender = senders.find((sender) => sender.track?.kind === 'audio');
+      const videoSender = senders.find((sender) => sender.track?.kind === 'video');
+      if ((audio && !audioSender) || (video && !videoSender)) return false;
+      try {
+        if (audioSender) void audioSender.replaceTrack(audio);
+        if (videoSender) void videoSender.replaceTrack(video);
+      } catch {
+        return false;
+      }
+    }
+    return true;
   }
   function closeAllMedia() {
     const calls = [...mediaConns];
@@ -612,6 +660,12 @@ export function joinParty({ code, identity, handlers = {}, create = true }: {
     status('hosting');
     h.onSelf?.({ host: true });
     if (readingState) h.onReading?.(readingState);
+    if (question) {
+      h.onQuestion?.(question);
+      broadcast({ t: 'ask', d: question });
+    }
+    if (answers.size) broadcast({ t: 'reply-sync', d: [...answers.values()] });
+    h.onAnswerList?.([...answers.values()]);
     emitRoster();
     // A re-elected hub keeps everyone in sync by re-announcing the reading state.
     if (readingState) broadcast({ t: 'reading', d: readingState });
@@ -809,11 +863,23 @@ export function joinParty({ code, identity, handlers = {}, create = true }: {
       else toHub({ t: 'meta', d: { name: me.name, color: me.color, avatar: me.avatar || null, av: hasMedia(), mic: getState().audio, cam: getState().video, screen: getState().screen } });
     },
     refreshMedia() {
-      closeAllMedia();
+      const kept = hasMedia() && replaceOutgoingTracks();
       const i = members.findIndex((x) => x.id === me.id);
       if (i >= 0) { members[i].av = hasMedia(); members[i].mic = getState().audio; members[i].cam = getState().video; members[i].screen = getState().screen; }
       if (isHub) { emitRoster(); broadcast({ t: 'roster', d: members.slice() }); }
-      else { toHub({ t: 'meta', d: { av: hasMedia(), mic: getState().audio, cam: getState().video, screen: getState().screen } }); scheduleReconcile(); }
+      else toHub({ t: 'meta', d: { av: hasMedia(), mic: getState().audio, cam: getState().video, screen: getState().screen } });
+      // A live call can take the new mic or screen track in place. Closing it
+      // in a room past eight people drops the audio, and the mesh will not dial
+      // again while the room stays over the cap.
+      if (kept) return;
+      if (!hasMedia()) { closeAllMedia(); return; }
+      if (capped()) {
+        closeAllMedia();
+        h.onError?.('mesh-capped');
+        return;
+      }
+      closeAllMedia();
+      if (!isHub) scheduleReconcile();
     },
     leave: leaveRoom,
   };

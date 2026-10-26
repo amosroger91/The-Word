@@ -90,7 +90,7 @@ test('iOS restarts the retained verse after a speech failure instead of resuming
   let callbacks;const exports={};
   const speech={speak(text,options){callbacks=options;},pause(){},resume(){},stop(){}};
   const modules={'react-native':{Platform:{OS:'ios'}},'expo-speech':speech,'expo-clipboard':{},'@react-native-async-storage/async-storage':{},'@the-word/core':{}};
-  vm.runInNewContext(ts.transpileModule(fs.readFileSync(require('node:path').join(__dirname,'../../mobile/src/platform.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText,{exports,require:id=>modules[id],Error});
+  vm.runInNewContext(ts.transpileModule(fs.readFileSync(require('node:path').join(__dirname,'../../mobile/src/platform.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText,{exports,require:id=>modules[id],Error,setTimeout,clearTimeout});
   const adapter=exports.createNativeSpeech();
   const failed=adapter.speak('Verse',{voice:'voice',rate:1,volume:1});const rejection=assert.rejects(failed,/failed/);
   callbacks.onError(new Error('failed'));await rejection;assert.equal(adapter.resume(),false);

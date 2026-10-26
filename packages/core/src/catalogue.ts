@@ -3,7 +3,9 @@ import type { Language } from './i18n';
 export const storageKeys = {
   translation: 'word.translation',
   language: 'word.language',
+  languageSet: 'word.languageSet',
   theme: 'word.theme',
+  themeSet: 'word.themeSet',
   fontSize: 'word.fontSize',
   font: 'word.font',
   bookmarks: 'word.bookmarks',

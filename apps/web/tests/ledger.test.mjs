@@ -44,7 +44,7 @@ const badgesUrl = transpile(path.join(here, '../src/badges.ts'), 'badges.mjs', (
   .replaceAll("'./ledger'", "'./ledger.mjs'")
   .replaceAll('"./ledger"', "'./ledger.mjs'"));
 
-const { appendEvent, mergeLedgers, uniqueChapters, alreadyReadToday, latestAnswers, eventId, shareCount, distinctShareCount, imageShareStats, groupActionCount, groupActionsDone, versesRead, chapterCompleted } = await import(ledgerUrl);
+const { appendEvent, mergeLedgers, parseStoredLedger, uniqueChapters, alreadyReadToday, latestAnswers, eventId, shareCount, distinctShareCount, imageShareStats, groupActionCount, groupActionsDone, versesRead, chapterCompleted } = await import(ledgerUrl);
 const { evaluate, BADGES, progressToward, hashLedger, bibleProgress } = await import(badgesUrl);
 const { parseVerseHash, encodeVerseRef, readerViewFromHash } = await import(verseLinkUrl);
 const { BOOKS_DATA } = await import(pathToFileURL(path.join(compiledDir, 'schema.mjs')).href);
@@ -55,6 +55,27 @@ const ACTOR = 'gunpub';
 function read(at, bookId, chapter, counter) {
   return { id: eventId(ACTOR, counter), kind: 'read', at, bookId, chapter };
 }
+
+test('a payload that is not a list is corrupt, not an empty ledger', () => {
+  assert.deepEqual(parseStoredLedger(null), { events: [], corrupt: null });
+  assert.deepEqual(parseStoredLedger(''), { events: [], corrupt: null });
+  const objectPayload = '{"not":"a list"}';
+  assert.deepEqual(parseStoredLedger(objectPayload), { events: [], corrupt: objectPayload });
+  assert.deepEqual(parseStoredLedger('not json'), { events: [], corrupt: 'not json' });
+  const parsed = parseStoredLedger('[{"id":"a:1","kind":"read"}]');
+  assert.equal(parsed.corrupt, null);
+  assert.equal(parsed.events.length, 1);
+  assert.equal(parsed.events[0].id, 'a:1');
+});
+
+test('merging keeps an event the other snapshot never had', () => {
+  const older = [{ id: 'a:1', kind: 'read', at: '2026-10-25T00:00:00.000Z', bookId: 43, chapter: 1 }];
+  const newer = [{ id: 'a:2', kind: 'note', at: '2026-10-26T00:00:00.000Z', bookId: 43, chapter: 1, verse: 1, text: 'keep' }];
+  const merged = mergeLedgers(older, newer);
+  assert.equal(merged.length, 2);
+  assert.equal(merged.find((event) => event.id === 'a:2').text, 'keep');
+  assert.equal(mergeLedgers(newer, older).length, 2);
+});
 
 test('merge is a set union by id and counters stay monotonic', () => {
   let events = [];

@@ -122,7 +122,18 @@ export function useReadParty(app: WordApp) {
         // Capture every message before React batches renders, including short
         // verses that arrive together while a slower device is still speaking.
         onReading: (state) => { followQueue.current.receive(state); setRemoteReading(state); setShared(state); },
-        onError: (c) => setError(c),
+        onError: (c) => {
+          setError(c);
+          if (c === 'mesh-capped') {
+            stopLocal();
+            setLocalStream(null);
+            setMicOn(false);
+            setCamOn(false);
+            setScreenOn(false);
+            setSystemAudioOn(false);
+            setMediaError('mesh-capped');
+          }
+        },
         onRemoteStream: (id, stream) => setRemoteStreams((prev) => ({ ...prev, [id]: stream })),
         onRemoteEnd: (id) => setRemoteStreams((prev) => {
           const next = { ...prev };

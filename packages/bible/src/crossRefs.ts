@@ -24,12 +24,19 @@ function unpack(packed: PackedCrossRef): CrossReference {
 export async function loadBookCrossRefs(bookId: number): Promise<BookCrossRefFile> {
   const cached = cache.get(bookId);
   if (cached) return cached;
-  const pending = loading.get(bookId) ?? (crossRefLoaders[bookId]?.().then((module) => {
+  const existing = loading.get(bookId);
+  if (existing) return existing;
+  const loader = crossRefLoaders[bookId];
+  if (!loader) return {};
+  const pending = loader().then((module) => {
     cache.set(bookId, module.default);
-    loading.delete(bookId);
     return module.default;
-  }) ?? Promise.resolve({}));
+  }).catch((error: unknown) => {
+    loading.delete(bookId);
+    throw error;
+  });
   loading.set(bookId, pending);
+  pending.then(() => { loading.delete(bookId); }, () => { /* rejection already cleared the slot */ });
   return pending;
 }
 

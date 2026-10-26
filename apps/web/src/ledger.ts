@@ -54,6 +54,7 @@ export type DraftEvent = LedgerEvent extends infer Event ? Event extends LedgerE
 const DB_NAME = 'word-ledger';
 const STORE = 'events';
 const MEMORY_KEY = 'word.ledger';
+const CORRUPT_PREFIX = 'word.ledger.corrupt.';
 
 export function eventId(gunPub: string, counter: number): EventId {
   return `${gunPub}:${counter}`;
@@ -295,13 +296,31 @@ export function eventsForActor(events: LedgerEvent[], gunPub: string): LedgerEve
   return events.filter((event) => parseEventId(event.id)?.gunPub === gunPub);
 }
 
-function memoryLoad(): LedgerEvent[] {
+/** A payload that is not a list is preserved by the caller instead of being
+ *  treated as an empty ledger. An empty ledger is what used to clear IndexedDB. */
+export function parseStoredLedger(raw: string | null): { events: LedgerEvent[]; corrupt: string | null } {
+  if (!raw) return { events: [], corrupt: null };
   try {
-    const raw = localStorage.getItem(MEMORY_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as LedgerEvent[];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch { return []; }
+    const parsed = JSON.parse(raw) as unknown;
+    return Array.isArray(parsed) ? { events: parsed as LedgerEvent[], corrupt: null } : { events: [], corrupt: raw };
+  } catch {
+    return { events: [], corrupt: raw };
+  }
+}
+
+function memoryLoad(): { events: LedgerEvent[]; corrupt: string | null } {
+  try {
+    return parseStoredLedger(localStorage.getItem(MEMORY_KEY));
+  } catch {
+    return { events: [], corrupt: null };
+  }
+}
+
+function preserveCorrupt(raw: string) {
+  try {
+    localStorage.setItem(`${CORRUPT_PREFIX}${Date.now()}`, raw);
+    localStorage.removeItem(MEMORY_KEY);
+  } catch { /* leave the unreadable value in place */ }
 }
 
 function memorySave(events: LedgerEvent[]) {
@@ -321,8 +340,8 @@ function openDb(): Promise<IDBDatabase> {
   });
 }
 
-export async function loadEvents(): Promise<LedgerEvent[]> {
-  if (typeof indexedDB === 'undefined') return memoryLoad();
+async function readIndexedEvents(): Promise<LedgerEvent[] | null> {
+  if (typeof indexedDB === 'undefined') return null;
   try {
     const db = await openDb();
     const rows = await new Promise<LedgerEvent[]>((resolve, reject) => {
@@ -330,24 +349,48 @@ export async function loadEvents(): Promise<LedgerEvent[]> {
       request.onsuccess = () => resolve((request.result as LedgerEvent[]) || []);
       request.onerror = () => reject(request.error);
     });
-    return rows.sort(byTime);
+    return rows;
   } catch {
-    return memoryLoad();
+    return null;
   }
 }
 
-export async function saveEvents(events: LedgerEvent[]): Promise<void> {
+export async function loadEvents(): Promise<LedgerEvent[]> {
+  const memory = memoryLoad();
+  if (memory.corrupt) preserveCorrupt(memory.corrupt);
+  const stored = await readIndexedEvents();
+  // IndexedDB is not authoritative by itself. A newer note can sit only in
+  // localStorage when the database write failed. Union by id keeps both.
+  if (!stored) return memory.events;
+  return mergeLedgers(stored, memory.events);
+}
+
+async function persistEvents(events: LedgerEvent[]): Promise<void> {
   memorySave(events);
   if (typeof indexedDB === 'undefined') return;
-  try {
-    const db = await openDb();
-    await new Promise<void>((resolve, reject) => {
-      const tx = db.transaction(STORE, 'readwrite');
-      const store = tx.objectStore(STORE);
-      store.clear();
-      for (const event of events) store.put(event);
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
-    });
-  } catch { /* private mode: memory/localStorage already held it */ }
+  const db = await openDb();
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    const store = tx.objectStore(STORE);
+    store.clear();
+    for (const event of events) store.put(event);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+// Overlapping load-modify-save calls each hold their own snapshot. The write
+// queue merges with whatever is stored now, so the slower save cannot drop
+// the note the faster one already added.
+let writeChain: Promise<unknown> = Promise.resolve();
+
+export function saveEvents(events: LedgerEvent[]): Promise<void> {
+  const run = writeChain.then(async () => {
+    const current = await loadEvents();
+    try {
+      await persistEvents(mergeLedgers(current, events));
+    } catch { /* private mode: localStorage already holds this snapshot */ }
+  });
+  writeChain = run.then(() => undefined, () => undefined);
+  return run;
 }

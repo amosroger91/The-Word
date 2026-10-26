@@ -1,6 +1,7 @@
 // The web reminder uses a service worker. Android uses a local notification
 // at the same time of day, and the same storage record, so a backup of the
 // key still describes the choice.
+import { normalizeClockTime } from '@the-word/core';
 
 const KEY = 'word.dailyReminder';
 const CHANNEL = 'word-daily';
@@ -16,7 +17,7 @@ export function readReminder(): ReminderSettings {
     const raw = localStorage.getItem(KEY);
     if (!raw) return { enabled: false, time: '07:00' };
     const parsed = JSON.parse(raw) as Partial<ReminderSettings>;
-    const time = typeof parsed.time === 'string' && /^\d{2}:\d{2}$/.test(parsed.time) ? parsed.time : '07:00';
+    const time = typeof parsed.time === 'string' ? (normalizeClockTime(parsed.time) ?? '07:00') : '07:00';
     return { enabled: Boolean(parsed.enabled), time };
   } catch {
     return { enabled: false, time: '07:00' };
@@ -59,13 +60,24 @@ async function prepare(Notifications: NotificationsModule) {
 }
 
 export async function applyReminder(settings: ReminderSettings, title: string, body: string): Promise<'ok' | 'blocked' | 'unsupported'> {
-  writeReminder(settings);
+  const time = normalizeClockTime(settings.time);
+  if (!time) return 'unsupported';
+  const next = { ...settings, time };
   const Notifications = await notifications();
-  if (!Notifications) return settings.enabled ? 'unsupported' : 'ok';
+  // Do not store enabled:true until a notification is actually scheduled.
+  // The F-Droid build omits expo-notifications; leaving the flag set kept the
+  // switch on for an alarm that can never fire.
+  if (!Notifications) {
+    writeReminder({ ...next, enabled: false });
+    return next.enabled ? 'unsupported' : 'ok';
+  }
   try {
     await prepare(Notifications);
     await Notifications.cancelScheduledNotificationAsync(NOTIFICATION_ID).catch(() => undefined);
-    if (!settings.enabled) return 'ok';
+    if (!next.enabled) {
+      writeReminder(next);
+      return 'ok';
+    }
     const current = await Notifications.getPermissionsAsync();
     let granted = current.granted;
     if (!granted) {
@@ -73,17 +85,19 @@ export async function applyReminder(settings: ReminderSettings, title: string, b
       granted = asked.granted;
     }
     if (!granted) {
-      writeReminder({ ...settings, enabled: false });
+      writeReminder({ ...next, enabled: false });
       return 'blocked';
     }
-    const [hour, minute] = settings.time.split(':').map((part) => Number(part));
+    const [hour, minute] = time.split(':').map((part) => Number(part));
     await Notifications.scheduleNotificationAsync({
       identifier: NOTIFICATION_ID,
       content: { title, body },
       trigger: { hour, minute, repeats: true, channelId: CHANNEL },
     });
+    writeReminder(next);
     return 'ok';
   } catch {
+    writeReminder({ ...next, enabled: false });
     return 'unsupported';
   }
 }

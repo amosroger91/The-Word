@@ -23,6 +23,20 @@ let status: ModelStatus = IDLE_STATUS;
 const listeners = new Set<Listener>();
 let nextId = 1;
 const pending = new Map<number, { resolve: (text: string) => void; reject: (error: Error) => void }>();
+let loadTimer = 0;
+const LOAD_TIMEOUT_MS = 180000;
+
+function failLoad(error: string) {
+  if (status.phase === 'ready' || status.phase === 'off') return;
+  window.clearTimeout(loadTimer);
+  emit({ phase: 'unavailable', error });
+  for (const [id, waiter] of pending) {
+    waiter.reject(new Error(error));
+    pending.delete(id);
+  }
+  worker?.terminate();
+  worker = null;
+}
 
 function emit(next: Partial<ModelStatus>) {
   status = { ...status, ...next };
@@ -43,6 +57,7 @@ function ensureWorker(): Worker {
   worker.addEventListener('message', (event: MessageEvent) => {
     const message = event.data;
     if (message.type === 'progress') {
+      if (status.phase === 'unavailable' || status.phase === 'off') return;
       emit({
         phase: 'downloading',
         progress: message.progress || (message.total ? message.loaded / message.total : 0),
@@ -50,10 +65,12 @@ function ensureWorker(): Worker {
         total: message.total,
       });
     } else if (message.type === 'ready') {
+      window.clearTimeout(loadTimer);
       saveModelState({ cachedAt: new Date().toISOString() });
       emit({ phase: 'ready', progress: 1 });
     } else if (message.type === 'failed') {
-      emit({ phase: 'unavailable', error: message.error });
+      window.clearTimeout(loadTimer);
+      failLoad(message.error || 'failed');
     } else if (message.type === 'result') {
       pending.get(message.id)?.resolve(message.text);
       pending.delete(message.id);
@@ -62,6 +79,7 @@ function ensureWorker(): Worker {
       pending.delete(message.id);
     }
   });
+  worker.addEventListener('error', () => failLoad('worker'));
   return worker;
 }
 
@@ -82,7 +100,11 @@ export function prepareModel(options: { force?: boolean } = {}) {
       emit({ phase: 'off', error: 'metered' });
       return;
     }
-    const start = () => ensureWorker().postMessage({ type: 'load', base: import.meta.env.BASE_URL });
+    const start = () => {
+      window.clearTimeout(loadTimer);
+      loadTimer = window.setTimeout(() => failLoad('timeout'), LOAD_TIMEOUT_MS);
+      ensureWorker().postMessage({ type: 'load', base: import.meta.env.BASE_URL });
+    };
     if (cached || options.force) { emit({ phase: 'downloading' }); start(); return; }
     const idle = (window as unknown as { requestIdleCallback?: (fn: () => void, o?: { timeout: number }) => void }).requestIdleCallback;
     emit({ phase: 'downloading' });

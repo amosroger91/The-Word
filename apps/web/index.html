@@ -4,6 +4,35 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#f7f4ee" />
+    <script>
+      (function () {
+        try {
+          var chosen = localStorage.getItem('word.themeSet') === '1';
+          var stored = localStorage.getItem('word.theme');
+          var dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          var theme = chosen && (stored === 'light' || stored === 'dark') ? stored : (dark ? 'dark' : 'light');
+          var root = document.documentElement;
+          root.dataset.theme = theme;
+          root.style.colorScheme = theme;
+          var color = theme === 'dark' ? '#191816' : '#f7f4ee';
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) meta.setAttribute('content', color);
+          var langChosen = localStorage.getItem('word.languageSet') === '1';
+          var storedLang = localStorage.getItem('word.language');
+          var supported = { en: 1, es: 1, fr: 1, zh: 1, vi: 1 };
+          var lang = langChosen && supported[storedLang] ? storedLang : '';
+          if (!lang) {
+            var list = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || 'en'];
+            lang = 'en';
+            for (var i = 0; i < list.length; i++) {
+              var primary = String(list[i] || '').toLowerCase().replace(/_/g, '-').split('-')[0];
+              if (supported[primary]) { lang = primary; break; }
+            }
+          }
+          root.lang = lang;
+        } catch (e) {}
+      })();
+    </script>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <!-- Relative so it resolves under a GitHub Pages subpath as well as at the
          root. Installing the app is what lets the browser deliver the daily

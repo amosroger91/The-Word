@@ -56,7 +56,19 @@ function partyStatusText(status: string, label: WordApp['label']) {
 
 function App() {
   const speech = useMemo(() => createWebSpeech(), []);
-  const platform = useMemo(() => ({ storage: webStorage, speech, clipboard: webClipboard }), [speech]);
+  const platform = useMemo(() => ({
+    storage: webStorage,
+    speech,
+    clipboard: webClipboard,
+    locales: navigator.languages?.length ? navigator.languages : [navigator.language || 'en'],
+    colorScheme: () => (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' as const : 'light' as const),
+    watchColorScheme: (listener: (theme: 'light' | 'dark') => void) => {
+      const media = window.matchMedia('(prefers-color-scheme: dark)');
+      const onChange = () => listener(media.matches ? 'dark' : 'light');
+      media.addEventListener('change', onChange);
+      return () => media.removeEventListener('change', onChange);
+    },
+  }), [speech]);
   const app = useWordApp(platform, window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
   const {
     label, language, chapter, chapterLoading, book, bookName, chapterNumber, selectedVerses, selectedText, selectedReference,
@@ -120,22 +132,31 @@ function App() {
   // The optional breakdown formatter fetches itself once the page is quiet.
   // Scripture is already on screen by then and never waits for it.
   useEffect(() => { prepareModel(); }, []);
-  useEffect(() => { document.documentElement.dataset.theme = app.theme; }, [app.theme]);
+  useEffect(() => {
+    document.documentElement.dataset.theme = app.theme;
+    document.documentElement.style.colorScheme = app.theme;
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', app.theme === 'dark' ? '#191816' : '#f7f4ee');
+  }, [app.theme]);
   useEffect(() => { document.documentElement.lang = language; }, [language]);
   useEffect(() => { document.documentElement.style.setProperty('--app-font', app.font.stack); }, [app.font]);
 
+  // goToVerse's identity used to change on every verse, and this effect called
+  // it again. That stopped read-aloud on the next render whenever a verse hash
+  // was open. Follow the hash only; call the latest navigation through the ref.
+  const goToVerseRef = useRef(app.goToVerse);
+  goToVerseRef.current = app.goToVerse;
   useEffect(() => {
     const onHash = () => {
       const next = viewFromHash();
       setView(next);
       const deep = parseVerseHash(window.location.hash);
-      if (deep) { app.goToVerse(deep.bookId, deep.chapter, deep.verse); toolsRef.current.dismiss(); setLibrary(null); setMobileView('reader'); }
+      if (deep) { goToVerseRef.current(deep.bookId, deep.chapter, deep.verse); toolsRef.current.dismiss(); setLibrary(null); setMobileView('reader'); }
     };
     window.addEventListener('hashchange', onHash);
     const deep = parseVerseHash(window.location.hash);
-    if (deep) app.goToVerse(deep.bookId, deep.chapter, deep.verse);
+    if (deep) goToVerseRef.current(deep.bookId, deep.chapter, deep.verse);
     return () => window.removeEventListener('hashchange', onHash);
-  }, [app.goToVerse]);
+  }, []);
 
   const openReader = useCallback(() => {
     if (parseVerseHash(window.location.hash)) { setView('reader'); return; }
@@ -367,11 +388,11 @@ function App() {
   const hostName = party.members.find(m=>m.host)?.name ?? 'the host';
   const participant = party.active && !party.isHost;
   const speechControls = <>
-    {speechState==='idle' && <button className="primary" onClick={()=>selectedVerses.size ? app.speakFromVerse(app.bookId,chapterNumber,currentVerse) : app.listen()} disabled={!chapter}>{selectedVerses.size?label.readFromHere:party.isHost?'Read to group':label.readAloud}</button>}
-    {speechState==='idle' && chapter && <button onClick={()=>{ void recordChapterReadInGroup(app.bookId, chapterNumber, chapter.verses.map((verse)=>verse.ref.verse)); }} disabled={ledger.chapterDone(app.bookId, chapterNumber)}>{ledger.chapterDone(app.bookId, chapterNumber) ? label.chapterMarkedRead : label.markChapterRead}</button>}
+    {speechState==='idle' && <button className="primary" onClick={()=>selectedVerses.size ? app.speakFromVerse(app.bookId,chapterNumber,currentVerse) : app.listen()} disabled={!app.chapterReady}>{selectedVerses.size?label.readFromHere:party.isHost?'Read to group':label.readAloud}</button>}
+    {speechState==='idle' && app.chapterReady && chapter && <button onClick={()=>{ void recordChapterReadInGroup(app.bookId, chapterNumber, chapter.verses.map((verse)=>verse.ref.verse)); }} disabled={ledger.chapterDone(app.bookId, chapterNumber)}>{ledger.chapterDone(app.bookId, chapterNumber) ? label.chapterMarkedRead : label.markChapterRead}</button>}
     {speechState==='speaking' && <button className="primary" onClick={app.pauseSpeech}>{party.isHost?'Pause group reading':label.pause}</button>}
     {speechState==='paused' && <button className="primary" onClick={app.resumeSpeech}>{party.isHost?'Resume group reading':label.resume}</button>}
-    {(speechState==='paused' || (speechState==='idle' && app.resumeAt?.bookId===app.bookId && app.resumeAt.chapter===chapterNumber)) && <button onClick={app.listenFromBeginning} disabled={!chapter}>{label.listenFromBeginning}</button>}
+    {(speechState==='paused' || (speechState==='idle' && app.resumeAt?.bookId===app.bookId && app.resumeAt.chapter===chapterNumber)) && <button onClick={app.listenFromBeginning} disabled={!app.chapterReady}>{label.listenFromBeginning}</button>}
     {speechState!=='idle' && <button onClick={()=>app.stopSpeech({remember:true})}>{label.stop}</button>}
   </>;
   const sound = <div className="sound-settings"><span className="workspace-eyebrow">Only on your device</span><h2>Find your balance.</h2><p role="status">{voiceState==='ready'?'Narration voice is ready on this device.':voiceState==='preparing'?'Preparing your narration voice in the background…':'Voice preparation failed. Check your connection or choose another voice in Settings.'}</p>
@@ -547,12 +568,12 @@ function App() {
             <span role="button" tabIndex={0} className="verse-select" onKeyDown={event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();app.toggleVerse(number);if(party.active&&party.isHost&&party.presenting)party.setFocusVerse(number);}}} aria-label={`Select ${bookName} ${chapterNumber}:${number}`} aria-pressed={selected} onClick={()=>{app.toggleVerse(number);if(party.active&&party.isHost&&party.presenting)party.setFocusVerse(number);}}><sup>{number}</sup><span>{verseRuns(verse.text,verse.redLetters).map((run,i)=><span key={i} className={run.red?'words-of-jesus':undefined}>{run.text}</span>)}</span>{app.bookmarks.has(app.bookmarkKey(number))&&<span className="bookmark" aria-label={label.bookmarks}>◆</span>}{ledger.noteAt(app.bookId,chapterNumber,number)&&<span className="verse-note-mark" aria-label={label.noteFor}>✎</span>}</span>
             <button className="xref-mark" aria-label={`Explore ${bookName} ${chapterNumber}:${number}`} title="Explore this verse" onClick={()=>inspect(number,'references')}>※</button>{speaking&&<span className="sr-only">Currently reading</span>}{shared&&<span className="sr-only">Shared highlight</span>}
           </span>;
-        })}</article>:<div className="empty-state"><h2>{label.chapterMissingTitle}</h2><p>{label.chapterMissingBody}</p></div>}
+        })}</article>:app.chapterError?<div className="empty-state"><h2>{label.chapterLoadFailedTitle}</h2><p>{label.chapterLoadFailedBody}</p><button type="button" onClick={app.reloadChapter}>{label.tryAgain}</button></div>:<div className="empty-state"><h2>{label.chapterMissingTitle}</h2><p>{label.chapterMissingBody}</p></div>}
         <div className="reader-end"><span>Continue in the Word</span><button onClick={()=>navigate(app.bookId,chapterNumber+1)} disabled={!book||chapterNumber===book.chapters}>{label.next} →</button></div>
       </section>
       <ToolDock tools={tools} backLabel={ui.back} onBack={returnToReading} names={{...toolNames,settings:label.settings,study:label.study,progress:label.progress,sound:ui.audio,share:ui.share,group:ui.group,guide:ui.context,references:ui.related,breakdown:ui.explanation,image:ui.image}}>{ {group,share:shareActions,settings:view==='reader'?preferences:null,sound,study:<><div className="study-destinations"><button onClick={()=>openTool('progress')}>← {label.progress}</button></div><StudyHub app={app} study={study} onOpenPassage={(b,c,v)=>navigate(b,c,v)} onReadTogether={()=>{openTool('group');}} onSharedVerse={(b,c,v)=>{void ledger.recordShare('feed',b,c,v);}} onFriendRequest={()=>{if(party.active)logGroupOnce('friendRequest','friendRequest');}}/></>,breakdown:<>{studySections}<Breakdown app={app} target={breakdownRef} onNavigate={(b,c,v)=>{navigate(b,c,v);setBreakdownRef({bookId:b,chapter:c,verse:v});}}/></>,progress:<ProgressPanel onPlans={()=>openTool('study')} label={label} language={language} chapters={ledger.chapters} verses={ledger.verses} streak={ledger.streak} longest={ledger.longestStreak} daysRead={ledger.daysRead} recentDays={ledger.recentDays} events={ledger.events} earned={ledger.earned}/>,references:<>{studySections}<PassageTools passage={passage} app={app} onNavigate={navigate} onRefresh={()=>setPassage(snapshot(app,currentVerse))} follow={followTool} onFollow={setFollowTool}/></>,guide:<>{studySections}<PassageTools guide passage={guidePassage} app={app} onNavigate={navigate} onRefresh={()=>setGuidePassage(snapshot(app,currentVerse))} follow={followGuide} onFollow={setFollowGuide}/></>,image:imageJob?<VerseImageEditor key={imageJob.reference+imageJob.text} embedded job={imageJob} fontStack={app.font.stack} label={label} onClose={returnToReading} onSaved={()=>{void ledger.recordShare('image',app.bookId,chapterNumber,currentVerse,'saved');}} onShared={()=>{void ledger.recordShare('image',app.bookId,chapterNumber,currentVerse,'shared');}}/>:<p>Select a verse to create an image.</p>} }</ToolDock>
     </main>
-    {(notice||speechError||party.mediaError||party.capped)&&<div className="workspace-notice" role="status"><span>{notice||speechError||(party.mediaError==='photo'?'That photo could not be loaded.':party.mediaError==='system-audio-none'?'No audio came through. In the picker, choose a tab or your whole screen and tick "Share audio" — a single window cannot carry sound.':party.mediaError==='system-audio'?'That audio could not be shared.':party.mediaError==='screen-audio'?'Screen is sharing, but without sound. Desktop audio needs Chrome or Edge, and the "Share audio" box ticked in the picker.':party.mediaError==='screen'?'That screen could not be shared.':party.mediaError?'Microphone or camera unavailable. Check your browser permissions.':'This room is above the 8-person voice/video threshold. Chat and passage sharing remain available.')}</span>{notice&&<button onClick={()=>setNotice('')} aria-label="Dismiss message">×</button>}</div>}
+    {(notice||speechError||party.mediaError||party.capped)&&<div className="workspace-notice" role="status"><span>{notice||speechError||(party.mediaError==='photo'?'That photo could not be loaded.':party.mediaError==='system-audio-none'?'No audio came through. In the picker, choose a tab or your whole screen and tick "Share audio" — a single window cannot carry sound.':party.mediaError==='system-audio'?'That audio could not be shared.':party.mediaError==='screen-audio'?'Screen is sharing, but without sound. Desktop audio needs Chrome or Edge, and the "Share audio" box ticked in the picker.':party.mediaError==='screen'?'That screen could not be shared.':party.mediaError==='mesh-capped'?'Voice and video cannot reconnect until the room is back to 8 people. The microphone is off.':party.mediaError?'Microphone or camera unavailable. Check your browser permissions.':'This room is above the 8-person voice/video threshold. Chat and passage sharing remain available.')}</span>{notice&&<button onClick={()=>setNotice('')} aria-label="Dismiss message">×</button>}</div>}
     {noteVerse!==null&&<VerseNote
       reference={`${bookName} ${chapterNumber}:${noteVerse}`}
       existing={ledger.noteAt(app.bookId,chapterNumber,noteVerse)}

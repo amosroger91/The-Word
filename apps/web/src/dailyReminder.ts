@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { dayKey } from '@the-word/core';
+import { dayKey, normalizeClockTime } from '@the-word/core';
 
 // A daily nudge to open Scripture, delivered as a browser notification even when
 // the page is closed. There is no server and no account, so the reminder is
@@ -62,7 +62,7 @@ function readSettings(): ReminderSettings {
     const data = JSON.parse(raw) as Partial<ReminderSettings>;
     return {
       enabled: data.enabled === true,
-      time: typeof data.time === 'string' && /^\d{1,2}:\d{2}$/.test(data.time) ? data.time : defaultReminderTime,
+      time: typeof data.time === 'string' ? (normalizeClockTime(data.time) ?? defaultReminderTime) : defaultReminderTime,
     };
   } catch {
     return fallback;
@@ -107,14 +107,22 @@ function reminderWorker() {
 }
 
 function waitForActive(registration: ServiceWorkerRegistration) {
-  if (registration.active) return registration;
+  if (registration.active?.state === 'activated') return Promise.resolve(registration);
   const worker = registration.waiting ?? registration.installing;
-  if (!worker) return registration;
-  return new Promise<ServiceWorkerRegistration>((resolve) => {
+  if (!worker) return Promise.resolve(registration);
+  if (worker.state === 'activated') return Promise.resolve(registration);
+  if (worker.state === 'redundant') return Promise.reject(new Error('reminder-worker-redundant'));
+  return new Promise<ServiceWorkerRegistration>((resolve, reject) => {
     const onState = () => {
-      if (worker.state !== 'activated') return;
-      worker.removeEventListener('statechange', onState);
-      resolve(registration);
+      if (worker.state === 'activated') {
+        worker.removeEventListener('statechange', onState);
+        resolve(registration);
+        return;
+      }
+      if (worker.state === 'redundant') {
+        worker.removeEventListener('statechange', onState);
+        reject(new Error('reminder-worker-redundant'));
+      }
     };
     worker.addEventListener('statechange', onState);
   });
@@ -257,7 +265,8 @@ export function useDailyReminder(text: ReminderText): DailyReminder {
   useEffect(() => {
     if (!supported) return;
     void arm({ enabled, time }, { title, body }).catch(() => {
-      // A blocked worker registration only costs the background paths.
+      // A worker that never activates used to leave the checkbox on forever.
+      setSettings((current) => (current.enabled ? { ...current, enabled: false } : current));
     });
   }, [supported, enabled, time, title, body, permission]);
 
@@ -303,8 +312,9 @@ export function useDailyReminder(text: ReminderText): DailyReminder {
   }, [supported]);
 
   const setTime = useCallback((next: string) => {
-    if (!/^\d{1,2}:\d{2}$/.test(next)) return;
-    setSettings((current) => ({ ...current, time: next }));
+    const time = normalizeClockTime(next);
+    if (!time) return;
+    setSettings((current) => ({ ...current, time }));
   }, []);
 
   const sendTest = useCallback(() => {

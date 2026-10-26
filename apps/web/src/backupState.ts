@@ -43,11 +43,39 @@ export function plainBackup(): { nsec: string; filename: string } {
   };
 }
 
-export function downloadText(filename: string, body: string) {
+type SavePickerWindow = Window & {
+  showSaveFilePicker?: (options: { suggestedName: string; types: Array<{ description: string; accept: Record<string, string[]> }> }) => Promise<{
+    createWritable: () => Promise<{ write: (data: string) => Promise<void>; close: () => Promise<void> }>;
+  }>;
+};
+
+// True only when the reader actually chose a file. A detached download link
+// cannot tell us that, and marking the backup done anyway hid the nag for a
+// key that never left the browser.
+export async function downloadText(filename: string, body: string): Promise<boolean> {
+  const picker = (window as SavePickerWindow).showSaveFilePicker;
+  if (picker) {
+    try {
+      const handle = await picker({
+        suggestedName: filename,
+        types: [{ description: 'Text', accept: { 'text/plain': ['.txt'] } }],
+      });
+      const writable = await handle.createWritable();
+      await writable.write(`${body}\n`);
+      await writable.close();
+      return true;
+    } catch (error) {
+      if ((error as { name?: string }).name === 'AbortError') return false;
+      throw error;
+    }
+  }
   const blob = new Blob([body + '\n'], { type: 'text/plain' });
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
   link.download = filename;
+  document.body.appendChild(link);
   link.click();
+  link.remove();
   setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+  return false;
 }

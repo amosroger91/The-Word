@@ -19,20 +19,30 @@ export function BackupPrompt({
 
   function withPassphrase() {
     if (password.length < MIN_BACKUP_PASSWORD) { setError(label.passwordTooShort); return; }
-    try {
-      downloadText('the-word-backup.txt', exportBackup(password));
-      markBackedUp();
-      onDone();
-    } catch {
-      setError(label.restoreFail);
-    }
+    void (async () => {
+      try {
+        const saved = await downloadText('the-word-backup.txt', exportBackup(password));
+        if (!saved) { setError(label.backupUnconfirmed); return; }
+        markBackedUp();
+        onDone();
+      } catch {
+        setError(label.restoreFail);
+      }
+    })();
   }
 
   function withoutPassphrase() {
     const { nsec, filename } = plainBackup();
-    downloadText(filename, nsec);
-    markBackedUp();
-    onDone();
+    void (async () => {
+      try {
+        const saved = await downloadText(filename, nsec);
+        if (!saved) { setError(label.backupUnconfirmed); return; }
+        markBackedUp();
+        onDone();
+      } catch {
+        setError(label.restoreFail);
+      }
+    })();
   }
 
   return (

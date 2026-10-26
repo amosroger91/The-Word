@@ -1,4 +1,11 @@
-import type { Theme } from './useWordApp';
+export type Theme = 'light' | 'dark';
+
+// A stored theme is a choice only after the reader toggles it. Older builds
+// wrote the system snapshot on launch, so that value is not a preference.
+export function explicitTheme(stored: string | null, chosen: boolean): Theme | null {
+  if (chosen && (stored === 'light' || stored === 'dark')) return stored;
+  return null;
+}
 
 // Shared palette: the web stylesheet and the native StyleSheets are both built from these values.
 export const palettes = {

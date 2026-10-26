@@ -82,6 +82,8 @@ export interface Strings {
   loading: string;
   chapterMissingTitle: string;
   chapterMissingBody: string;
+  chapterLoadFailedTitle: string;
+  chapterLoadFailedBody: string;
   searchTitle: string;
   searchPlaceholder: string;
   allWords: string;
@@ -221,6 +223,7 @@ export interface Strings {
   backupPlainHint: string;
   backupDownload: string;
   backupDone: string;
+  backupUnconfirmed: string;
   readers: string;
   readersHint: string;
   readerName: string;
@@ -327,6 +330,23 @@ function verseList(verses: number[]) {
 
 export const languages: Language[] = ['en', 'es', 'fr', 'zh', 'vi'];
 
+const languageSet = new Set<string>(languages);
+
+// First supported tag wins. An unsupported tag is skipped so "de, fr" is French.
+export function languageFromLocales(locales?: readonly string[] | null): Language {
+  for (const tag of locales ?? []) {
+    const primary = tag.trim().toLowerCase().replace(/_/g, '-').split('-')[0];
+    if (languageSet.has(primary)) return primary as Language;
+  }
+  return 'en';
+}
+
+// Stored language counts only after the reader picks one. Otherwise follow the system.
+export function preferredLanguage(stored: string | null, chosen: boolean, locales?: readonly string[] | null): Language {
+  if (chosen && languageSet.has(stored ?? '')) return stored as Language;
+  return languageFromLocales(locales);
+}
+
 export const strings: Record<Language, Strings> = {
   en: {
     languageName: 'English',
@@ -402,6 +422,8 @@ export const strings: Record<Language, Strings> = {
     loading: 'Loading translation…',
     chapterMissingTitle: 'This chapter is not installed yet',
     chapterMissingBody: 'This chapter is not available in the selected translation asset.',
+    chapterLoadFailedTitle: 'This chapter did not load',
+    chapterLoadFailedBody: 'The translation could not be downloaded. Check the connection and try again.',
     searchTitle: 'Search',
     searchPlaceholder: 'Search words or an exact phrase…',
     allWords: 'All words',
@@ -541,6 +563,7 @@ export const strings: Record<Language, Strings> = {
     backupPlainHint: 'A file without a password is your account: anyone who opens it is you. Keep it in a password manager. Forgetting a password loses the backup just as surely as losing the key.',
     backupDownload: 'Download backup',
     backupDone: 'Saved. Keep the file somewhere you will still have it next year.',
+    backupUnconfirmed: 'The share sheet closed. This account is backed up only if you kept the file. Copy it if you are not sure.',
     readers: 'Who is reading',
     readersHint: 'Everyone on this device earns their own badges and progress. One account, one backup.',
     readerName: 'Name',
@@ -714,6 +737,8 @@ export const strings: Record<Language, Strings> = {
     loading: 'Cargando la traducción…',
     chapterMissingTitle: 'Este capítulo aún no está instalado',
     chapterMissingBody: 'Este capítulo no está disponible en la traducción seleccionada.',
+    chapterLoadFailedTitle: 'No se pudo cargar este capítulo',
+    chapterLoadFailedBody: 'No se pudo descargar la traducción. Revisa la conexión e inténtalo de nuevo.',
     searchTitle: 'Buscar',
     searchPlaceholder: 'Busca palabras o una frase exacta…',
     allWords: 'Todas las palabras',
@@ -853,6 +878,7 @@ export const strings: Record<Language, Strings> = {
     backupPlainHint: 'Un archivo sin contraseña es tu cuenta: quien lo abra eres tú. Guárdalo en un gestor de contraseñas. Olvidar una contraseña pierde la copia igual que perder la clave.',
     backupDownload: 'Descargar la copia',
     backupDone: 'Guardada. Deja el archivo donde sigas teniéndolo el año que viene.',
+    backupUnconfirmed: 'La hoja para compartir se cerró. La cuenta queda respaldada solo si guardaste el archivo. Cópialo si no estás seguro.',
     readers: 'Quién está leyendo',
     readersHint: 'Cada persona de este dispositivo gana sus propias insignias y su progreso. Una cuenta, una copia de seguridad.',
     readerName: 'Nombre',
@@ -1026,6 +1052,8 @@ export const strings: Record<Language, Strings> = {
     loading: 'Chargement de la traduction…',
     chapterMissingTitle: "Ce chapitre n'est pas encore installé",
     chapterMissingBody: "Ce chapitre n'est pas disponible dans la traduction sélectionnée.",
+    chapterLoadFailedTitle: "Ce chapitre n'a pas pu être chargé",
+    chapterLoadFailedBody: "La traduction n'a pas pu être téléchargée. Vérifiez la connexion et réessayez.",
     searchTitle: 'Rechercher',
     searchPlaceholder: 'Cherchez des mots ou une expression exacte…',
     allWords: 'Tous les mots',
@@ -1165,6 +1193,7 @@ export const strings: Record<Language, Strings> = {
     backupPlainHint: 'Un fichier sans mot de passe est votre compte : quiconque l’ouvre est vous. Gardez-le dans un gestionnaire de mots de passe. Oublier un mot de passe perd la sauvegarde aussi sûrement que perdre la clé.',
     backupDownload: 'Télécharger la sauvegarde',
     backupDone: 'Enregistrée. Gardez le fichier là où vous l’aurez encore l’an prochain.',
+    backupUnconfirmed: 'La feuille de partage s’est fermée. Le compte n’est sauvegardé que si vous avez gardé le fichier. Copiez-le si vous n’êtes pas sûr.',
     readers: 'Qui lit',
     readersHint: 'Chaque personne de cet appareil gagne ses propres badges et sa progression. Un compte, une sauvegarde.',
     readerName: 'Nom',
@@ -1338,6 +1367,8 @@ export const strings: Record<Language, Strings> = {
     loading: '正在加载译本…',
     chapterMissingTitle: '本章尚未安装',
     chapterMissingBody: '所选译本中没有本章内容。',
+    chapterLoadFailedTitle: '本章未能加载',
+    chapterLoadFailedBody: '译本下载失败。请检查网络后重试。',
     searchTitle: '搜索',
     searchPlaceholder: '搜索词语或完整短语…',
     allWords: '所有词语',
@@ -1477,6 +1508,7 @@ export const strings: Record<Language, Strings> = {
     backupPlainHint: '没有密码的文件就是你的账户：打开它的人就是你。请放进密码管理器。忘记密码和丢失密钥一样，备份同样没了。',
     backupDownload: '下载备份',
     backupDone: '已保存。把文件放在明年还找得到的地方。',
+    backupUnconfirmed: '分享面板已关闭。只有留下了文件，账户才算已备份。如果不确定，请再复制一份。',
     readers: '谁在读',
     readersHint: '此设备上的每个人都有自己的徽章和进度。一个账户，一份备份。',
     readerName: '名字',
@@ -1650,6 +1682,8 @@ export const strings: Record<Language, Strings> = {
     loading: 'Đang tải bản dịch…',
     chapterMissingTitle: 'Đoạn này chưa được cài đặt',
     chapterMissingBody: 'Đoạn này không có trong bản dịch đã chọn.',
+    chapterLoadFailedTitle: 'Không tải được đoạn này',
+    chapterLoadFailedBody: 'Không tải được bản dịch. Hãy kiểm tra kết nối và thử lại.',
     searchTitle: 'Tìm kiếm',
     searchPlaceholder: 'Tìm từ hoặc cụm từ chính xác…',
     allWords: 'Mọi từ',
@@ -1789,6 +1823,7 @@ export const strings: Record<Language, Strings> = {
     backupPlainHint: 'Tệp không mật khẩu chính là tài khoản của bạn: ai mở nó là bạn. Hãy giữ trong trình quản lý mật khẩu. Quên mật khẩu thì mất bản sao lưu y như mất khoá.',
     backupDownload: 'Tải bản sao lưu',
     backupDone: 'Đã lưu. Hãy giữ tệp ở nơi sang năm bạn vẫn còn.',
+    backupUnconfirmed: 'Bảng chia sẻ đã đóng. Tài khoản chỉ được sao lưu nếu bạn đã giữ tệp. Hãy sao chép nếu bạn chưa chắc.',
     readers: 'Ai đang đọc',
     readersHint: 'Mỗi người trên thiết bị này có huy hiệu và tiến độ riêng. Một tài khoản, một bản sao lưu.',
     readerName: 'Tên',
